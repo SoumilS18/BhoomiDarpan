@@ -1,0 +1,134 @@
+bun test v1.3.14 (0d9b296a)
+
+tests\authAuthorization.test.ts:
+(pass) Day 5 Authentication & Authorization Verification > authenticates request using valid mock JWT in test environment [0.62ms]
+(pass) Day 5 Authentication & Authorization Verification > rejects unauthenticated request with 401 when no token or persona supplied [1.05ms]
+(pass) Day 5 Authentication & Authorization Verification > rejects invalid or expired token with 401 [509.60ms]
+(pass) Day 5 Authentication & Authorization Verification > successfully authenticates with evaluation persona headers [0.40ms]
+(pass) Day 5 Authentication & Authorization Verification > rejects unsupported or fraudulent evaluation role [0.43ms]
+(pass) Day 5 Authentication & Authorization Verification > requireRole allows users with permitted role [0.27ms]
+(pass) Day 5 Authentication & Authorization Verification > requireRole blocks unauthorized role with 403 Forbidden [0.09ms]
+(pass) Day 5 Authentication & Authorization Verification > admin role bypasses role restrictions safely [0.10ms]
+
+tests\bhuvanIntegration.test.ts:
+(pass) Bhuvan / ISRO Geospatial Integration Verification Suite > 1. Active Catalogue Verification Metadata > verifies every active catalogue entry possesses complete live verification metadata [0.77ms]
+(pass) Bhuvan / ISRO Geospatial Integration Verification Suite > 1. Active Catalogue Verification Metadata > uses verified public NRSC endpoints without API keys [0.08ms]
+(pass) Bhuvan / ISRO Geospatial Integration Verification Suite > 2. Disabled & Unavailable Layers Protection > never returns disabled or unverified layers from resolveBhuvanLayers [1.93ms]
+(pass) Bhuvan / ISRO Geospatial Integration Verification Suite > 2. Disabled & Unavailable Layers Protection > strictly preserves disabled legacy placeholders with unavailable verification status in catalogue [0.46ms]
+(pass) Bhuvan / ISRO Geospatial Integration Verification Suite > 3. All-India Geography Resolution (28 States & 8 UTs) > normalizes freeform state names, aliases, and ISO codes cleanly [0.93ms]
+(pass) Bhuvan / ISRO Geospatial Integration Verification Suite > 3. All-India Geography Resolution (28 States & 8 UTs) > resolves verified LULC layers for all 28 Indian States [1.41ms]
+(pass) Bhuvan / ISRO Geospatial Integration Verification Suite > 3. All-India Geography Resolution (28 States & 8 UTs) > resolves verified LULC layers for 7 UTs and honestly reports Ladakh as unavailable [0.42ms]
+(pass) Bhuvan / ISRO Geospatial Integration Verification Suite > 4. Multi-State Corridor Resolution > resolves verified layers for multiple covered jurisdictions without fabricating cross-border continuity [0.12ms]
+(pass) Bhuvan / ISRO Geospatial Integration Verification Suite > 4. Multi-State Corridor Resolution > returns both verified state layers and honest unavailable report when a multi-state corridor includes an uncovered jurisdiction [0.08ms]
+(pass) Bhuvan / ISRO Geospatial Integration Verification Suite > 5. National & Regional Layer Resolution > resolves verified regional Ganga basin land cover layer and interstate boundary line [0.17ms]
+(pass) Bhuvan / ISRO Geospatial Integration Verification Suite > 6. Disaster Workspace Capability-Specific Resolution > resolves verified landslide susceptibility layers for mountainous states [0.31ms]
+(pass) Bhuvan / ISRO Geospatial Integration Verification Suite > 6. Disaster Workspace Capability-Specific Resolution > honestly reports disaster layers as unavailable for non-mountainous / plains states [0.17ms]
+(pass) Bhuvan / ISRO Geospatial Integration Verification Suite > 7. LULC Capability-Specific Resolution > resolves LULC 50k layers specifically when workspace is lulc [0.07ms]
+(pass) Bhuvan / ISRO Geospatial Integration Verification Suite > 8. Capability-Specific Workspace Health Checking > reports workspace breakdown for LULC and Disaster and handles partial workspace degradation [1.05ms]
+(pass) Bhuvan / ISRO Geospatial Integration Verification Suite > 8. Capability-Specific Workspace Health Checking > reports unavailable when both workspaces fail [0.27ms]
+(pass) Bhuvan / ISRO Geospatial Integration Verification Suite > 8. Capability-Specific Workspace Health Checking > caches capabilities in memory to prevent repeated external network requests [1.08ms]
+(pass) Bhuvan / ISRO Geospatial Integration Verification Suite > 9. Strict Intelligence Boundary Invariance > proves Bhuvan WMS presence produces zero change to numerical risk, bottlenecks, and SLA [3.93ms]
+
+tests\day1Integrations.test.ts:
+(pass) Day 1 Foundation: Real Data & Integration Layer Verification > 1. accurately detects whether Supabase is configured [0.03ms]
+(pass) Day 1 Foundation: Real Data & Integration Layer Verification > 2. detects and rejects placeholder credentials in environment [0.03ms]
+(pass) Day 1 Foundation: Real Data & Integration Layer Verification > 3. reports honest error and refuses to masquerade offline state as remote persistence [1129.24ms]
+(pass) Day 1 Foundation: Real Data & Integration Layer Verification > 4. strictly requires valid credentials and parses evaluation personas in dev mode [0.55ms]
+(pass) Day 1 Foundation: Real Data & Integration Layer Verification > 5. validates storage path naming and content types for documents [0.20ms]
+(pass) Day 1 Foundation: Real Data & Integration Layer Verification > 6. validates structured document extraction output against strict Zod schema [4.40ms]
+(pass) Day 1 Foundation: Real Data & Integration Layer Verification > 7. safely handles missing API keys without throwing uncaught exceptions [1.76ms]
+(pass) Day 1 Foundation: Real Data & Integration Layer Verification > 8. strictly isolates missing information and never fabricates legal data [0.50ms]
+[Realtime] Tearing down empty channel case:test-case-id-123
+(pass) Day 1 Foundation: Real Data & Integration Layer Verification > 9. correctly manages subscription lifecycle and executes cleanup on unsubscribe [6.49ms]
+(pass) Day 1 Foundation: Real Data & Integration Layer Verification > 10. normalizes raw Nominatim geocode responses into standard schema [0.18ms]
+(pass) Day 1 Foundation: Real Data & Integration Layer Verification > 11. strictly throws on out-of-bounds coordinates without fabricating coordinates [0.65ms]
+(pass) Day 1 Foundation: Real Data & Integration Layer Verification > 12. dynamically stores and retrieves administrative hierarchy without hardcoded lists [0.45ms]
+(pass) Day 1 Foundation: Real Data & Integration Layer Verification > 13. processes structured imports, records validation errors, and returns honest summary [1036.62ms]
+(pass) Day 1 Foundation: Real Data & Integration Layer Verification > 14. tracks data provenance with statutory classification and officer verification [921.16ms]
+(pass) Day 1 Foundation: Real Data & Integration Layer Verification > 15. strictly separates configured from operational in telemetry diagnostics [562.00ms]
+(pass) Day 1 Foundation: Real Data & Integration Layer Verification > 16. strictly never exposes API keys or secrets in telemetry or data source outputs [1971.73ms]
+(pass) Day 1 Foundation: Real Data & Integration Layer Verification > 17. preserves existing system policy and workflow calculation functionality [616.53ms]
+
+tests\day2ExternalData.test.ts:
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 1. registers open_meteo as a first-class meteorological data source in registry [1150.39ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 2. evaluates live operational status truthfully across configured, operational, and disabled states [622.31ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 3. normalizes real provider response into standard atmospheric schema using genuine coordinates [1108.31ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 4. handles provider timeouts safely without hanging or crashing [0.39ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 5. handles provider HTTP errors gracefully without exposing internal stack traces [1218.76ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 6. honestly reports not_configured for unconfigured providers without fabricating responses [622.79ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 7. safely handles invalid or unmapped WMO weather codes [0.21ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 8. calculates fresh observation state for readings observed within SLA window [0.31ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 9. accurately flags observations between 2 hours and 24 hours as stale [0.14ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 10. flags observations older than 24 hours as expired [0.18ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 11. creates statutory provenance trail classified as EXTERNALLY_SOURCED [717.18ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 12. calculates explainable 0-100 data quality score with dimensional audit trail [0.81ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 13. detects coordinate mismatches exceeding statutory threshold across multiple sources [310.84ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 14. strictly reports "Insufficient sources for cross-source comparison" when only 1 source exists [1.00ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 15. associates external observations dynamically by GIS coordinates without hardcoding [1122.33ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 16. traces external intelligence input: inflates risk only for severe fresh weather; contextual otherwise [3.25ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 17. correctly manages source sync realtime subscription lifecycle with cleanup [2.60ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 18. deduplicates concurrent in-flight sync requests for the same source [2549.93ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 19. strictly never leaks server secrets in external observations, metadata, or registry [1842.53ms]
+(pass) Day 2 Live Data, Multi-Source Intelligence & Data Freshness > 20. strictly falls back to cached observation marked STALE or DATA_UNAVAILABLE when remote fails, never fakes data [706.62ms]
+
+tests\day3HardeningVerification.test.ts:
+(pass) BhoomiSetu Day 3 Final Hardening & Verification Pass > 1. Predictive Delay Arithmetic & Evidence Traceability > manually traces completed milestones velocity calculation with exact arithmetic [1.55ms]
+(pass) BhoomiSetu Day 3 Final Hardening & Verification Pass > 1. Predictive Delay Arithmetic & Evidence Traceability > honestly reports statutory baseline and limitations when 0 milestones completed [0.68ms]
+(pass) BhoomiSetu Day 3 Final Hardening & Verification Pass > 1. Predictive Delay Arithmetic & Evidence Traceability > does not double-count active stage overdue in expected additional delay [0.33ms]
+(pass) BhoomiSetu Day 3 Final Hardening & Verification Pass > 2. Runtime System Policy Dynamic Usage > modifies predictive delay calculations immediately when policy is updated at runtime [711.19ms]
+(pass) BhoomiSetu Day 3 Final Hardening & Verification Pass > 2. Runtime System Policy Dynamic Usage > modifies recommendation urgency thresholds dynamically when policy is updated [616.57ms]
+(pass) BhoomiSetu Day 3 Final Hardening & Verification Pass > 3. Downstream Schedule DAG Impact: 5 Canonical Cases > Case A: evaluates stage with zero dependencies without artificial propagation [0.28ms]
+(pass) BhoomiSetu Day 3 Final Hardening & Verification Pass > 3. Downstream Schedule DAG Impact: 5 Canonical Cases > Case B: propagates delay directly from Stage 1 to single dependent Stage 2 [0.37ms]
+(pass) BhoomiSetu Day 3 Final Hardening & Verification Pass > 3. Downstream Schedule DAG Impact: 5 Canonical Cases > Case C: propagates delay along multi-level chain without double-counting net project slip [0.42ms]
+(pass) BhoomiSetu Day 3 Final Hardening & Verification Pass > 3. Downstream Schedule DAG Impact: 5 Canonical Cases > Case D: correctly identifies non-critical parallel stage with positive schedule slack [0.37ms]
+(pass) BhoomiSetu Day 3 Final Hardening & Verification Pass > 3. Downstream Schedule DAG Impact: 5 Canonical Cases > Case E: flags stage on the critical path with 0 slack and critical path status [0.29ms]
+(pass) BhoomiSetu Day 3 Final Hardening & Verification Pass > 4. Root Cause Attribution & Evidence Transparency > returns "insufficient_evidence" when case is delayed but no milestone logs exist [2.41ms]
+(pass) BhoomiSetu Day 3 Final Hardening & Verification Pass > 4. Root Cause Attribution & Evidence Transparency > identifies external contextual factor when severe fresh weather telemetry is present [2511.19ms]
+(pass) BhoomiSetu Day 3 Final Hardening & Verification Pass > 5. What-If Scenario Simulation Non-Destructive Isolation > runs simulation repeatedly without mutating original case or stage dates [5.15ms]
+
+tests\day3PredictiveIntelligence.test.ts:
+(pass) Day 3: Predictive Decision Intelligence & Explainability Engine > 1. Policy-Driven Configuration & Defaults > retrieves predictive delay and recommendation policies via policyEngine [0.05ms]
+(pass) Day 3: Predictive Decision Intelligence & Explainability Engine > 2. Empirical Predictive Delay Forecasting > computes empirical velocity from completed milestones and projects completion [0.61ms]
+(pass) Day 3: Predictive Decision Intelligence & Explainability Engine > 2. Empirical Predictive Delay Forecasting > honestly reports limitations and defaults to statutory baseline when 0 milestones are completed [0.20ms]
+(pass) Day 3: Predictive Decision Intelligence & Explainability Engine > 2. Empirical Predictive Delay Forecasting > excludes stale external meteorological observations from delay projection per policy [0.45ms]
+[RootCauseAnalyzer] Gemini synthesis failed or timed out, returning deterministic causes: warn: [GoogleGenerativeAI Error]: Error fetching from https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent: [429 Too Many Requests] You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. 
+* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.6-flash
+Please retry in 50.023034325s. [{"@type":"type.googleapis.com/google.rpc.Help","links":[{"description":"Learn more about Gemini API quotas","url":"https://ai.google.dev/gemini-api/docs/rate-limits"}]},{"@type":"type.googleapis.com/google.rpc.QuotaFailure","violations":[{"quotaMetric":"generativelanguage.googleapis.com/generate_content_free_tier_requests","quotaId":"GenerateRequestsPerDayPerProjectPerModel-FreeTier","quotaDimensions":{"location":"global","model":"gemini-3.6-flash"},"quotaValue":"20"}]},{"@type":"type.googleapis.com/google.rpc.RetryInfo","retryDelay":"50s"}]
+     status: 429,
+ statusText: "Too Many Requests",
+ errorDetails: [
+  [Object ...], [Object ...], [Object ...]
+],
+
+      at handleResponseNotOk (C:\Users\soumi\OneDrive\Desktop\Soumil\College\hackathons\SIH\BhoomiSetu\BhoomiSetu\node_modules\@google\generative-ai\dist\index.mjs:432:11)
+      at async makeRequest (C:\Users\soumi\OneDrive\Desktop\Soumil\College\hackathons\SIH\BhoomiSetu\BhoomiSetu\node_modules\@google\generative-ai\dist\index.mjs:401:15)
+
+(pass) Day 3: Predictive Decision Intelligence & Explainability Engine > 3. Root Cause Attribution with 5-Level Classification > distinguishes immediate cause, upstream cause, and contributing factors across DAG [335.51ms]
+(pass) Day 3: Predictive Decision Intelligence & Explainability Engine > 3. Root Cause Attribution with 5-Level Classification > returns "insufficient_evidence" when case is delayed but no milestone evidence is logged [0.42ms]
+(pass) Day 3: Predictive Decision Intelligence & Explainability Engine > 4. Downstream Schedule DAG Impact & Critical Path Analysis > distinguishes direct delay from propagated delay and computes schedule slack [0.81ms]
+(pass) Day 3: Predictive Decision Intelligence & Explainability Engine > 5. Advisory Recommendations & Human Governance > generates prioritized recommendations with valid UUIDs, policies, and expected benefits [2.14ms]
+(pass) Day 3: Predictive Decision Intelligence & Explainability Engine > 6. What-If Scenario Simulation Sandbox (In-Memory Isolation) > supports 6 intervention types and computes timeline recovery without mutating production records [1.22ms]
+(pass) Day 3: Predictive Decision Intelligence & Explainability Engine > 7. Explainable Risk Assessment & Excluded Evidence > documents applied policy keys and logs excluded stale weather with 0 penalty [0.93ms]
+
+tests\day4Acceptance.test.ts:
+(pass) Day 4 Final Acceptance Verification Suite > 1. Adversarial Authorization & Scope Enforcement > rejects unauthenticated request to /api/portfolio/overview with HTTP 401 [7.08ms]
+(pass) Day 4 Final Acceptance Verification Suite > 1. Adversarial Authorization & Scope Enforcement > rejects unauthenticated request to all other portfolio endpoints with HTTP 401 [11.95ms]
+(pass) Day 4 Final Acceptance Verification Suite > 1. Adversarial Authorization & Scope Enforcement > authorizes admin request with full unrestricted scope [348.83ms]
+(pass) Day 4 Final Acceptance Verification Suite > 1. Adversarial Authorization & Scope Enforcement > authorizes LAO request with full unrestricted scope [301.42ms]
+(pass) Day 4 Final Acceptance Verification Suite > 1. Adversarial Authorization & Scope Enforcement > strictly confines Project Officer to their assigned project scope [1.13ms]
+(pass) Day 4 Final Acceptance Verification Suite > 1. Adversarial Authorization & Scope Enforcement > strictly confines Revenue Inspector to their assigned jurisdiction [0.31ms]
+(pass) Day 4 Final Acceptance Verification Suite > 1. Adversarial Authorization & Scope Enforcement > confines viewer to assigned scope and blocks wider data access [0.08ms]
+(pass) Day 4 Final Acceptance Verification Suite > 1. Adversarial Authorization & Scope Enforcement > blocks scope bypass on live server via malicious query parameter tampering [321.37ms]
+(pass) Day 4 Final Acceptance Verification Suite > 1. Adversarial Authorization & Scope Enforcement > blocks scope bypass on live server via geographic parameter tampering [316.57ms]
+(pass) Day 4 Final Acceptance Verification Suite > 2. Real API -> Route -> DB -> Analyzer -> Response Verification > verifies GET /api/portfolio/overview returns validated live response [311.10ms]
+(pass) Day 4 Final Acceptance Verification Suite > 2. Real API -> Route -> DB -> Analyzer -> Response Verification > verifies GET /api/portfolio/delays returns validated live response [383.97ms]
+(pass) Day 4 Final Acceptance Verification Suite > 2. Real API -> Route -> DB -> Analyzer -> Response Verification > verifies GET /api/portfolio/risk returns validated live response [310.99ms]
+(pass) Day 4 Final Acceptance Verification Suite > 2. Real API -> Route -> DB -> Analyzer -> Response Verification > verifies GET /api/portfolio/bottlenecks returns validated live response [303.81ms]
+(pass) Day 4 Final Acceptance Verification Suite > 2. Real API -> Route -> DB -> Analyzer -> Response Verification > verifies GET /api/portfolio/trends returns validated live response [308.46ms]
+(pass) Day 4 Final Acceptance Verification Suite > 2. Real API -> Route -> DB -> Analyzer -> Response Verification > verifies GET /api/portfolio/geography returns validated live response [306.47ms]
+(pass) Day 4 Final Acceptance Verification Suite > 2. Real API -> Route -> DB -> Analyzer -> Response Verification > verifies GET /api/portfolio/outcomes returns validated live response [307.10ms]
+(pass) Day 4 Final Acceptance Verification Suite > 2. Real API -> Route -> DB -> Analyzer -> Response Verification > verifies GET /api/portfolio/attention-queue returns validated live response [297.88ms]
+(pass) Day 4 Final Acceptance Verification Suite > 2. Real API -> Route -> DB -> Analyzer -> Response Verification > verifies legacy /api/analytics/portfolio alias works identically [310.75ms]
+(pass) Day 4 Final Acceptance Verification Suite > 2. Real API -> Route -> DB -> Analyzer -> Response Verification > verifies legacy /api/analytics/dashboard alias works identically [415.65ms]
+(pass) Day 4 Final Acceptance Verification Suite > 3. Sparse-Data Honesty & Sample Size Limitations > returns honest empty state for 0 cases with zero fabricated numbers [3.31ms]
+(pass) Day 4 Final Acceptance Verification Suite > 3. Sparse-Data Honesty & Sample Size Limitations > flags sample size limitations when cases are 1 or 2 (prevents unjustified national claims) [5.95ms]

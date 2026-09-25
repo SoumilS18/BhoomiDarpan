@@ -1,0 +1,305 @@
+import React, { useState, useEffect } from 'react';
+import {
+  LayoutDashboard,
+  FileText,
+  Building2,
+  MapPin,
+  Sparkles,
+  BarChart3,
+  Bell,
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+  ShieldCheck,
+  UserCheck,
+} from 'lucide-react';
+import { clsx } from 'clsx';
+import { useAuth } from '../../context/AuthContext';
+import { UserRole } from '../../../shared/types';
+import { fetchNotificationCounts } from '../../lib/api';
+
+export type ActiveTab =
+  | 'dashboard'
+  | 'cases'
+  | 'projects'
+  | 'gis'
+  | 'intelligence'
+  | 'analytics'
+  | 'notifications'
+  | 'admin';
+
+interface SidebarProps {
+  activeTab: ActiveTab;
+  onSelectTab: (tab: ActiveTab) => void;
+  caseCount?: number;
+}
+
+interface NavDestination {
+  id: ActiveTab;
+  label: string;
+  hindiLabel?: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: string | number | null;
+  badgeVariant?: 'red' | 'navy' | 'slate' | 'amber';
+  description: string;
+}
+
+const ROLE_AUTHORIZED_DESTINATIONS: Record<UserRole, ActiveTab[]> = {
+  admin: ['dashboard', 'cases', 'projects', 'gis', 'intelligence', 'analytics', 'notifications', 'admin'],
+  lao: ['dashboard', 'cases', 'projects', 'gis', 'intelligence', 'analytics', 'notifications'],
+  approver: ['dashboard', 'cases', 'projects', 'gis', 'intelligence', 'analytics', 'notifications'],
+  project_officer: ['dashboard', 'cases', 'projects', 'gis', 'intelligence', 'notifications'],
+  revenue_inspector: ['dashboard', 'cases', 'gis', 'notifications'],
+  legal_officer: ['dashboard', 'cases', 'projects', 'gis', 'notifications'],
+  viewer: ['dashboard', 'cases', 'projects', 'gis'],
+};
+
+export const Sidebar: React.FC<SidebarProps> = ({
+  activeTab,
+  onSelectTab,
+  caseCount,
+}) => {
+  const { activePersona } = useAuth();
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [unreadAlerts, setUnreadAlerts] = useState<number>(0);
+
+  useEffect(() => {
+    fetchNotificationCounts()
+      .then((res) => {
+        setUnreadAlerts(res.counts.unread_count || 0);
+      })
+      .catch(() => {
+        // Degraded mode fallback
+      });
+  }, [activeTab]);
+
+  const allDestinations: NavDestination[] = [
+    {
+      id: 'dashboard',
+      label: 'Operational Dashboard',
+      hindiLabel: 'डैशबोर्ड',
+      icon: LayoutDashboard,
+      badge: null,
+      description: 'National overview, Attention Queue & Workflow Health',
+    },
+    {
+      id: 'cases',
+      label: 'Acquisition Cases',
+      hindiLabel: 'भू-अर्जन मामले',
+      icon: FileText,
+      badge: caseCount !== undefined && caseCount > 0 ? caseCount : null,
+      badgeVariant: 'navy',
+      description: 'Registry workspace, high-density case tracking',
+    },
+    {
+      id: 'projects',
+      label: 'Projects Portfolio',
+      hindiLabel: 'परियोजनाएं',
+      icon: Building2,
+      badge: null,
+      description: 'Corridors, budgets, and aggregated case health',
+    },
+    {
+      id: 'gis',
+      label: 'GIS & Spatial Cadastre',
+      hindiLabel: 'स्थानिक नक्शा',
+      icon: MapPin,
+      badge: null,
+      description: 'Interactive maps, Bhuvan overlays & parcel boundaries',
+    },
+    {
+      id: 'intelligence',
+      label: 'Cross-Case Intelligence',
+      hindiLabel: 'विश्लेषण केंद्र',
+      icon: Sparkles,
+      badge: null,
+      description: 'Systemic bottlenecks, root causes & DAG impact',
+    },
+    {
+      id: 'analytics',
+      label: 'Portfolio Analytics',
+      hindiLabel: 'सांख्यिकी',
+      icon: BarChart3,
+      badge: null,
+      description: 'Trends, geography, SLAs & observed outcomes',
+    },
+    {
+      id: 'notifications',
+      label: 'Notification Center',
+      hindiLabel: 'अधिसूचनाएं',
+      icon: Bell,
+      badge: unreadAlerts > 0 ? unreadAlerts : null,
+      badgeVariant: 'red',
+      description: 'SLA triggers, escalation workflow & audit logs',
+    },
+    {
+      id: 'admin',
+      label: 'Administration',
+      hindiLabel: 'प्रशासन',
+      icon: Settings,
+      badge: null,
+      description: 'Users, policies, workflow engines & integration registry',
+    },
+  ];
+
+  // Role-aware filtering
+  const authorizedIds = ROLE_AUTHORIZED_DESTINATIONS[activePersona.role] || ROLE_AUTHORIZED_DESTINATIONS.lao;
+  const visibleDestinations = allDestinations.filter((d) => authorizedIds.includes(d.id));
+
+  return (
+    <aside
+      aria-label="Primary Application Navigation"
+      className={clsx(
+        'bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 transition-all duration-200 select-none z-20',
+        isCollapsed ? 'w-18 py-4 px-2' : 'w-64 py-5 px-3'
+      )}
+    >
+      {/* Top Navigation Items */}
+      <div className="space-y-4">
+        {/* Workspace Title & Collapse Toggle */}
+        <div className="flex items-center justify-between px-2">
+          {!isCollapsed ? (
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Operations Workspace
+              </span>
+              <span className="text-[11px] font-semibold text-gov-slate">
+                RFCTLARR 2013 Compliance
+              </span>
+            </div>
+          ) : (
+            <div className="mx-auto text-[10px] font-bold text-gov-navy">
+              BS
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            aria-label={isCollapsed ? 'Expand navigation sidebar' : 'Collapse navigation sidebar'}
+            className="p-1 rounded-md text-slate-400 hover:text-gov-slate hover:bg-slate-100 transition-colors cursor-pointer"
+            title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isCollapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </button>
+        </div>
+
+        {/* Navigation Destination List */}
+        <nav className="space-y-1">
+          {visibleDestinations.map((dest) => {
+            const Icon = dest.icon;
+            const isActive = activeTab === dest.id;
+
+            return (
+              <button
+                key={dest.id}
+                type="button"
+                onClick={() => onSelectTab(dest.id)}
+                title={isCollapsed ? `${dest.label} (${dest.description})` : undefined}
+                className={clsx(
+                  'w-full flex items-center rounded-lg text-xs font-medium transition-all text-left cursor-pointer group relative',
+                  isCollapsed ? 'justify-center p-3' : 'justify-between px-3 py-2.5',
+                  isActive
+                    ? 'bg-gov-navy text-white shadow-sm font-semibold'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-gov-slate'
+                )}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <Icon
+                    className={clsx(
+                      'h-4 w-4 shrink-0 transition-colors',
+                      isActive ? 'text-amber-400' : 'text-slate-400 group-hover:text-gov-navy'
+                    )}
+                  />
+                  {!isCollapsed && (
+                    <div className="truncate">
+                      <div className="truncate leading-tight">{dest.label}</div>
+                      {dest.hindiLabel && (
+                        <div
+                          className={clsx(
+                            'text-[10px] leading-none mt-0.5 font-normal',
+                            isActive ? 'text-blue-200' : 'text-slate-400'
+                          )}
+                        >
+                          {dest.hindiLabel}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Badge indicator */}
+                {dest.badge !== null && dest.badge !== undefined && (
+                  <span
+                    className={clsx(
+                      'text-[10px] px-2 py-0.5 rounded-full font-bold tabular-nums shrink-0',
+                      isCollapsed
+                        ? 'absolute top-1 right-1 h-2 w-2 p-0 rounded-full bg-red-500'
+                        : dest.badgeVariant === 'red'
+                        ? isActive
+                          ? 'bg-red-500 text-white'
+                          : 'bg-red-100 text-red-700'
+                        : isActive
+                        ? 'bg-blue-800 text-amber-300'
+                        : 'bg-slate-100 text-slate-700'
+                    )}
+                  >
+                    {!isCollapsed ? dest.badge : ''}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* Bottom Identity & Statutory Compliance Card */}
+      <div className="pt-4 border-t border-slate-100 space-y-3">
+        {/* Active Officer Identity Pill */}
+        <div
+          className={clsx(
+            'rounded-lg border border-slate-200 bg-slate-50/70 p-2.5 text-xs transition-all',
+            isCollapsed && 'p-2 text-center'
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-7 rounded-full bg-gov-navy/10 text-gov-navy flex items-center justify-center font-bold text-xs shrink-0">
+              <UserCheck className="h-4 w-4 text-gov-navy" />
+            </div>
+            {!isCollapsed && (
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-gov-slate text-xs truncate">
+                  {activePersona.name}
+                </p>
+                <p className="text-[10px] text-slate-500 truncate">
+                  {activePersona.label}
+                </p>
+              </div>
+            )}
+          </div>
+          {!isCollapsed && (
+            <div className="mt-2 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-400">
+              <span className="truncate">{activePersona.department}</span>
+            </div>
+          )}
+        </div>
+
+        {/* SLA Compliance Note */}
+        {!isCollapsed && (
+          <div className="rounded-lg bg-emerald-50/50 p-2.5 border border-emerald-200/60 text-[11px] text-slate-600">
+            <div className="font-semibold text-gov-slate flex items-center gap-1.5 mb-0.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+              <span className="text-xs">Statutory Engine</span>
+            </div>
+            <p className="text-[10px] text-slate-500 leading-snug">
+              Rigid audit trail with zero fabricated signals.
+            </p>
+          </div>
+        )}
+      </div>
+    </aside>
+  );
+};

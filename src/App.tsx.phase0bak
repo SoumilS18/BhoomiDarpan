@@ -1,0 +1,185 @@
+import React, { useState, useEffect } from 'react';
+import { Header } from './components/layout/Header';
+import { Sidebar, ActiveTab } from './components/layout/Sidebar';
+import { DashboardPage } from './pages/DashboardPage';
+import { CasesListPage } from './pages/CasesListPage';
+import { CaseDetailPage } from './pages/CaseDetailPage';
+import { ProjectsPage } from './pages/ProjectsPage';
+import { GISSpatialIntelligencePage } from './pages/GISSpatialIntelligencePage';
+import { IntelligencePage } from './pages/IntelligencePage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
+import { NotificationsPage } from './pages/NotificationsPage';
+import { AdministrationPage } from './pages/AdministrationPage';
+import { CreateCaseModal } from './components/cases/CreateCaseModal';
+import { fetchProjects, fetchWorkflows, fetchHealth, fetchCases, HealthResponse } from './lib/api';
+import { Project, Workflow } from '../shared/types';
+import { AlertTriangle } from 'lucide-react';
+
+export const App: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [selectedCaseTab, setSelectedCaseTab] = useState<string | undefined>(undefined);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  // Pre-loaded projects & workflows for Create modal
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [caseCount, setCaseCount] = useState<number>(0);
+  const [health, setHealth] = useState<HealthResponse | null>(null);
+
+  const loadInitialData = () => {
+    fetchHealth().then(setHealth).catch(console.warn);
+    fetchProjects().then((r) => setProjects(r.projects || [])).catch(console.warn);
+    fetchWorkflows().then((r) => setWorkflows(r.workflows || [])).catch(console.warn);
+    fetchCases().then((r) => setCaseCount((r.cases || []).length)).catch(console.warn);
+  };
+
+  useEffect(() => {
+    loadInitialData();
+  }, []);
+
+  const handleSelectCase = (caseId: string, tab?: string) => {
+    setSelectedCaseId(caseId);
+    setSelectedCaseTab(tab || 'overview');
+  };
+
+  const handleBackToCases = () => {
+    setSelectedCaseId(null);
+    setSelectedCaseTab(undefined);
+    setActiveTab('cases');
+  };
+
+  const handleCaseCreated = () => {
+    loadInitialData();
+    setActiveTab('cases');
+  };
+
+  const tabLabels: Record<ActiveTab, string> = {
+    dashboard: 'Operations Dashboard',
+    cases: 'Acquisition Cases Registry',
+    projects: 'Projects Portfolio',
+    gis: 'GIS Spatial Intelligence',
+    intelligence: 'Cross-Case Decision Intelligence',
+    analytics: 'Portfolio Analytics',
+    notifications: 'Notification Center',
+    admin: 'Administration & Governance',
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col bg-gov-canvas text-gov-slate">
+      {/* Top Header */}
+      <Header
+        onOpenCreateCase={() => setIsCreateModalOpen(true)}
+        onSearch={(term) => {
+          if (term && activeTab !== 'cases') {
+            setActiveTab('cases');
+          }
+        }}
+      />
+
+      {/* Supabase Pending Banner (if credentials pending) */}
+      {health && !health.database.connected && (
+        <div className="bg-amber-500/10 border-b border-amber-300/60 px-4 py-2 text-xs text-amber-900">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-700 shrink-0" />
+              <span>
+                <strong>Remote Supabase Database Connection Pending:</strong> {health.database.message}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-[11px]">
+              <span className="font-mono bg-amber-100 px-2 py-0.5 rounded">
+                Edit BhoomiSetu/.env with your Supabase keys
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Workspace Layout */}
+      <div className="flex-1 flex max-w-7xl w-full mx-auto">
+        {/* Left Navigation Sidebar */}
+        <Sidebar
+          activeTab={activeTab}
+          onSelectTab={(tab) => {
+            setSelectedCaseId(null);
+            setActiveTab(tab);
+          }}
+          caseCount={caseCount}
+        />
+
+        {/* Content Viewport */}
+        <main className="flex-1 p-6 overflow-y-auto">
+          {selectedCaseId ? (
+            <CaseDetailPage
+              caseId={selectedCaseId}
+              onBack={handleBackToCases}
+              initialTab={selectedCaseTab}
+            />
+          ) : (
+            <>
+              {activeTab === 'dashboard' && (
+                <DashboardPage
+                  onSelectCase={handleSelectCase}
+                  onOpenCreateCase={() => setIsCreateModalOpen(true)}
+                  onNavigateToCases={() => setActiveTab('cases')}
+                />
+              )}
+
+              {activeTab === 'cases' && (
+                <CasesListPage
+                  onSelectCase={handleSelectCase}
+                  onOpenCreateCase={() => setIsCreateModalOpen(true)}
+                />
+              )}
+
+              {activeTab === 'projects' && (
+                <ProjectsPage
+                  onSelectCase={handleSelectCase}
+                  onOpenCreateCase={() => setIsCreateModalOpen(true)}
+                />
+              )}
+
+              {activeTab === 'gis' && (
+                <GISSpatialIntelligencePage
+                  onSelectCase={handleSelectCase}
+                />
+              )}
+
+              {activeTab === 'intelligence' && (
+                <IntelligencePage
+                  onSelectCase={handleSelectCase}
+                />
+              )}
+
+              {activeTab === 'analytics' && (
+                <AnalyticsPage
+                  onSelectCase={handleSelectCase}
+                />
+              )}
+
+              {activeTab === 'notifications' && (
+                <NotificationsPage
+                  onSelectCase={handleSelectCase}
+                />
+              )}
+
+              {activeTab === 'admin' && (
+                <AdministrationPage />
+              )}
+            </>
+          )}
+        </main>
+      </div>
+
+      {/* Create Case Modal */}
+      <CreateCaseModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        projects={projects}
+        workflows={workflows}
+        onCaseCreated={handleCaseCreated}
+      />
+    </div>
+  );
+};

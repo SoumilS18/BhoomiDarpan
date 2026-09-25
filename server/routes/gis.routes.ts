@@ -1,0 +1,579 @@
+import { Router, Request, Response } from 'express';
+import { getSupabase, isSupabaseConfigured } from '../config/supabase';
+import { validateGeoJSON } from '../utils/geojsonValidator';
+import { logCaseEvent } from '../services/auditLogger';
+import { PARCEL_STATUS_COLORS } from '../../shared/utils/geojson';
+import { requireAuth, requireRole } from '../middleware/auth.middleware';
+import { authorizeUserForCase } from '../services/portfolioAnalyzer';
+import {
+  getGISOverview,
+  getScopedCases,
+  getScopedProjects,
+  getParcelsForCase,
+  getCaseSpatialContext,
+  findNearbyEntities,
+  generateCasesGeoJSON,
+  generateProjectsGeoJSON,
+  generateParcelsGeoJSON,
+  computeAccurateCentroid,
+} from '../services/spatialIntelligenceService';
+import { getSpatialPolicySync } from '../services/policyEngine';
+
+const router = Router();
+
+// ============================================================================
+// DAY 6: AUTHENTICATED GIS & SPATIAL INTELLIGENCE ENDPOINTS
+// ============================================================================
+
+// GET /api/gis/overview (or /overview) - High-level spatial overview & layer status
+const handleOverview = async (req: Request, res: Response) => {
+  try {
+    const overview = await getGISOverview(req.user);
+    res.json(overview);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+router.get('/overview', requireAuth, handleOverview);
+router.get('/gis/overview', requireAuth, handleOverview);
+
+// GET /api/gis/cases (or /cases) - GeoJSON FeatureCollection of cases with spatial filters
+const handleCases = async (req: Request, res: Response) => {
+  try {
+    let cases = await getScopedCases(req.user);
+
+    // Apply query filters
+    const { state, district, project_id, status, risk_level, bbox, has_geometry } = req.query;
+
+    if (state && typeof state === 'string') {
+      cases = cases.filter((c) => c.state.toLowerCase() === state.toLowerCase());
+    }
+    if (district && typeof district === 'string') {
+      cases = cases.filter((c) => c.district.toLowerCase() === district.toLowerCase());
+    }
+    if (project_id && typeof project_id === 'string') {
+      cases = cases.filter((c) => c.project_id === project_id);
+    }
+    if (status && typeof status === 'string') {
+      cases = cases.filter((c) => c.status === status);
+    }
+    if (risk_level && typeof risk_level === 'string') {
+      cases = cases.filter((c) => (c as any).risk_level === risk_level);
+    }
+    if (has_geometry === 'true') {
+      cases = cases.filter((c) => Boolean(c.geojson_boundary));
+    }
+
+    // Bounding box filter: bbox=minLng,minLat,maxLng,maxLat
+    if (bbox && typeof bbox === 'string') {
+      const parts = bbox.split(',').map(Number);
+      if (parts.length === 4 && parts.every((n) => !isNaN(n))) {
+        const [minLng, minLat, maxLng, maxLat] = parts;
+        cases = cases.filter((c) => {
+          const centroid = computeAccurateCentroid(c.geojson_boundary);
+          if (!centroid) return false;
+          const [lat, lng] = centroid;
+          return lng >= minLng && lng <= maxLng && lat >= minLat && lat <= maxLat;
+        });
+      }
+    }
+
+    const featureCollection = generateCasesGeoJSON(cases);
+    res.json(featureCollection);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+router.get('/cases', requireAuth, handleCases);
+router.get('/gis/cases', requireAuth, handleCases);
+
+// GET /api/gis/projects (or /projects) - GeoJSON FeatureCollection of projects
+const handleProjects = async (req: Request, res: Response) => {
+  try {
+    const projects = await getScopedProjects(req.user);
+    const featureCollection = generateProjectsGeoJSON(projects);
+    res.json(featureCollection);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+router.get('/projects', requireAuth, handleProjects);
+router.get('/gis/projects', requireAuth, handleProjects);
+
+// GET /api/gis/parcels (or /parcels) - Cadastral parcels GeoJSON
+const handleParcels = async (req: Request, res: Response) => {
+  try {
+    // Citizens/Viewers cannot view internal cadastral parcels
+    if (req.user?.role === 'viewer') {
+      return res.json({ type: 'FeatureCollection', features: [] });
+    }
+
+    const { case_id } = req.query;
+    if (!case_id || typeof case_id !== 'string') {
+      return res.status(400).json({ error: 'case_id query parameter is required for cadastral parcels.' });
+    }
+
+    // Verify user has scope to view this case
+    const scopedCases = await getScopedCases(req.user);
+    const hasAccess = scopedCases.some((c) => c.id === case_id);
+    if (!hasAccess) {
+      return res.status(403).json({ error: 'Access denied: case is outside your authorized operational scope.' });
+    }
+
+    const parcels = await getParcelsForCase(case_id);
+    const featureCollection = generateParcelsGeoJSON(parcels);
+    res.json(featureCollection);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+router.get('/parcels', requireAuth, handleParcels);
+router.get('/gis/parcels', requireAuth, handleParcels);
+
+// GET /api/gis/spatial-context/:caseId - Complete case spatial context
+const handleSpatialContext = async (req: Request, res: Response) => {
+  try {
+    const rawCaseId = req.params.caseId;
+    const caseId = Array.isArray(rawCaseId) ? rawCaseId[0] : rawCaseId;
+    const context = await getCaseSpatialContext(caseId, req.user);
+    if (!context) {
+      return res.status(404).json({ error: 'Case not found or outside authorized operational jurisdiction.' });
+    }
+    res.json(context);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+router.get('/spatial-context/:caseId', requireAuth, handleSpatialContext);
+router.get('/gis/spatial-context/:caseId', requireAuth, handleSpatialContext);
+
+// GET /api/gis/nearby (or /nearby) - Proximity search around coordinate [lat, lng]
+const handleNearby = async (req: Request, res: Response) => {
+  try {
+    const lat = parseFloat(req.query.lat as string);
+    const lng = parseFloat(req.query.lng as string);
+
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return res.status(400).json({
+        error: 'Valid numeric latitude [-90, 90] and longitude [-180, 180] query parameters are required.',
+      });
+    }
+
+    const radiusKm = req.query.radius_km ? parseFloat(req.query.radius_km as string) : undefined;
+    const nearby = await findNearbyEntities(lat, lng, radiusKm, req.user);
+
+    res.json({
+      search_center: [lat, lng],
+      radius_km: radiusKm || getSpatialPolicySync().nearby_search_radius_km,
+      total_found: nearby.length,
+      entities: nearby,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+router.get('/nearby', requireAuth, handleNearby);
+router.get('/gis/nearby', requireAuth, handleNearby);
+
+// GET /api/gis/layers - Available layer manifest
+const handleLayers = async (req: Request, res: Response) => {
+  try {
+    const overview = await getGISOverview(req.user);
+    res.json({ layers: overview.layer_manifest });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+router.get('/layers', requireAuth, handleLayers);
+router.get('/gis/layers', requireAuth, handleLayers);
+
+// ============================================================================
+// LEGACY CASE GIS ENDPOINTS (PRESERVED FOR BACKWARD COMPATIBILITY)
+// ============================================================================
+
+// GET /api/cases/:id/gis - Get combined FeatureCollection of case boundary & parcels
+router.get('/cases/:id/gis', async (req: Request, res: Response) => {
+  try {
+    if (!isSupabaseConfigured) {
+      return res.status(503).json({ error: 'Supabase not configured' });
+    }
+
+    const { id: caseId } = req.params;
+    const supabase = getSupabase();
+
+    // Fetch case boundary and parcels
+    const { data: caseItem, error: caseErr } = await supabase
+      .from('acquisition_cases')
+      .select('id, case_number, title, total_area_hectares, geojson_boundary')
+      .eq('id', caseId)
+      .single();
+
+    if (caseErr || !caseItem) {
+      return res.status(404).json({ error: 'Case not found' });
+    }
+
+    const { data: parcels, error: parcelErr } = await supabase
+      .from('parcels')
+      .select('*')
+      .eq('case_id', caseId)
+      .order('created_at', { ascending: true });
+
+    if (parcelErr) {
+      return res.status(500).json({ error: parcelErr.message });
+    }
+
+    const features: any[] = [];
+
+    // 1. Add Case Boundary Feature if present
+    if (caseItem.geojson_boundary) {
+      const boundaryGeom =
+        caseItem.geojson_boundary.type === 'Feature'
+          ? caseItem.geojson_boundary.geometry
+          : caseItem.geojson_boundary.type === 'FeatureCollection'
+          ? caseItem.geojson_boundary.features[0]?.geometry
+          : caseItem.geojson_boundary;
+
+      if (boundaryGeom) {
+        features.push({
+          type: 'Feature',
+          id: `boundary-${caseItem.id}`,
+          properties: {
+            layer_type: 'case_boundary',
+            case_number: caseItem.case_number,
+            title: caseItem.title,
+            total_area_hectares: caseItem.total_area_hectares,
+          },
+          geometry: boundaryGeom,
+        });
+      }
+    }
+
+    // 2. Add Parcel Features
+    (parcels || []).forEach((p: any) => {
+      if (p.geojson_geometry) {
+        const parcelGeom =
+          p.geojson_geometry.type === 'Feature'
+            ? p.geojson_geometry.geometry
+            : p.geojson_geometry;
+
+        const statusColor = PARCEL_STATUS_COLORS[p.acquisition_status] || PARCEL_STATUS_COLORS.identified;
+
+        features.push({
+          type: 'Feature',
+          id: `parcel-${p.id}`,
+          properties: {
+            layer_type: 'parcel',
+            parcel_id: p.id,
+            survey_number: p.survey_number,
+            khata_number: p.khata_number,
+            landowner_names: p.landowner_names,
+            land_type: p.land_type,
+            area_acres: p.area_acres,
+            compensation_amount: p.compensation_amount,
+            acquisition_status: p.acquisition_status,
+            color: statusColor.stroke,
+            fillColor: statusColor.fill,
+          },
+          geometry: parcelGeom,
+        });
+      }
+    });
+
+    const featureCollection = {
+      type: 'FeatureCollection',
+      features,
+    };
+
+    res.json({
+      case_id: caseId,
+      has_geometry: features.length > 0,
+      total_parcels: parcels?.length || 0,
+      parcels_with_geometry: features.filter((f) => f.properties.layer_type === 'parcel').length,
+      gis_data: featureCollection,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/cases/:id/geojson - Save/update case boundary GeoJSON
+router.post('/cases/:id/geojson', requireAuth, requireRole(['admin', 'project_officer', 'lao', 'revenue_inspector']), async (req: Request, res: Response) => {
+  try {
+    if (!isSupabaseConfigured) {
+      return res.status(503).json({ error: 'Supabase not configured' });
+    }
+
+    const { id: caseId } = req.params;
+    const { geojson, actorName } = req.body;
+
+    if (!geojson) {
+      return res.status(400).json({ error: 'geojson object is required' });
+    }
+
+    // Strictly validate GeoJSON structure
+    const validation = validateGeoJSON(geojson);
+    if (!validation.valid) {
+      return res.status(400).json({
+        error: `Invalid GeoJSON: ${validation.error}`,
+      });
+    }
+
+    const supabase = getSupabase();
+
+    const { data: updatedCase, error } = await supabase
+      .from('acquisition_cases')
+      .update({
+        geojson_boundary: geojson,
+      })
+      .eq('id', caseId)
+      .select('id, case_number, title, geojson_boundary')
+      .single();
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    // Log audit event
+    await logCaseEvent({
+      case_id: typeof caseId === 'string' ? caseId : (caseId as any)[0],
+      event_type: 'CASE_BOUNDARY_UPDATED',
+      title: 'Case Spatial Boundary Demarcated',
+      description: `Spatial boundary (${validation.type}) validated and saved.`,
+      actor_name: actorName || 'GIS Specialist',
+      metadata: {
+        geojson_type: validation.type,
+        bbox: validation.bbox,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Case boundary geometry successfully updated.',
+      case: updatedCase,
+      bbox: validation.bbox,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/cases/:id/parcels - Add parcel with optional geometry
+router.post('/cases/:id/parcels', requireAuth, requireRole(['admin', 'project_officer', 'lao', 'revenue_inspector']), async (req: Request, res: Response) => {
+  try {
+    if (!isSupabaseConfigured) {
+      return res.status(503).json({ error: 'Supabase not configured' });
+    }
+
+    const { id: caseId } = req.params;
+
+    // Verify user is authorized for this case within project and territorial scope
+    const authCheck = await authorizeUserForCase((req as any).user, String(caseId));
+    if (!authCheck.authorized) {
+      return res.status(authCheck.errorStatus).json({ error: authCheck.errorMessage });
+    }
+    const {
+      survey_number,
+      khata_number,
+      landowner_names,
+      land_type,
+      area_acres,
+      compensation_amount,
+      acquisition_status,
+      geojson_geometry,
+      actorName,
+    } = req.body;
+
+    if (!survey_number || typeof survey_number !== 'string' || survey_number.trim().length === 0) {
+      return res.status(400).json({ error: 'survey_number is required and cannot be empty' });
+    }
+
+    const area = Number(area_acres);
+    if (isNaN(area) || area <= 0) {
+      return res.status(400).json({ error: 'area_acres must be a positive number' });
+    }
+
+    // If geometry is provided, strictly validate it
+    if (geojson_geometry) {
+      const validation = validateGeoJSON(geojson_geometry);
+      if (!validation.valid) {
+        return res.status(400).json({ error: `Invalid parcel geometry: ${validation.error}` });
+      }
+    }
+
+    const supabase = getSupabase();
+
+    const { data: newParcel, error } = await supabase
+      .from('parcels')
+      .insert({
+        case_id: caseId,
+        survey_number: survey_number.trim(),
+        khata_number: khata_number ? String(khata_number).trim() : null,
+        landowner_names: Array.isArray(landowner_names)
+          ? landowner_names.filter((n) => typeof n === 'string' && n.trim().length > 0)
+          : [],
+        land_type: land_type || 'Agricultural',
+        area_acres: area,
+        compensation_amount: Number(compensation_amount || 0),
+        acquisition_status: acquisition_status || 'identified',
+        geojson_geometry: geojson_geometry || null,
+      })
+      .select('*')
+      .single();
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    // Log audit event
+    await logCaseEvent({
+      case_id: typeof caseId === 'string' ? caseId : (caseId as any)[0],
+      event_type: 'PARCEL_REGISTERED',
+      title: `Cadastral Parcel Registered: Survey #${newParcel.survey_number}`,
+      description: `Registered ${newParcel.area_acres} acres for survey #${newParcel.survey_number} with status ${newParcel.acquisition_status}.`,
+      actor_name: actorName || 'Revenue Officer',
+      metadata: {
+        parcel_id: newParcel.id,
+        survey_number: newParcel.survey_number,
+        has_geometry: Boolean(geojson_geometry),
+      },
+    });
+
+    res.status(201).json({ parcel: newParcel });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PATCH /api/cases/:id/parcels/:parcelId - Update parcel
+router.patch('/cases/:id/parcels/:parcelId', requireAuth, requireRole(['admin', 'project_officer', 'lao', 'revenue_inspector', 'approver']), async (req: Request, res: Response) => {
+  try {
+    if (!isSupabaseConfigured) {
+      return res.status(503).json({ error: 'Supabase not configured' });
+    }
+
+    const { id: caseId, parcelId } = req.params;
+
+    // Verify user is authorized for this case within project and territorial scope
+    const authCheck = await authorizeUserForCase((req as any).user, String(caseId));
+    if (!authCheck.authorized) {
+      return res.status(authCheck.errorStatus).json({ error: authCheck.errorMessage });
+    }
+
+    const {
+      survey_number,
+      khata_number,
+      landowner_names,
+      land_type,
+      area_acres,
+      compensation_amount,
+      acquisition_status,
+      geojson_geometry,
+      actorName,
+    } = req.body;
+
+    const updates: any = {};
+    if (survey_number !== undefined) updates.survey_number = String(survey_number).trim();
+    if (khata_number !== undefined) updates.khata_number = khata_number ? String(khata_number).trim() : null;
+    if (landowner_names !== undefined) updates.landowner_names = Array.isArray(landowner_names) ? landowner_names : [];
+    if (land_type !== undefined) updates.land_type = land_type;
+    if (area_acres !== undefined) updates.area_acres = Number(area_acres);
+    if (compensation_amount !== undefined) updates.compensation_amount = Number(compensation_amount);
+    if (acquisition_status !== undefined) updates.acquisition_status = acquisition_status;
+
+    if (geojson_geometry !== undefined) {
+      if (geojson_geometry === null) {
+        updates.geojson_geometry = null;
+      } else {
+        const validation = validateGeoJSON(geojson_geometry);
+        if (!validation.valid) {
+          return res.status(400).json({ error: `Invalid parcel geometry: ${validation.error}` });
+        }
+        updates.geojson_geometry = geojson_geometry;
+      }
+    }
+
+    const supabase = getSupabase();
+
+    const { data: updatedParcel, error } = await supabase
+      .from('parcels')
+      .update(updates)
+      .eq('id', parcelId)
+      .eq('case_id', caseId)
+      .select('*')
+      .single();
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    await logCaseEvent({
+      case_id: typeof caseId === 'string' ? caseId : (caseId as any)[0],
+      event_type: 'PARCEL_UPDATED',
+      title: `Parcel Updated: Survey #${updatedParcel.survey_number}`,
+      description: `Updated parcel status to ${updatedParcel.acquisition_status}.`,
+      actor_name: actorName || (req as any).user?.name || (req as any).user?.full_name || 'Revenue Officer',
+      actor_id: (req as any).user?.id,
+      metadata: { parcel_id: parcelId, updates },
+    });
+
+    res.json({ parcel: updatedParcel });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/cases/:id/parcels/:parcelId - Delete parcel
+router.delete('/cases/:id/parcels/:parcelId', requireAuth, requireRole(['admin', 'project_officer', 'lao', 'revenue_inspector']), async (req: Request, res: Response) => {
+  try {
+    if (!isSupabaseConfigured) {
+      return res.status(503).json({ error: 'Supabase not configured' });
+    }
+
+    const { id: caseId, parcelId } = req.params;
+
+    // Verify user is authorized for this case within project and territorial scope
+    const authCheck = await authorizeUserForCase((req as any).user, String(caseId));
+    if (!authCheck.authorized) {
+      return res.status(authCheck.errorStatus).json({ error: authCheck.errorMessage });
+    }
+
+    const supabase = getSupabase();
+
+    const { data: parcel, error: fetchErr } = await supabase
+      .from('parcels')
+      .select('id, survey_number')
+      .eq('id', parcelId)
+      .eq('case_id', caseId)
+      .single();
+
+    if (fetchErr || !parcel) {
+      return res.status(404).json({ error: 'Parcel not found in this case' });
+    }
+
+    const { error } = await supabase
+      .from('parcels')
+      .delete()
+      .eq('id', parcelId)
+      .eq('case_id', caseId);
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    await logCaseEvent({
+      case_id: typeof caseId === 'string' ? caseId : (caseId as any)[0],
+      event_type: 'PARCEL_REMOVED',
+      title: `Parcel Removed: Survey #${parcel?.survey_number || parcelId}`,
+      description: `Parcel record removed from case by ${(req as any).user?.name || 'Revenue Officer'}.`,
+      actor_name: (req as any).user?.name || (req as any).user?.full_name || 'Revenue Officer',
+      actor_id: (req as any).user?.id,
+      metadata: { parcel_id: parcelId, survey_number: parcel?.survey_number },
+    });
+
+    res.json({ success: true, message: 'Parcel removed' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+export default router;

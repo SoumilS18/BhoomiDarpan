@@ -1,0 +1,1 @@
+$ concurrently -n "SERVER,CLIENT" -c "blue,green" "bun run server/index.ts" "vite"

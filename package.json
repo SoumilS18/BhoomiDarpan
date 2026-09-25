@@ -1,0 +1,53 @@
+{
+  "name": "bhoomisetu",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n \"SERVER,CLIENT\" -c \"blue,green\" \"bun run server/index.ts\" \"vite\"",
+    "dev:server": "bun run server/index.ts",
+    "dev:client": "vite",
+    "build": "tsc && vite build",
+    "lint": "tsc --noEmit",
+    "test": "bun test",
+    "test:lgd-live": "bun run scripts/verifyLgdLive.ts",
+    "test:bhuvan-live": "bun run scripts/verifyBhuvanLive.ts",
+    "seed": "bun run scripts/seed.ts",
+    "migrate": "bun run scripts/migrate.ts",
+    "migrate:verify": "bun run scripts/migrate.ts --verify"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.0",
+    "@supabase/supabase-js": "^2.49.1",
+    "@types/multer": "^2.2.0",
+    "clsx": "^2.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.475.0",
+    "multer": "^2.4.0",
+    "pg": "^8.23.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.15.1",
+    "tailwind-merge": "^3.0.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/leaflet": "^1.9.16",
+    "@types/node": "^22.13.4",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.2",
+    "postcss": "^8.5.2",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0"
+  }
+}
