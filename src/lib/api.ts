@@ -1,5 +1,6 @@
 import {
   AcquisitionCase,
+  CaseStageInstance,
   Workflow,
   Project,
   DashboardAnalytics,
@@ -229,6 +230,107 @@ export async function evaluateStage(
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || `Failed to evaluate stage advancement (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function fetchWorkflowPresets(): Promise<{ presets: Record<string, any> }> {
+  const res = await fetch(`${API_BASE}/cases/workflow/presets`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || `Failed to fetch workflow presets (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function initializeCaseWorkflowPreset(
+  caseId: string,
+  payload: {
+    preset_type?: string;
+    start_date?: string;
+    custom_stages?: Array<{
+      title: string;
+      code?: string;
+      description?: string;
+      default_duration_days?: number;
+      required_role?: string;
+      expected_start_date?: string;
+      expected_end_date?: string;
+      status?: string;
+      notes?: string;
+    }>;
+  }
+): Promise<{ success: boolean; message: string; expected_completion_date: string; stages: CaseStageInstance[] }> {
+  const res = await fetch(`${API_BASE}/cases/${caseId}/workflow/initialize`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || `Failed to initialize workflow (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function updateCaseStageSchedule(
+  caseId: string,
+  stageId: string,
+  payload: {
+    expected_start_date?: string;
+    expected_end_date?: string;
+    actual_start_date?: string;
+    actual_end_date?: string;
+    status?: string;
+    notes?: string;
+    title?: string;
+    description?: string;
+    delay_days?: number;
+  }
+): Promise<{ success: boolean; message: string; stage: CaseStageInstance; stages: CaseStageInstance[] }> {
+  const res = await fetch(`${API_BASE}/cases/${caseId}/stages/${stageId}/schedule`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || `Failed to update stage schedule (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function addCaseStage(
+  caseId: string,
+  payload: {
+    title: string;
+    code?: string;
+    description?: string;
+    expected_start_date?: string;
+    expected_end_date?: string;
+    required_role?: string;
+    default_duration_days?: number;
+    status?: string;
+    notes?: string;
+  }
+): Promise<{ success: boolean; message: string; stage: CaseStageInstance; stages: CaseStageInstance[] }> {
+  const res = await fetch(`${API_BASE}/cases/${caseId}/stages`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || `Failed to add workflow stage (${res.status})`);
   }
   return res.json();
 }

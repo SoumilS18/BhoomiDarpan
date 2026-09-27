@@ -18,6 +18,337 @@ export interface InitializeCaseStagesResult {
   expectedCompletionDate: string;
 }
 
+export const PRESET_WORKFLOW_DEFINITIONS: Record<string, {
+  name: string;
+  description: string;
+  legal_framework: string;
+  stages: Array<{
+    stage_number: number;
+    code: string;
+    title: string;
+    description: string;
+    default_duration_days: number;
+    required_role: any;
+    required_documents: string[];
+    is_mandatory: boolean;
+  }>;
+}> = {
+  rfctlarr_statutory_2013: {
+    name: 'RFCTLARR Act 2013 Statutory Standard',
+    description: 'Standard 7-stage statutory land acquisition lifecycle under RFCTLARR Act 2013 with SIA, gazette notifications, award determination, and PFMS direct disbursement.',
+    legal_framework: 'RFCTLARR Act 2013',
+    stages: [
+      {
+        stage_number: 1,
+        code: 'STAGE_1_PRELIM_NOTIF',
+        title: 'Preliminary Notification (Section 11)',
+        description: 'Publication of Section 11 gazette notification specifying acquisition intent and boundaries.',
+        default_duration_days: 60,
+        required_role: 'lao',
+        required_documents: ['Section 11 Notification'],
+        is_mandatory: true,
+      },
+      {
+        stage_number: 2,
+        code: 'STAGE_2_SIA_RR',
+        title: 'Social Impact Assessment & R&R Scheme (Section 16-18)',
+        description: 'Conduct comprehensive Social Impact Assessment (SIA) and formulate Rehabilitation & Resettlement draft.',
+        default_duration_days: 45,
+        required_role: 'lao',
+        required_documents: ['SIA Report', 'R&R Scheme Draft'],
+        is_mandatory: true,
+      },
+      {
+        stage_number: 3,
+        code: 'STAGE_3_OBJECTION_HEARINGS',
+        title: 'Hearing of Objections & Claims (Section 15)',
+        description: 'Statutory 60-day window for landholders to register Section 15 claims and formal hearings.',
+        default_duration_days: 60,
+        required_role: 'lao',
+        required_documents: ['Objection Hearing Record'],
+        is_mandatory: true,
+      },
+      {
+        stage_number: 4,
+        code: 'STAGE_4_DECLARATION',
+        title: 'Declaration of Acquisition (Section 19)',
+        description: 'Issuance and gazette publication of Section 19 declaration of acquisition taking.',
+        default_duration_days: 30,
+        required_role: 'admin',
+        required_documents: ['Section 19 Declaration'],
+        is_mandatory: true,
+      },
+      {
+        stage_number: 5,
+        code: 'STAGE_5_DEMARCATION_SURVEY',
+        title: 'Cadastral Survey & Boundary Demarcation (Section 20-21)',
+        description: 'Joint on-ground cadastral demarcations, DGPS georeferencing, and parcel area reconciliations.',
+        default_duration_days: 30,
+        required_role: 'revenue_inspector',
+        required_documents: ['Joint Survey Map'],
+        is_mandatory: true,
+      },
+      {
+        stage_number: 6,
+        code: 'STAGE_6_STATUTORY_AWARD',
+        title: 'Enquiry and Statutory Compensation Award (Section 23-30)',
+        description: 'Valuation with 100% solatium, 12% statutory interest, market multiplier, and Form-11 statutory decree.',
+        default_duration_days: 60,
+        required_role: 'lao',
+        required_documents: ['Form-11 Statutory Award Decree'],
+        is_mandatory: true,
+      },
+      {
+        stage_number: 7,
+        code: 'STAGE_7_POSSESSION_PFMS',
+        title: 'Possession Taking & PFMS Direct Disbursement (Section 38)',
+        description: 'Disbursement of compensation awards via PFMS DBT and execution of Section 38 possession memorandum.',
+        default_duration_days: 30,
+        required_role: 'lao',
+        required_documents: ['Possession Certificate', 'DBT Disbursement Receipt'],
+        is_mandatory: true,
+      },
+    ],
+  },
+  direct_purchase_consent: {
+    name: 'Direct Land Purchase & Consent Agreement',
+    description: 'Expedited 5-stage negotiated consent agreement process for willing landowners and price fixing committee rates.',
+    legal_framework: 'State Direct Purchase Policy',
+    stages: [
+      {
+        stage_number: 1,
+        code: 'DP_STAGE_1_NEGOTIATION',
+        title: 'Identification & Landowner Negotiations',
+        description: 'Conduct village meetings, record landowner willingness, and execute preliminary consent.',
+        default_duration_days: 30,
+        required_role: 'project_officer',
+        required_documents: ['Landowner Consent Forms'],
+        is_mandatory: true,
+      },
+      {
+        stage_number: 2,
+        code: 'DP_STAGE_2_PRICE_FIXING',
+        title: 'Price Fixing Committee Rate Determination',
+        description: 'District level committee fixes mutually agreed compensation package per acre.',
+        default_duration_days: 20,
+        required_role: 'lao',
+        required_documents: ['Committee Rate Resolution'],
+        is_mandatory: true,
+      },
+      {
+        stage_number: 3,
+        code: 'DP_STAGE_3_TITLE_SEARCH',
+        title: 'Title Verification & 30-Year Encumbrance Search',
+        description: 'Verify 7/12 extract, mutation register, encumbrance certificates, and heirship deeds.',
+        default_duration_days: 15,
+        required_role: 'revenue_inspector',
+        required_documents: ['Encumbrance Certificate', 'Title Search Report'],
+        is_mandatory: true,
+      },
+      {
+        stage_number: 4,
+        code: 'DP_STAGE_4_SALE_DEED',
+        title: 'Registered Sale Deed Execution',
+        description: 'Execute and register bipartite sale deed in favour of acquiring body.',
+        default_duration_days: 15,
+        required_role: 'revenue_inspector',
+        required_documents: ['Registered Sale Deed'],
+        is_mandatory: true,
+      },
+      {
+        stage_number: 5,
+        code: 'DP_STAGE_5_DBT_HANDOVER',
+        title: 'Possession Handover & Direct Bank Transfer',
+        description: 'Instant PFMS bank transfer to beneficiary account and physical land takeover.',
+        default_duration_days: 10,
+        required_role: 'lao',
+        required_documents: ['DBT Payment Receipt', 'Handover Certificate'],
+        is_mandatory: true,
+      },
+    ],
+  },
+  nhai_fasttrack_highway: {
+    name: 'NHAI Fast-Track Highway Scheme (NHAI Act 1956)',
+    description: 'Fast-track National Highway land acquisition under Section 3A to 3H statutory mandates.',
+    legal_framework: 'National Highways Act 1956',
+    stages: [
+      {
+        stage_number: 1,
+        code: 'NH_STAGE_1_SEC3A',
+        title: 'Section 3A Intention Notification',
+        description: 'Notification of intention to acquire land for National Highway corridor.',
+        default_duration_days: 21,
+        required_role: 'lao',
+        required_documents: ['Section 3A Gazette Notification'],
+        is_mandatory: true,
+      },
+      {
+        stage_number: 2,
+        code: 'NH_STAGE_2_SEC3C',
+        title: 'Section 3C Hearing of Objections',
+        description: 'Statutory 21-day window for submission of objections and CALA hearings.',
+        default_duration_days: 21,
+        required_role: 'lao',
+        required_documents: ['Section 3C Hearing Minutes'],
+        is_mandatory: true,
+      },
+      {
+        stage_number: 3,
+        code: 'NH_STAGE_3_SEC3D',
+        title: 'Section 3D Declaration of Acquisition',
+        description: 'Vesting of land in the Central Government free from all encumbrances.',
+        default_duration_days: 30,
+        required_role: 'admin',
+        required_documents: ['Section 3D Declaration Gazette'],
+        is_mandatory: true,
+      },
+      {
+        stage_number: 4,
+        code: 'NH_STAGE_4_SEC3G',
+        title: 'Section 3G Competent Authority Compensation Award',
+        description: 'Determination of compensation by CALA in accordance with RFCTLARR First Schedule principles.',
+        default_duration_days: 45,
+        required_role: 'lao',
+        required_documents: ['Section 3G Award Order'],
+        is_mandatory: true,
+      },
+      {
+        stage_number: 5,
+        code: 'NH_STAGE_5_SEC3H',
+        title: 'Section 3H Deposit & Physical Handover',
+        description: 'Deposit of compensation amount into landowner accounts and physical handover to NHAI.',
+        default_duration_days: 20,
+        required_role: 'lao',
+        required_documents: ['Handover Memorandum', 'PFMS Disbursement Note'],
+        is_mandatory: true,
+      },
+    ],
+  },
+};
+
+/**
+ * Initializes stage instances for an acquisition case from a preset template or custom stage list.
+ */
+export async function initializeCaseWorkflowWithPreset(
+  caseId: string,
+  presetType: string = 'rfctlarr_statutory_2013',
+  caseStartDate: string = new Date().toISOString().split('T')[0],
+  customStages?: Array<{
+    title: string;
+    code?: string;
+    description?: string;
+    default_duration_days?: number;
+    required_role?: any;
+    expected_start_date?: string;
+    expected_end_date?: string;
+    status?: StageInstanceStatus;
+    notes?: string;
+  }>
+): Promise<InitializeCaseStagesResult> {
+  const preset = PRESET_WORKFLOW_DEFINITIONS[presetType] || PRESET_WORKFLOW_DEFINITIONS.rfctlarr_statutory_2013;
+  const stageDefs = (customStages && customStages.length > 0)
+    ? customStages.map((cs, idx) => ({
+        stage_number: idx + 1,
+        code: cs.code || `CUSTOM_STAGE_${idx + 1}`,
+        title: cs.title,
+        description: cs.description || '',
+        default_duration_days: cs.default_duration_days || 30,
+        required_role: cs.required_role || 'lao',
+        required_documents: [],
+        is_mandatory: true,
+        custom_expected_start: cs.expected_start_date,
+        custom_expected_end: cs.expected_end_date,
+        custom_status: cs.status,
+        custom_notes: cs.notes,
+      }))
+    : preset.stages.map((s) => ({
+        ...s,
+        custom_expected_start: undefined,
+        custom_expected_end: undefined,
+        custom_status: undefined,
+        custom_notes: undefined,
+      }));
+
+  let runningDate = caseStartDate;
+  const stageInstances: CaseStageInstance[] = [];
+
+  for (let i = 0; i < stageDefs.length; i++) {
+    const s = stageDefs[i];
+    const duration = s.default_duration_days || 30;
+    const expectedStart = s.custom_expected_start || runningDate;
+    const expectedEnd = s.custom_expected_end || addDaysToDate(expectedStart, duration);
+    const isFirst = i === 0;
+
+    const instanceId = `stage-inst-${caseId.slice(-6)}-${i + 1}-${Date.now().toString().slice(-4)}`;
+    const mockStageId = `ws-preset-${presetType}-${i + 1}`;
+
+    const instance: CaseStageInstance = {
+      id: instanceId,
+      case_id: caseId,
+      stage_id: mockStageId,
+      status: (s.custom_status || (isFirst ? 'in_progress' : 'not_started')) as StageInstanceStatus,
+      expected_start_date: expectedStart,
+      expected_end_date: expectedEnd,
+      actual_start_date: isFirst ? caseStartDate : undefined,
+      actual_end_date: undefined,
+      delay_days: 0,
+      notes: s.custom_notes || (isFirst ? 'Initiated automatically on workflow creation.' : undefined),
+      updated_at: new Date().toISOString(),
+      stage: {
+        id: mockStageId,
+        workflow_id: `wf-${presetType}`,
+        stage_number: s.stage_number,
+        code: s.code,
+        title: s.title,
+        description: s.description,
+        default_duration_days: duration,
+        is_mandatory: s.is_mandatory,
+        required_role: s.required_role,
+        required_documents: (s as any).required_documents || [],
+        completion_criteria: {},
+        escalation_threshold_days: 15,
+        created_at: new Date().toISOString(),
+      },
+    };
+
+    stageInstances.push(instance);
+    runningDate = expectedEnd;
+  }
+
+  // Attempt database persistence if Supabase configured
+  try {
+    const supabase = getSupabase();
+    await supabase.from('case_stage_instances').delete().eq('case_id', caseId);
+    await supabase.from('case_stage_instances').insert(
+      stageInstances.map((inst) => ({
+        case_id: inst.case_id,
+        stage_id: inst.stage_id,
+        status: inst.status,
+        expected_start_date: inst.expected_start_date,
+        expected_end_date: inst.expected_end_date,
+        actual_start_date: inst.actual_start_date || null,
+        actual_end_date: inst.actual_end_date || null,
+        delay_days: inst.delay_days,
+        notes: inst.notes || null,
+      }))
+    );
+    await supabase
+      .from('acquisition_cases')
+      .update({
+        expected_completion_date: runningDate,
+        status: 'active',
+      })
+      .eq('id', caseId);
+  } catch {
+    // Memory store used
+  }
+
+  return {
+    stageInstances,
+    expectedCompletionDate: runningDate,
+  };
+}
+
 /**
  * Initializes stage instances for a new acquisition case according to its workflow definition.
  */

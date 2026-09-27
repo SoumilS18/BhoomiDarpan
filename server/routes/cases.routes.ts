@@ -1,7 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { getSupabase, isSupabaseConfigured } from '../config/supabase';
-import { initializeCaseWorkflow, advanceStageInstance, evaluateStageAdvancement } from '../services/workflowEngine';
-import { calculateCaseMetrics, calculateStageDeviations } from '../services/deviationCalculator';
+import {
+  initializeCaseWorkflow,
+  initializeCaseWorkflowWithPreset,
+  PRESET_WORKFLOW_DEFINITIONS,
+  advanceStageInstance,
+  evaluateStageAdvancement,
+} from '../services/workflowEngine';
+import { calculateCaseMetrics, calculateStageDeviations, addDaysToDate } from '../services/deviationCalculator';
 import { logCaseEvent } from '../services/auditLogger';
 import { extractGeometryCentroid, authorizeUserForCase } from '../services/portfolioAnalyzer';
 import { getLiveWeatherObservation } from '../services/weatherAdapter';
@@ -9,7 +15,7 @@ import { geocodingService } from '../services/geocodingService';
 import { detectCrossSourceDiscrepancies, SourceCandidate } from '../services/discrepancyDetector';
 import { getProvenanceForEntity } from '../services/provenanceService';
 import { detectSpatialAndCadastralRelationships, getScopedCases } from '../services/spatialIntelligenceService';
-import { CaseExternalContextBundle, CaseDispute, AcquisitionCase } from '../../shared/types';
+import { CaseExternalContextBundle, CaseDispute, AcquisitionCase, CaseStageInstance, StageInstanceStatus } from '../../shared/types';
 import { CreateCaseSchema, AdvanceStageSchema, CreateDisputeSchema, UpdateDisputeSchema } from '../utils/validators';
 import { requireAuth, requireRole } from '../middleware/auth.middleware';
 import {
@@ -19,9 +25,14 @@ import {
 } from '../services/statutoryAwardService';
 
 const inMemoryDisputes = new Map<string, CaseDispute[]>();
+export const inMemoryStageInstances = new Map<string, any[]>();
 
 export function getDisputesForCaseSync(caseId: string): CaseDispute[] {
   return inMemoryDisputes.get(caseId) || [];
+}
+
+export function getStagesForCaseSync(caseId: string): any[] {
+  return inMemoryStageInstances.get(caseId) || [];
 }
 
 const router = Router();
@@ -171,7 +182,12 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
       .order('created_at', { ascending: false });
 
     // Calculate dynamic deviations and metrics
-    const stageInstances = (caseItem.stage_instances || []).sort(
+    let rawStages = (caseItem.stage_instances || []).slice();
+    if (rawStages.length === 0 && inMemoryStageInstances.has(id)) {
+      rawStages = inMemoryStageInstances.get(id) || [];
+    }
+
+    const stageInstances = rawStages.sort(
       (a: any, b: any) => (a.stage?.stage_number || 0) - (b.stage?.stage_number || 0)
     );
 
@@ -407,6 +423,311 @@ router.patch('/:id/stages/:stageId', requireAuth, requireRole(['admin', 'project
     res.status(400).json({ error: err.message });
   }
 });
+
+// GET /api/cases/workflow/presets - Get available workflow presets
+router.get('/workflow/presets', requireAuth, async (_req: Request, res: Response) => {
+  res.json({ presets: PRESET_WORKFLOW_DEFINITIONS });
+});
+
+// POST /api/cases/:id/workflow/initialize - Initialize or regenerate workflow stages for a case
+router.post(
+  ['/:id/workflow/initialize', '/:id/initialize-workflow'],
+  requireAuth,
+  requireRole(['admin', 'project_officer', 'lao', 'revenue_inspector']),
+  async (req: Request, res: Response) => {
+    try {
+      const rawId = req.params.id;
+      const id = Array.isArray(rawId) ? rawId[0] : String(rawId);
+      const { preset_type, start_date, custom_stages } = req.body || {};
+
+      let caseStartDate = start_date;
+      if (!caseStartDate && isSupabaseConfigured) {
+        try {
+          const supabase = getSupabase();
+          const { data: dbCase } = await supabase.from('acquisition_cases').select('start_date').eq('id', id).single();
+          if (dbCase?.start_date) caseStartDate = dbCase.start_date;
+        } catch {}
+      }
+      if (!caseStartDate) {
+        caseStartDate = new Date().toISOString().split('T')[0];
+      }
+
+      const result = await initializeCaseWorkflowWithPreset(
+        id,
+        preset_type || 'rfctlarr_statutory_2013',
+        caseStartDate,
+        custom_stages
+      );
+
+      // Save to memory cache as well
+      inMemoryStageInstances.set(id, result.stageInstances);
+
+      await logCaseEvent({
+        case_id: id,
+        event_type: 'WORKFLOW_INITIALIZED',
+        title: `Statutory Workflow Initialized: ${PRESET_WORKFLOW_DEFINITIONS[preset_type]?.name || 'Custom Workflow'}`,
+        description: `Configured ${result.stageInstances.length} workflow stages with baseline completion target on ${result.expectedCompletionDate}.`,
+        actor_name: (req as any).user?.name || (req as any).user?.full_name || 'Land Acquisition Officer',
+        actor_id: (req as any).user?.id,
+        metadata: {
+          preset_type,
+          stages_count: result.stageInstances.length,
+          target_date: result.expectedCompletionDate,
+        },
+      });
+
+      const enrichedStages = calculateStageDeviations(result.stageInstances);
+
+      res.json({
+        success: true,
+        message: 'Workflow stages successfully initialized and baseline timeline established.',
+        expected_completion_date: result.expectedCompletionDate,
+        stages: enrichedStages,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to initialize case workflow' });
+    }
+  }
+);
+
+// PATCH /api/cases/:id/stages/:stageId/schedule - Update stage schedule & target dates
+router.patch(
+  '/:id/stages/:stageId/schedule',
+  requireAuth,
+  requireRole(['admin', 'project_officer', 'lao', 'revenue_inspector', 'approver']),
+  async (req: Request, res: Response) => {
+    try {
+      const rawCaseId = req.params.id;
+      const rawStageId = req.params.stageId;
+      const caseId = Array.isArray(rawCaseId) ? rawCaseId[0] : String(rawCaseId);
+      const stageId = Array.isArray(rawStageId) ? rawStageId[0] : String(rawStageId);
+      const {
+        expected_start_date,
+        expected_end_date,
+        actual_start_date,
+        actual_end_date,
+        status,
+        notes,
+        title,
+        description,
+        delay_days,
+      } = req.body || {};
+
+      let stages = inMemoryStageInstances.get(caseId) || [];
+
+      if (isSupabaseConfigured) {
+        try {
+          const supabase = getSupabase();
+          const updateData: any = {};
+          if (expected_start_date) updateData.expected_start_date = expected_start_date;
+          if (expected_end_date) updateData.expected_end_date = expected_end_date;
+          if (actual_start_date !== undefined) updateData.actual_start_date = actual_start_date || null;
+          if (actual_end_date !== undefined) updateData.actual_end_date = actual_end_date || null;
+          if (status) updateData.status = status;
+          if (notes !== undefined) updateData.notes = notes || null;
+          if (delay_days !== undefined) updateData.delay_days = delay_days;
+
+          await supabase
+            .from('case_stage_instances')
+            .update(updateData)
+            .eq('id', stageId)
+            .eq('case_id', caseId);
+
+          const { data: allDbStages } = await supabase
+            .from('case_stage_instances')
+            .select('*, stage:workflow_stages(*)')
+            .eq('case_id', caseId)
+            .order('expected_start_date', { ascending: true });
+
+          if (allDbStages) stages = allDbStages;
+        } catch {}
+      }
+
+      // Update memory store
+      const targetIdx = stages.findIndex((s) => s.id === stageId);
+      if (targetIdx >= 0) {
+        stages[targetIdx] = {
+          ...stages[targetIdx],
+          expected_start_date: expected_start_date || stages[targetIdx].expected_start_date,
+          expected_end_date: expected_end_date || stages[targetIdx].expected_end_date,
+          actual_start_date: actual_start_date !== undefined ? actual_start_date : stages[targetIdx].actual_start_date,
+          actual_end_date: actual_end_date !== undefined ? actual_end_date : stages[targetIdx].actual_end_date,
+          status: status || stages[targetIdx].status,
+          notes: notes !== undefined ? notes : stages[targetIdx].notes,
+          stage: {
+            ...stages[targetIdx].stage,
+            title: title || stages[targetIdx].stage?.title,
+            description: description || stages[targetIdx].stage?.description,
+          },
+        };
+      } else if (stages.length === 0) {
+        // Create an instance in memory
+        stages.push({
+          id: stageId,
+          case_id: caseId,
+          stage_id: stageId,
+          expected_start_date: expected_start_date || new Date().toISOString().split('T')[0],
+          expected_end_date: expected_end_date || new Date().toISOString().split('T')[0],
+          actual_start_date,
+          actual_end_date,
+          status: status || 'in_progress',
+          notes,
+          delay_days: delay_days || 0,
+          stage: {
+            id: stageId,
+            workflow_id: 'custom',
+            stage_number: 1,
+            code: 'STAGE_1',
+            title: title || 'Stage 1',
+            description,
+            default_duration_days: 30,
+            is_mandatory: true,
+            required_role: 'lao',
+            required_documents: [],
+            completion_criteria: {},
+            escalation_threshold_days: 15,
+            created_at: new Date().toISOString(),
+          },
+        });
+      }
+
+      inMemoryStageInstances.set(caseId, stages);
+
+      const enrichedStages = calculateStageDeviations(stages);
+      const updatedInstance = enrichedStages.find((s) => s.id === stageId) || enrichedStages[0];
+
+      await logCaseEvent({
+        case_id: caseId,
+        stage_instance_id: stageId,
+        event_type: 'STAGE_SCHEDULE_UPDATED',
+        title: `Stage Schedule Updated: ${updatedInstance?.stage?.title || 'Workflow Stage'}`,
+        description: `Updated target dates: ${updatedInstance?.expected_start_date} to ${updatedInstance?.expected_end_date} (Status: ${updatedInstance?.status}).`,
+        actor_name: (req as any).user?.name || (req as any).user?.full_name || 'Land Acquisition Officer',
+        actor_id: (req as any).user?.id,
+        metadata: {
+          target_date: updatedInstance?.expected_end_date,
+          status: updatedInstance?.status,
+          is_overdue: (updatedInstance as any)?.is_overdue,
+          delay_days: (updatedInstance as any)?.delay_days,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: 'Stage schedule and target dates updated successfully.',
+        stage: updatedInstance,
+        stages: enrichedStages,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to update stage schedule' });
+    }
+  }
+);
+
+// POST /api/cases/:id/stages - Add a custom milestone / task to the workflow
+router.post(
+  '/:id/stages',
+  requireAuth,
+  requireRole(['admin', 'project_officer', 'lao', 'revenue_inspector']),
+  async (req: Request, res: Response) => {
+    try {
+      const rawCaseId = req.params.id;
+      const caseId = Array.isArray(rawCaseId) ? rawCaseId[0] : String(rawCaseId);
+      const {
+        title,
+        code,
+        description,
+        expected_start_date,
+        expected_end_date,
+        required_role,
+        default_duration_days,
+        status,
+        notes,
+      } = req.body || {};
+
+      if (!title) {
+        return res.status(400).json({ error: 'Task/Stage title is required' });
+      }
+
+      let stages = inMemoryStageInstances.get(caseId) || [];
+      const newStageNumber = stages.length + 1;
+      const newId = `stage-custom-${caseId.slice(-6)}-${newStageNumber}-${Date.now().toString().slice(-4)}`;
+      const startDate = expected_start_date || (stages.length > 0 ? stages[stages.length - 1].expected_end_date : new Date().toISOString().split('T')[0]);
+      const duration = Number(default_duration_days) || 30;
+      const endDate = expected_end_date || addDaysToDate(startDate, duration);
+
+      const newInstance: CaseStageInstance = {
+        id: newId,
+        case_id: caseId,
+        stage_id: newId,
+        status: (status || (stages.length === 0 ? 'in_progress' : 'not_started')) as StageInstanceStatus,
+        expected_start_date: startDate,
+        expected_end_date: endDate,
+        actual_start_date: stages.length === 0 ? startDate : undefined,
+        actual_end_date: undefined,
+        delay_days: 0,
+        notes: notes || undefined,
+        updated_at: new Date().toISOString(),
+        stage: {
+          id: newId,
+          workflow_id: 'custom',
+          stage_number: newStageNumber,
+          code: code || `STAGE_${newStageNumber}`,
+          title,
+          description: description || '',
+          default_duration_days: duration,
+          is_mandatory: true,
+          required_role: required_role || 'lao',
+          required_documents: [],
+          completion_criteria: {},
+          escalation_threshold_days: 15,
+          created_at: new Date().toISOString(),
+        },
+      };
+
+      stages.push(newInstance);
+      inMemoryStageInstances.set(caseId, stages);
+
+      if (isSupabaseConfigured) {
+        try {
+          const supabase = getSupabase();
+          await supabase.from('case_stage_instances').insert({
+            case_id: caseId,
+            stage_id: newId,
+            status: newInstance.status,
+            expected_start_date: newInstance.expected_start_date,
+            expected_end_date: newInstance.expected_end_date,
+            actual_start_date: newInstance.actual_start_date || null,
+            actual_end_date: null,
+            delay_days: 0,
+            notes: newInstance.notes || null,
+          });
+        } catch {}
+      }
+
+      await logCaseEvent({
+        case_id: caseId,
+        stage_instance_id: newId,
+        event_type: 'STAGE_CREATED',
+        title: `Custom Task Added: ${title}`,
+        description: `Added new workflow task scheduled from ${startDate} to ${endDate}.`,
+        actor_name: (req as any).user?.name || (req as any).user?.full_name || 'Land Acquisition Officer',
+        actor_id: (req as any).user?.id,
+      });
+
+      const enrichedStages = calculateStageDeviations(stages);
+
+      res.json({
+        success: true,
+        message: 'New workflow task added successfully.',
+        stage: enrichedStages[enrichedStages.length - 1],
+        stages: enrichedStages,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to add workflow stage' });
+    }
+  }
+);
 
 // GET /api/cases/:id/timeline - Return calculated timeline coordinates for Gantt
 router.get('/:id/timeline', requireAuth, async (req: Request, res: Response) => {

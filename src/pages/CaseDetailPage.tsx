@@ -6,6 +6,7 @@ import { Badge } from '../components/common/Badge';
 import { Card, CardHeader, CardContent } from '../components/common/Card';
 import { PageHeader, PageEyebrow } from '../components/common/PageHeader';
 import { CaseOverviewTab } from '../components/cases/CaseOverviewTab';
+import { CaseWorkflowTab } from '../components/cases/CaseWorkflowTab';
 import { TimelineGantt } from '../components/workflow/TimelineGantt';
 import { StageAdvanceModal } from '../components/workflow/StageAdvanceModal';
 import { CaseMapView } from '../components/gis/CaseMapView';
@@ -421,24 +422,10 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
 
       {/* TAB 2: WORKFLOW */}
       {activeTab === 'workflow' && (
-        <Card className="border-slate-200">
-          <CardHeader
-            title="Statutory Workflow Progression (Expected vs Actual Timeline)"
-            subtitle="Stage progression timeline, statutory SLA baselines, prerequisite checks, and advancement guards"
-          />
-          <CardContent>
-            {caseItem.stage_instances && caseItem.stage_instances.length > 0 ? (
-              <TimelineGantt
-                stages={caseItem.stage_instances}
-                onSelectStageForAdvance={handleOpenAdvance}
-              />
-            ) : (
-              <div className="text-center py-12 text-slate-400 text-xs">
-                No stages initialized for this case.
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <CaseWorkflowTab
+          caseItem={caseItem}
+          onRefresh={loadCaseDetails}
+        />
       )}
 
       {/* TAB 3: INTELLIGENCE */}
