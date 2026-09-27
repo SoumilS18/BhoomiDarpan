@@ -6,6 +6,7 @@ import { ROLE_LABELS, ROLE_ORDER } from '../lib/domainLabels';
 import { navRoutesForRole, ROUTES } from '../router';
 import { WorkflowConfigPage } from './WorkflowConfigPage';
 import { IntegrationsPage } from './IntegrationsPage';
+import { AccessRequestsManager } from '../components/admin/AccessRequestsManager';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
 import {
@@ -28,11 +29,12 @@ import {
 import { clsx } from 'clsx';
 
 /** Addressable sections of the administration console (`/admin/:section`). */
-export type AdminSection = 'users' | 'workflows' | 'policies' | 'integrations' | 'audit';
+export type AdminSection = 'requests' | 'users' | 'workflows' | 'policies' | 'integrations' | 'audit';
 
 type AdminSubTab = AdminSection;
 
-const ADMIN_SECTIONS: AdminSection[] = ['users', 'workflows', 'policies', 'integrations', 'audit'];
+const ADMIN_SECTIONS: AdminSection[] = ['requests', 'users', 'workflows', 'policies', 'integrations', 'audit'];
+
 
 /**
  * Sidebar destinations, in registry order.
@@ -58,10 +60,15 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
   const { activePersona, session } = useAuth();
 
   // Derived from the URL, so each console section is deep-linkable.
-  const activeSubTab: AdminSubTab = ADMIN_SECTIONS.includes(section as AdminSection)
-    ? (section as AdminSection)
-    : 'users';
+  const resolvedSection: AdminSubTab =
+    section === 'access-requests' || section === 'requests'
+      ? 'requests'
+      : ADMIN_SECTIONS.includes(section as AdminSection)
+      ? (section as AdminSection)
+      : 'requests';
+  const activeSubTab: AdminSubTab = resolvedSection;
   const setActiveSubTab = (next: AdminSubTab) => onSectionChange(next);
+
 
   // Policy state
   const [policies, setPolicies] = useState<SystemPolicy[]>([]);
@@ -163,6 +170,20 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
       <div className="flex border-b border-slate-200 bg-white rounded-t-xl px-4 gap-6 text-xs font-medium overflow-x-auto shadow-xs">
         <button
           type="button"
+          onClick={() => setActiveSubTab('requests')}
+          className={clsx(
+            'py-3.5 flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer',
+            activeSubTab === 'requests'
+              ? 'border-gov-navy text-gov-navy font-bold'
+              : 'border-transparent text-slate-500 hover:text-gov-slate'
+          )}
+        >
+          <UserCheck className="h-4 w-4 text-emerald-600" />
+          <span>1. Access Requests &amp; Approvals</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveSubTab('users')}
           className={clsx(
             'py-3.5 flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer',
@@ -172,7 +193,7 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
           )}
         >
           <Users className="h-4 w-4 text-gov-navy" />
-          <span>1. Users &amp; Roles</span>
+          <span>2. Officer Roles &amp; Directory</span>
         </button>
 
         <button
@@ -186,7 +207,7 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
           )}
         >
           <GitBranch className="h-4 w-4 text-teal-600" />
-          <span>2. Workflow Configuration</span>
+          <span>3. Workflow Configuration</span>
         </button>
 
         <button
@@ -200,7 +221,7 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
           )}
         >
           <ShieldAlert className="h-4 w-4 text-amber-600" />
-          <span>3. Policies &amp; Thresholds</span>
+          <span>4. Policies &amp; Thresholds</span>
         </button>
 
         <button
@@ -214,7 +235,7 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
           )}
         >
           <Database className="h-4 w-4 text-blue-600" />
-          <span>4. External Integrations</span>
+          <span>5. External Integrations</span>
         </button>
 
         <button
@@ -228,14 +249,18 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
           )}
         >
           <History className="h-4 w-4 text-purple-600" />
-          <span>5. System Audit Ledger</span>
+          <span>6. System Audit Ledger</span>
         </button>
       </div>
 
       {/* Sub-Tab Content Viewports */}
       <div className="space-y-6">
-        {/* SUBTAB 1: USERS & ROLES */}
+        {/* SUBTAB 1: ACCESS REQUESTS */}
+        {activeSubTab === 'requests' && <AccessRequestsManager />}
+
+        {/* SUBTAB 2: USERS & ROLES */}
         {activeSubTab === 'users' && (
+
           <div className="space-y-5">
             <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 shadow-xs">
               <div>

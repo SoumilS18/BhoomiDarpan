@@ -1956,3 +1956,26 @@ export interface NormalizedTranslationResult {
   timestamp: string;
 }
 
+export interface AccessRequest {
+  id: string;
+  full_name: string;
+  email: string;
+  organization: string;
+  department?: string | null;
+  designation?: string | null;
+  contact_phone?: string | null;
+  jurisdiction_state_lgd_code?: string | null;
+  jurisdiction_state_name?: string | null;
+  jurisdiction_district_lgd_code?: string | null;
+  jurisdiction_district_name?: string | null;
+  justification: string;
+  requested_role?: UserRole | null;
+  status: 'pending' | 'in_review' | 'approved' | 'rejected' | 'withdrawn';
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  review_note?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+

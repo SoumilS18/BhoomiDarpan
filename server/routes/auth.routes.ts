@@ -1,6 +1,9 @@
 import { Request, Response, Router } from 'express';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { getSupabase, isSupabaseConfigured } from '../config/supabase';
 import { getAdministrativeUnitByCode } from '../services/administrativeGeographyService';
+import { requireAuth, requireRole } from '../middleware/auth.middleware';
+import { UserRole } from '../../shared/types';
 
 // ============================================================================
 // Public account-access request API
@@ -377,4 +380,266 @@ authRouter.post('/request-access', async (req: Request, res: Response) => {
   });
 });
 
+// ============================================================================
+// Administrative Access-Request Management API
+// ----------------------------------------------------------------------------
+// Only accessible to authenticated administrators (`requireRole(['admin'])`).
+// Allows reviewing, approving (provisioning real accounts), and rejecting.
+// ============================================================================
+
+/** Valid application roles that an admin can assign to an approved user */
+const ALL_ASSIGNABLE_ROLES: UserRole[] = [
+  'admin',
+  'lao',
+  'project_officer',
+  'revenue_inspector',
+  'legal_officer',
+  'approver',
+  'viewer',
+];
+
+/** Helper to find existing Auth user by email across pages */
+async function findExistingAuthUser(email: string): Promise<string | null> {
+  const supabase = getSupabase();
+  for (let page = 1; page <= 10; page++) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 100 });
+    if (error || !data?.users) break;
+    const hit = data.users.find((u) => (u.email || '').toLowerCase() === email.toLowerCase());
+    if (hit) return hit.id;
+    if (data.users.length < 100) break;
+  }
+  return null;
+}
+
+/**
+ * GET /api/auth/access-requests
+ * Returns all access requests for administrative review.
+ */
+const listAccessRequestsHandler = async (req: Request, res: Response) => {
+  if (!(await isTableAvailable())) {
+    return res.status(503).json({
+      error: 'Access requests table is not configured.',
+      code: 'NOT_CONFIGURED',
+      requests: [],
+    });
+  }
+
+  const statusFilter = typeof req.query.status === 'string' ? req.query.status.trim() : null;
+
+  try {
+    let query = getSupabase()
+      .from('access_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (statusFilter && statusFilter !== 'all') {
+      query = query.eq('status', statusFilter);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('[AuthRoutes] Failed to fetch access requests:', error.message);
+      return res.status(500).json({ error: 'Failed to fetch access requests.', code: 'QUERY_FAILED' });
+    }
+
+    return res.json({
+      requests: data || [],
+      count: data?.length || 0,
+    });
+  } catch (err: any) {
+    console.error('[AuthRoutes] Exception fetching access requests:', err);
+    return res.status(500).json({ error: 'Internal server error while fetching requests.' });
+  }
+};
+
+authRouter.get('/access-requests', requireAuth, requireRole(['admin']), listAccessRequestsHandler);
+authRouter.get('/request-access/list', requireAuth, requireRole(['admin']), listAccessRequestsHandler);
+
+/**
+ * POST /api/auth/access-requests/:id/approve
+ * Approves a request, creates a real Supabase Auth user, and inserts user_profiles row.
+ */
+authRouter.post('/access-requests/:id/approve', requireAuth, requireRole(['admin']), async (req: Request, res: Response) => {
+  if (!isSupabaseConfigured) {
+    return res.status(503).json({
+      error: 'Supabase is not configured on this server.',
+      code: 'SUPABASE_NOT_CONFIGURED',
+    });
+  }
+
+  const requestId = req.params.id;
+  const body = (req.body || {}) as Record<string, unknown>;
+  const adminUser = req.user!;
+  const supabase = getSupabase();
+
+  try {
+    // 1. Fetch access request
+    const { data: request, error: fetchErr } = await supabase
+      .from('access_requests')
+      .select('*')
+      .eq('id', requestId)
+      .single();
+
+    if (fetchErr || !request) {
+      return res.status(404).json({
+        error: 'Access request not found.',
+        code: 'NOT_FOUND',
+      });
+    }
+
+    if (request.status === 'approved') {
+      return res.status(400).json({
+        error: 'This access request has already been approved.',
+        code: 'ALREADY_APPROVED',
+      });
+    }
+
+    // 2. Determine target role
+    let assignedRole: UserRole = (request.requested_role as UserRole) || 'viewer';
+    if (typeof body.role === 'string' && ALL_ASSIGNABLE_ROLES.includes(body.role as UserRole)) {
+      assignedRole = body.role as UserRole;
+    }
+
+    // 3. Password handling
+    const rawPass = clean(body.temporaryPassword);
+    const temporaryPassword = rawPass || `${randomBytes(8).toString('hex')}@Bhoomi1`;
+
+    const email = request.email.trim().toLowerCase();
+    let authUid: string | null = null;
+
+    // 4. Check if auth user already exists
+    authUid = await findExistingAuthUser(email);
+
+    if (!authUid) {
+      // Create new Supabase Auth user
+      const { data: createdUser, error: createErr } = await supabase.auth.admin.createUser({
+        email,
+        password: temporaryPassword,
+        email_confirm: true,
+        user_metadata: {
+          full_name: request.full_name,
+          role: assignedRole,
+          department: request.department || undefined,
+          approved_by: adminUser.id,
+        },
+      });
+
+      if (createErr || !createdUser?.user) {
+        console.error('[AuthRoutes] Failed to create auth user:', createErr?.message);
+        // Fallback: search again in case of race
+        authUid = await findExistingAuthUser(email);
+        if (!authUid) {
+          return res.status(500).json({
+            error: `Failed to provision authentication account: ${createErr?.message || 'Unknown error'}`,
+            code: 'AUTH_PROVISION_FAILED',
+          });
+        }
+      } else {
+        authUid = createdUser.user.id;
+      }
+    } else {
+      // User existed: update their password if provided
+      if (rawPass) {
+        await supabase.auth.admin.updateUserById(authUid, { password: rawPass });
+      }
+    }
+
+    // 5. Upsert user_profiles row
+    const { error: profileErr } = await supabase.from('user_profiles').upsert(
+      {
+        id: authUid,
+        auth_user_id: authUid,
+        email,
+        full_name: request.full_name,
+        role: assignedRole,
+        department: request.department || `${request.organization} — ${request.designation || 'Staff'}`,
+        jurisdiction_state_lgd_code: request.jurisdiction_state_lgd_code || null,
+        jurisdiction_district_lgd_code: request.jurisdiction_district_lgd_code || null,
+      },
+      { onConflict: 'id' }
+    );
+
+    if (profileErr) {
+      console.error('[AuthRoutes] user_profiles upsert failed:', profileErr.message);
+      return res.status(500).json({
+        error: `Account created but failed to save user profile: ${profileErr.message}`,
+        code: 'PROFILE_CREATION_FAILED',
+      });
+    }
+
+    // 6. Mark access_requests as approved
+    const reviewNote = clean(body.reviewNote) || `Approved as ${assignedRole} by ${adminUser.full_name || 'Admin'}`;
+    const { error: updateErr } = await supabase
+      .from('access_requests')
+      .update({
+        status: 'approved',
+        reviewed_by: adminUser.id,
+        reviewed_at: new Date().toISOString(),
+        review_note: reviewNote,
+      })
+      .eq('id', requestId);
+
+    if (updateErr) {
+      console.warn('[AuthRoutes] Status update warning on access_requests:', updateErr.message);
+    }
+
+    return res.json({
+      success: true,
+      message: `Account for ${request.full_name} (${email}) has been approved and provisioned as ${assignedRole}.`,
+      credentials: {
+        uid: authUid,
+        email,
+        role: assignedRole,
+        temporaryPassword,
+      },
+    });
+  } catch (err: any) {
+    console.error('[AuthRoutes] Approval exception:', err);
+    return res.status(500).json({
+      error: 'An unexpected error occurred while approving the access request.',
+      details: err?.message,
+    });
+  }
+});
+
+/**
+ * POST /api/auth/access-requests/:id/reject
+ * Rejects an access request with an optional reason note.
+ */
+authRouter.post('/access-requests/:id/reject', requireAuth, requireRole(['admin']), async (req: Request, res: Response) => {
+  const requestId = req.params.id;
+  const body = (req.body || {}) as Record<string, unknown>;
+  const adminUser = req.user!;
+  const supabase = getSupabase();
+
+  try {
+    const reviewNote = clean(body.reviewNote) || 'Request declined by administrator.';
+
+    const { error } = await supabase
+      .from('access_requests')
+      .update({
+        status: 'rejected',
+        reviewed_by: adminUser.id,
+        reviewed_at: new Date().toISOString(),
+        review_note: reviewNote,
+      })
+      .eq('id', requestId);
+
+    if (error) {
+      console.error('[AuthRoutes] Rejection update failed:', error.message);
+      return res.status(500).json({ error: 'Failed to update request status.', code: 'UPDATE_FAILED' });
+    }
+
+    return res.json({
+      success: true,
+      message: 'Access request has been rejected.',
+    });
+  } catch (err: any) {
+    console.error('[AuthRoutes] Rejection exception:', err);
+    return res.status(500).json({ error: 'Internal server error while rejecting request.' });
+  }
+});
+
 export default authRouter;
+

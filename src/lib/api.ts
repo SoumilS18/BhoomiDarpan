@@ -42,7 +42,9 @@ import {
   LgdSyncStatus,
   LgdSyncSummary,
   CaseEvent,
+  AccessRequest,
 } from '../../shared/types';
+
 
 const API_BASE = '/api';
 
@@ -1629,6 +1631,76 @@ export async function fetchBhuvanHealth(): Promise<{
   }
   return res.json();
 }
+
+// ---------------------------------------------------------------------------
+// Administrative Access-Request Management API
+// ---------------------------------------------------------------------------
+
+export async function fetchAccessRequests(status?: string): Promise<{
+  requests: AccessRequest[];
+  count: number;
+}> {
+  const query = status && status !== 'all' ? `?status=${encodeURIComponent(status)}` : '';
+  const res = await fetch(`${API_BASE}/auth/access-requests${query}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch access requests (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function approveAccessRequest(
+  id: string,
+  payload: {
+    role?: string;
+    temporaryPassword?: string;
+    reviewNote?: string;
+  }
+): Promise<{
+  success: boolean;
+  message: string;
+  credentials?: {
+    uid: string;
+    email: string;
+    role: string;
+    temporaryPassword?: string;
+  };
+}> {
+  const res = await fetch(`${API_BASE}/auth/access-requests/${id}/approve`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to approve access request (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function rejectAccessRequest(
+  id: string,
+  payload: {
+    reviewNote?: string;
+  }
+): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  const res = await fetch(`${API_BASE}/auth/access-requests/${id}/reject`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to reject access request (${res.status})`);
+  }
+  return res.json();
+}
+
 
 
 
