@@ -1331,4 +1331,102 @@ router.post(
   }
 );
 
+// DELETE /api/cases/:id - Delete an acquisition case (Admins and LAOs only)
+router.delete(
+  '/:id',
+  requireAuth,
+  requireRole(['admin', 'lao']),
+  async (req: Request, res: Response) => {
+    try {
+      const rawId = req.params.id;
+      const caseId = Array.isArray(rawId) ? rawId[0] : rawId;
+      const caller = (req as any).user;
+
+      if (!caseId || caseId.trim().length === 0) {
+        return res.status(400).json({ error: 'Case ID is required.' });
+      }
+
+      if (isSupabaseConfigured) {
+        const supabase = getSupabase();
+
+        // 1. Fetch case for existence check and scoping
+        const { data: targetCase, error: fetchErr } = await supabase
+          .from('acquisition_cases')
+          .select('*')
+          .eq('id', caseId)
+          .single();
+
+        if (fetchErr || !targetCase) {
+          return res.status(404).json({ error: `Case "${caseId}" not found.` });
+        }
+
+        // Authorize caller for case jurisdiction
+        if (caller && caller.role !== 'admin') {
+          const authCheck = await authorizeUserForCase(caller, String(caseId));
+          if (!authCheck.authorized) {
+            return res.status(authCheck.errorStatus || 403).json({ error: authCheck.errorMessage || 'Unauthorized to delete this case.' });
+          }
+        }
+
+        // 2. Cleanup associated records
+        await Promise.all([
+          supabase.from('case_stage_instances').delete().eq('case_id', caseId),
+          supabase.from('case_disputes').delete().eq('case_id', caseId),
+          supabase.from('case_events').delete().eq('case_id', caseId),
+          supabase.from('parcels').delete().eq('case_id', caseId),
+          supabase.from('notifications').delete().eq('case_id', caseId),
+        ]);
+
+        // 3. Delete case record
+        const { error: delErr } = await supabase
+          .from('acquisition_cases')
+          .delete()
+          .eq('id', caseId);
+
+        if (delErr) {
+          return res.status(500).json({ error: delErr.message });
+        }
+
+        // Clean in-memory caches
+        inMemoryStageInstances.delete(caseId);
+        inMemoryDisputes.delete(caseId);
+
+        // 4. Log audit event
+        await logCaseEvent({
+          case_id: null,
+          project_id: targetCase.project_id || null,
+          event_type: 'CASE_DELETED',
+          title: `Case Deleted: ${targetCase.case_number}`,
+          description: `${caller?.full_name || 'Administrator'} permanently deleted case ${targetCase.case_number} (${targetCase.title}).`,
+          actor_id: caller?.id,
+          actor_name: caller?.full_name || 'Administrator',
+          metadata: {
+            deleted_case_id: caseId,
+            deleted_case_number: targetCase.case_number,
+            deleted_case_title: targetCase.title,
+            deleted_case_state: targetCase.state,
+            deleted_case_district: targetCase.district,
+          },
+        });
+
+        return res.json({
+          success: true,
+          message: `Case ${targetCase.case_number} (${targetCase.title}) permanently removed.`,
+        });
+      }
+
+      // Memory cleanup if Supabase is offline
+      inMemoryStageInstances.delete(caseId);
+      inMemoryDisputes.delete(caseId);
+
+      return res.json({
+        success: true,
+        message: `Case ${caseId} deleted (in-memory mode).`,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to delete case.' });
+    }
+  }
+);
+
 export default router;

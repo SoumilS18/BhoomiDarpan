@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { fetchCaseById, fetchCaseIntelligence } from '../lib/api';
+import { fetchCaseById, fetchCaseIntelligence, deleteCase } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import { AcquisitionCase, CaseStageInstance, CaseIntelligenceBundle } from '../../shared/types';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
@@ -32,6 +33,8 @@ import {
   Sparkles,
   Scale,
   Lightbulb,
+  Trash2,
+  X,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -99,12 +102,32 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
   const setActiveTab = (tab: CaseDetailTab) => onTabChange(tab);
 
   // Modals state
+  const { activePersona } = useAuth();
+  const canDeleteCase = activePersona.role === 'admin' || activePersona.role === 'lao';
   const [selectedStage, setSelectedStage] = useState<CaseStageInstance | null>(null);
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
   const [isGeoJSONModalOpen, setIsGeoJSONModalOpen] = useState(false);
   const [isAddParcelModalOpen, setIsAddParcelModalOpen] = useState(false);
   const [selectedParcelId, setSelectedParcelId] = useState<string | undefined>(undefined);
   const [gisRefreshKey, setGisRefreshKey] = useState(0);
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeletingCase, setIsDeletingCase] = useState(false);
+  const [deleteCaseError, setDeleteCaseError] = useState<string | null>(null);
+
+  const handleDeleteCase = async () => {
+    if (!caseItem) return;
+    setIsDeletingCase(true);
+    setDeleteCaseError(null);
+    try {
+      await deleteCase(caseItem.id);
+      setShowDeleteModal(false);
+      onBack();
+    } catch (err: any) {
+      setDeleteCaseError(err.message || 'Failed to delete case');
+      setIsDeletingCase(false);
+    }
+  };
 
   useEffect(() => {
     loadCaseDetails();
@@ -207,7 +230,7 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
               </span>
             }
             actions={
-              <>
+              <div className="flex flex-wrap items-center gap-2">
                 <Button variant="outline" size="sm" onClick={onBack} leftIcon={<ArrowLeft className="h-4 w-4" />}>
                   Back to Registry
                 </Button>
@@ -219,7 +242,20 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
                 >
                   Refresh
                 </Button>
-              </>
+                {canDeleteCase && (
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => {
+                      setDeleteCaseError(null);
+                      setShowDeleteModal(true);
+                    }}
+                    leftIcon={<Trash2 className="h-3.5 w-3.5" />}
+                  >
+                    Delete Case
+                  </Button>
+                )}
+              </div>
             }
           />
 
@@ -726,6 +762,65 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
           loadCaseDetails();
         }}
       />
+
+      {/* Delete Case Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5 text-red-600">
+                <div className="p-2 bg-red-100 rounded-lg">
+                  <Trash2 className="h-5 w-5" />
+                </div>
+                <h3 className="text-base font-bold text-slate-900">Delete Acquisition Case</h3>
+              </div>
+              <button
+                onClick={() => !isDeletingCase && setShowDeleteModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+                disabled={isDeletingCase}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-3">
+              <p className="text-sm text-slate-600">
+                Are you sure you want to permanently delete case <strong className="text-slate-900 font-mono">{caseItem?.case_number}</strong>?
+              </p>
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-800 space-y-1">
+                <p className="font-semibold">This action is permanent and cannot be undone.</p>
+                <p>All associated workflow stage instances, GIS parcels, land disputes, notifications, and events for this case will be permanently purged.</p>
+              </div>
+
+              {deleteCaseError && (
+                <div className="p-3 bg-red-100 border border-red-300 rounded-lg text-xs text-red-900">
+                  {deleteCaseError}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDeleteModal(false)}
+                disabled={isDeletingCase}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleDeleteCase}
+                isLoading={isDeletingCase}
+                leftIcon={<Trash2 className="h-4 w-4" />}
+              >
+                Confirm Delete Case
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

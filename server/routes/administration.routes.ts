@@ -16,7 +16,7 @@ import {
   getLgdSyncStatus,
 } from '../services/lgdIngestionService';
 import { getSupabase, isSupabaseConfigured } from '../config/supabase';
-import { getRecentAuditLogs } from '../services/auditLogger';
+import { getRecentAuditLogs, logCaseEvent } from '../services/auditLogger';
 import { requireAuth, requireRole } from '../middleware/auth.middleware';
 import { LgdAdministrativeTier } from '../config/lgdConfig';
 import { AdminUnitType } from '../../shared/types';
@@ -343,6 +343,119 @@ administrationRouter.get(
         .slice(-limit)
         .reverse();
       res.json({ events, source: 'memory', count: events.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+// ============================================================================
+// 4. USER ACCESS MANAGEMENT & REVOCATION
+// ============================================================================
+
+/**
+ * GET /api/administration/users
+ * Lists registered officers and their assigned roles/jurisdictions.
+ */
+administrationRouter.get(
+  '/users',
+  requireAuth,
+  requireRole(['admin']),
+  async (_req: Request, res: Response) => {
+    try {
+      if (isSupabaseConfigured) {
+        const supabase = getSupabase();
+        const { data: users, error } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!error && users) {
+          return res.json({ users, count: users.length });
+        }
+      }
+
+      return res.json({ users: [], count: 0 });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+/**
+ * DELETE /api/administration/users/:id
+ * Revokes officer access, deletes Supabase auth account, and cleans user profile.
+ */
+administrationRouter.delete(
+  '/users/:id',
+  requireAuth,
+  requireRole(['admin']),
+  async (req: Request, res: Response) => {
+    try {
+      const targetUserId = typeof req.params.id === 'string' ? req.params.id : String(req.params.id || '');
+      const caller = (req as any).user;
+
+      if (!targetUserId || targetUserId.trim().length === 0) {
+        return res.status(400).json({ error: 'Target user ID is required.' });
+      }
+
+      if (caller && caller.id === targetUserId) {
+        return res.status(400).json({
+          error: 'Self-revocation is prohibited. An administrator cannot revoke their own active account.',
+        });
+      }
+
+      if (isSupabaseConfigured) {
+        const supabase = getSupabase();
+
+        // 1. Fetch user to verify existence and get details for audit
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', targetUserId)
+          .single();
+
+        // 2. Delete auth user from Supabase Auth
+        try {
+          await supabase.auth.admin.deleteUser(targetUserId);
+        } catch (authErr: any) {
+          console.warn('[Administration] Supabase auth user deletion warning:', authErr?.message);
+        }
+
+        // 3. Delete profile row
+        const { error: delErr } = await supabase
+          .from('user_profiles')
+          .delete()
+          .eq('id', targetUserId);
+
+        if (delErr) {
+          return res.status(500).json({ error: delErr.message });
+        }
+
+        // 4. Log audit event
+        await logCaseEvent({
+          event_type: 'USER_ACCESS_REVOKED',
+          title: `Access Revoked: ${profile?.full_name || targetUserId}`,
+          description: `Administrator ${caller?.full_name || 'Admin'} revoked access for ${profile?.full_name || targetUserId} (${profile?.email || 'N/A'}, role: ${profile?.role || 'N/A'}).`,
+          actor_id: caller?.id,
+          actor_name: caller?.full_name || 'Administrator',
+          metadata: {
+            revoked_user_id: targetUserId,
+            revoked_user_email: profile?.email,
+            revoked_user_role: profile?.role,
+          },
+        });
+
+        return res.json({
+          success: true,
+          message: `Access successfully revoked for ${profile?.full_name || targetUserId}.`,
+        });
+      }
+
+      return res.json({
+        success: true,
+        message: `User ${targetUserId} access revoked (in-memory mode).`,
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

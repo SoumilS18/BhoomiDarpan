@@ -49,6 +49,7 @@ import {
   SpatialResolutionSimulation,
   StatutoryAwardCalculation,
   CaseAwardSummary,
+  UserProfile,
 } from '../../shared/types';
 
 
@@ -1970,6 +1971,78 @@ export async function rejectAccessRequest(
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Failed to reject access request (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Lists all active registered officers and system profiles (Admin only).
+ */
+export async function fetchAdminUsers(): Promise<{
+  users: UserProfile[];
+  count: number;
+}> {
+  const res = await fetch(`${API_BASE}/administration/users`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to load users (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Permanently revokes officer access and deletes user profile (Admin only).
+ */
+export async function revokeUserAccess(userId: string): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  const res = await fetch(`${API_BASE}/administration/users/${userId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to revoke user access (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Permanently deletes an acquisition case and its associated records (Admin / LAO).
+ */
+export async function deleteCase(caseId: string): Promise<{
+  success: boolean;
+  message: string;
+}> {
+  const res = await fetch(`${API_BASE}/cases/${caseId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to delete case (${res.status})`);
+  }
+  return res.json();
+}
+
+/**
+ * Permanently deletes an infrastructure project (Admin only).
+ */
+export async function deleteProject(projectId: string): Promise<{
+  success: boolean;
+  message: string;
+  unlinked_cases?: number;
+}> {
+  const res = await fetch(`${API_BASE}/projects/${projectId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to delete project (${res.status})`);
   }
   return res.json();
 }

@@ -143,4 +143,84 @@ router.post('/', requireAuth, requireRole(['admin', 'project_officer', 'lao']), 
   }
 });
 
+// DELETE /api/projects/:id - Delete an infrastructure project (Admins only)
+router.delete('/:id', requireAuth, requireRole(['admin']), async (req: Request, res: Response) => {
+  try {
+    if (!isSupabaseConfigured) {
+      return res.status(503).json({ error: 'Supabase not configured' });
+    }
+
+    const rawId = req.params.id;
+    const projectId = Array.isArray(rawId) ? rawId[0] : rawId;
+    const caller = (req as any).user;
+
+    if (!projectId || projectId.trim().length === 0) {
+      return res.status(400).json({ error: 'Project ID is required.' });
+    }
+
+    const supabase = getSupabase();
+
+    // 1. Fetch project to verify existence
+    const { data: project, error: fetchErr } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', projectId)
+      .single();
+
+    if (fetchErr || !project) {
+      return res.status(404).json({ error: `Project "${projectId}" not found.` });
+    }
+
+    // 2. Check if project has associated cases
+    const { data: associatedCases } = await supabase
+      .from('acquisition_cases')
+      .select('id, case_number')
+      .eq('project_id', projectId);
+
+    const caseCount = associatedCases?.length || 0;
+
+    // Unlink cases from deleted project so cases are preserved safely
+    if (caseCount > 0) {
+      await supabase
+        .from('acquisition_cases')
+        .update({ project_id: null })
+        .eq('project_id', projectId);
+    }
+
+    // 3. Delete project record
+    const { error: delErr } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', projectId);
+
+    if (delErr) {
+      return res.status(500).json({ error: delErr.message });
+    }
+
+    // 4. Log audit event
+    await logCaseEvent({
+      project_id: null,
+      event_type: 'PROJECT_DELETED',
+      title: `Project Deleted: ${project.name} (${project.code})`,
+      description: `Administrator ${caller?.full_name || 'Admin'} deleted project ${project.name} (${project.code}). ${caseCount} associated cases were unlinked.`,
+      actor_id: caller?.id,
+      actor_name: caller?.full_name || 'Administrator',
+      metadata: {
+        deleted_project_id: projectId,
+        deleted_project_code: project.code,
+        deleted_project_name: project.name,
+        unlinked_case_count: caseCount,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: `Project ${project.name} (${project.code}) deleted successfully.`,
+      unlinked_cases: caseCount,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

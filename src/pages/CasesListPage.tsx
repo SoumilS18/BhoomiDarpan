@@ -6,7 +6,9 @@ import {
   fetchDistricts,
   fetchSubDistricts,
   fetchVillages,
+  deleteCase,
 } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import { useQueryParams } from '../router';
 import { AcquisitionCase, Project, AdministrativeUnit } from '../../shared/types';
 import { CaseCard } from '../components/cases/CaseCard';
@@ -31,6 +33,8 @@ import {
   LayoutGrid,
   CheckCircle2,
   FileWarning,
+  Trash2,
+  X,
 } from 'lucide-react';
 import { PageHeader, PageEyebrow } from '../components/common/PageHeader';
 import { clsx } from 'clsx';
@@ -51,10 +55,32 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
   onSelectCase,
   onOpenCreateCase,
 }) => {
+  const { activePersona } = useAuth();
+  const canDeleteCase = activePersona.role === 'admin' || activePersona.role === 'lao';
+
   const [cases, setCases] = useState<AcquisitionCase[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [caseToDelete, setCaseToDelete] = useState<AcquisitionCase | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleDeleteCase = async () => {
+    if (!caseToDelete) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteCase(caseToDelete.id);
+      setCases((prev) => prev.filter((c) => c.id !== caseToDelete.id));
+      setCaseToDelete(null);
+    } catch (err: any) {
+      setDeleteError(err.message || 'Failed to delete case');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Administrative units loaded from authoritative hierarchy
   const [adminStates, setAdminStates] = useState<AdministrativeUnit[]>([]);
@@ -961,6 +987,19 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
                             >
                               Open
                             </button>
+                            {canDeleteCase && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDeleteError(null);
+                                  setCaseToDelete(item);
+                                }}
+                                className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                                title="Delete Case"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1118,6 +1157,65 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Case Confirmation Modal */}
+      {caseToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5 text-red-600">
+                <div className="p-2 bg-red-100 rounded-lg">
+                  <Trash2 className="h-5 w-5" />
+                </div>
+                <h3 className="text-base font-bold text-slate-900">Delete Acquisition Case</h3>
+              </div>
+              <button
+                onClick={() => !isDeleting && setCaseToDelete(null)}
+                className="text-slate-400 hover:text-slate-600 p-1"
+                disabled={isDeleting}
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-3">
+              <p className="text-sm text-slate-600">
+                Are you sure you want to permanently delete case <strong className="text-slate-900 font-mono">{caseToDelete.case_number}</strong>?
+              </p>
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-800 space-y-1">
+                <p className="font-semibold">This action is permanent and cannot be undone.</p>
+                <p>All associated workflow stage instances, GIS parcels, land disputes, notifications, and audit events will be purged.</p>
+              </div>
+
+              {deleteError && (
+                <div className="p-3 bg-red-100 border border-red-300 rounded-lg text-xs text-red-900">
+                  {deleteError}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCaseToDelete(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleDeleteCase}
+                isLoading={isDeleting}
+                leftIcon={<Trash2 className="h-4 w-4" />}
+              >
+                Confirm Delete Case
+              </Button>
+            </div>
           </div>
         </div>
       )}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { fetchProjects, fetchCases } from '../lib/api';
+import { fetchProjects, fetchCases, deleteProject } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import { Project, AcquisitionCase } from '../../shared/types';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
@@ -22,6 +23,8 @@ import {
   Layers,
   Activity,
   Plus,
+  Trash2,
+  X,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -47,6 +50,12 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const { activePersona } = useAuth();
+  const isAdmin = activePersona.role === 'admin';
+
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -62,6 +71,25 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({
       setError(err.message || 'Failed to load projects and cases');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!projectToDelete) return;
+    setIsDeleting(true);
+    setFeedbackMessage(null);
+    try {
+      const res = await deleteProject(projectToDelete.id);
+      setFeedbackMessage(res.message);
+      if (selectedProjectId === projectToDelete.id) {
+        setSelectedProjectId(null);
+      }
+      setProjectToDelete(null);
+      await loadData();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete project.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -203,14 +231,26 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({
             </>
           }
           actions={
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => (onBack ? onBack() : setSelectedProjectId(null))}
-              leftIcon={<ArrowLeft className="h-4 w-4" />}
-            >
-              Back to Projects Portfolio
-            </Button>
+            <div className="flex items-center gap-2">
+              {isAdmin && (
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => setProjectToDelete(selectedProject)}
+                  leftIcon={<Trash2 className="h-4 w-4" />}
+                >
+                  Delete Project
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => (onBack ? onBack() : setSelectedProjectId(null))}
+                leftIcon={<ArrowLeft className="h-4 w-4" />}
+              >
+                Back to Projects Portfolio
+              </Button>
+            </div>
           }
         />
 
@@ -471,7 +511,21 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({
                   )}
                 </div>
 
-                <div className="flex justify-end pt-2">
+                <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                  {isAdmin ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setProjectToDelete(p);
+                      }}
+                      className="inline-flex items-center gap-1 text-[11px] text-rose-600 hover:text-rose-800 font-medium py-1 px-1.5 rounded hover:bg-rose-50 transition-colors"
+                      title="Delete this project"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                      <span>Delete</span>
+                    </button>
+                  ) : <span />}
                   <span className="flex items-center gap-1 text-xs font-semibold text-gov-navy group-hover:underline">
                     <span>Inspect Corridor Workspace</span>
                     <ArrowRight className="h-3.5 w-3.5" />
@@ -482,6 +536,58 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({
           );
         })}
       </div>
+      )}
+
+      {/* Delete Project Confirmation Modal */}
+      {projectToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-sand-200 space-y-4 animate-in fade-in zoom-in duration-150">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                <Trash2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-gov-slate">Delete Infrastructure Project</h4>
+                <p className="text-xs text-mocha-500">Permanent administrator removal</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-3.5 space-y-2 text-xs text-rose-900">
+              <p className="font-semibold">
+                Are you sure you want to permanently delete this project?
+              </p>
+              <div className="space-y-1 text-[11px] text-rose-800">
+                <p><strong>Code:</strong> {projectToDelete.code}</p>
+                <p><strong>Name:</strong> {projectToDelete.name}</p>
+                <p><strong>Agency:</strong> {projectToDelete.sponsoring_agency}</p>
+                <p><strong>State:</strong> {projectToDelete.state}</p>
+              </div>
+              <p className="text-[10px] text-rose-700 pt-1">
+                Any acquisition cases linked to this project will be unlinked and preserved safely.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setProjectToDelete(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleConfirmDelete}
+                isLoading={isDeleting}
+                leftIcon={<Trash2 className="h-3.5 w-3.5" />}
+              >
+                Confirm Delete Project
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       <CreateProjectModal

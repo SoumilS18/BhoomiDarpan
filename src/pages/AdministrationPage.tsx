@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { fetchPolicies, updatePolicyByKey, fetchAdministrationAudit } from '../lib/api';
-import { SystemPolicy, CaseEvent, UserRole } from '../../shared/types';
+import {
+  fetchPolicies,
+  updatePolicyByKey,
+  fetchAdministrationAudit,
+  fetchAdminUsers,
+  revokeUserAccess,
+} from '../lib/api';
+import { SystemPolicy, CaseEvent, UserRole, UserProfile } from '../../shared/types';
 import { ROLE_LABELS, ROLE_ORDER } from '../lib/domainLabels';
 import { navRoutesForRole, ROUTES } from '../router';
 import { WorkflowConfigPage } from './WorkflowConfigPage';
@@ -23,6 +29,13 @@ import {
   ChevronDown,
   ChevronUp,
   UserCheck,
+  UserX,
+  Trash2,
+  Search,
+  Building2,
+  MapPin,
+  Mail,
+  X,
   Shield,
   Save,
 } from 'lucide-react';
@@ -109,15 +122,54 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
     }
   };
 
+  // Registered users state
+  const [usersList, setUsersList] = useState<UserProfile[]>([]);
+  const [isUsersLoading, setIsUsersLoading] = useState(false);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [userSearch, setUserSearch] = useState('');
+  const [userToRevoke, setUserToRevoke] = useState<UserProfile | null>(null);
+  const [isRevoking, setIsRevoking] = useState(false);
+  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+
+  const loadUsers = async () => {
+    setIsUsersLoading(true);
+    setUsersError(null);
+    try {
+      const res = await fetchAdminUsers();
+      setUsersList(res.users || []);
+    } catch (err: any) {
+      setUsersError(err.message || 'Failed to load officer directory.');
+    } finally {
+      setIsUsersLoading(false);
+    }
+  };
+
+  const handleConfirmRevoke = async () => {
+    if (!userToRevoke) return;
+    setIsRevoking(true);
+    setActionFeedback(null);
+    try {
+      const res = await revokeUserAccess(userToRevoke.id);
+      setActionFeedback(res.message);
+      setUserToRevoke(null);
+      await loadUsers();
+    } catch (err: any) {
+      setUsersError(err.message || 'Failed to revoke user access.');
+    } finally {
+      setIsRevoking(false);
+    }
+  };
+
   useEffect(() => {
+    if (activeSubTab === 'users') {
+      loadUsers();
+    }
     if (activeSubTab === 'policies') {
       loadPolicies();
     }
     if (activeSubTab === 'audit') {
       loadAudit();
     }
-    // Re-run on role change: the ledger endpoint is role-gated, so a stale
-    // "Access Denied" from the previous role must not survive a switch.
   }, [activeSubTab, activePersona.role]);
 
   const handleStartEditPolicy = (p: SystemPolicy) => {
@@ -256,21 +308,224 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
 
         {/* SUBTAB 2: USERS & ROLES */}
         {activeSubTab === 'users' && (
-
           <div className="space-y-5">
-            <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 shadow-xs">
+            {/* Feedback alert */}
+            {actionFeedback && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-center justify-between text-xs text-emerald-800">
+                <span className="flex items-center gap-2 font-medium">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                  {actionFeedback}
+                </span>
+                <button type="button" onClick={() => setActionFeedback(null)} className="text-emerald-600 hover:text-emerald-900">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            {usersError && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 flex items-center justify-between text-xs text-rose-800">
+                <span className="flex items-center gap-2 font-medium">
+                  <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
+                  {usersError}
+                </span>
+                <button type="button" onClick={() => setUsersError(null)} className="text-rose-600 hover:text-rose-900">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Active Registered Officers Table */}
+            <div className="bg-white rounded-xl border border-sand-200 p-5 space-y-4 shadow-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-bold text-gov-slate text-sm flex items-center gap-2">
+                    <Users className="h-4 w-4 text-terra-700" />
+                    Registered Officers &amp; Access Control
+                  </h3>
+                  <p className="text-[11px] text-mocha-500">
+                    Administrators have full statutory power to manage registered accounts and permanently revoke officer access.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-mocha-400" />
+                    <input
+                      type="text"
+                      placeholder="Search officers..."
+                      value={userSearch}
+                      onChange={(e) => setUserSearch(e.target.value)}
+                      className="input pl-8 py-1.5 text-xs w-48 rounded-lg"
+                    />
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={loadUsers}
+                    isLoading={isUsersLoading}
+                    leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
+                  >
+                    Refresh
+                  </Button>
+                </div>
+              </div>
+
+              {isUsersLoading && usersList.length === 0 ? (
+                <div className="py-8 text-center text-xs text-mocha-500">
+                  <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-terra-600" />
+                  Loading officer directory...
+                </div>
+              ) : (
+                <div className="overflow-x-auto border border-sand-200 rounded-lg">
+                  <table className="table-shell">
+                    <thead>
+                      <tr>
+                        <th>Officer Name</th>
+                        <th>Email / Account</th>
+                        <th>Department &amp; Organization</th>
+                        <th>Role Assigned</th>
+                        <th>Jurisdiction</th>
+                        <th className="text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {usersList
+                        .filter((u) => {
+                          if (!userSearch.trim()) return true;
+                          const q = userSearch.toLowerCase();
+                          return (
+                            u.full_name?.toLowerCase().includes(q) ||
+                            u.email?.toLowerCase().includes(q) ||
+                            u.department?.toLowerCase().includes(q) ||
+                            u.role?.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((u) => {
+                          const isCurrentUser = session && session.userId === u.id;
+                          return (
+                            <tr key={u.id}>
+                              <td className="font-semibold text-gov-slate">
+                                <div className="flex items-center gap-2">
+                                  <span className="h-6 w-6 rounded-full bg-terra-100 text-terra-800 font-bold flex items-center justify-center text-[10px]">
+                                    {u.full_name ? u.full_name.charAt(0).toUpperCase() : 'U'}
+                                  </span>
+                                  <span>{u.full_name || 'Unnamed Officer'}</span>
+                                  {isCurrentUser && (
+                                    <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold border border-emerald-200">
+                                      You
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="font-mono text-[11px] text-mocha-700">{u.email}</td>
+                              <td className="text-mocha-600">{u.department || '—'}</td>
+                              <td>
+                                <Badge variant={u.role === 'admin' ? 'red' : u.role === 'lao' ? 'amber' : 'navy'}>
+                                  {ROLE_LABELS[u.role as UserRole] || u.role}
+                                </Badge>
+                              </td>
+                              <td className="text-mocha-600 text-[11px]">
+                                {u.jurisdiction_district_lgd_code
+                                  ? `District LGD: ${u.jurisdiction_district_lgd_code}`
+                                  : u.jurisdiction_state_lgd_code
+                                  ? `State LGD: ${u.jurisdiction_state_lgd_code}`
+                                  : 'National Scope'}
+                              </td>
+                              <td className="text-right">
+                                {isCurrentUser ? (
+                                  <span className="text-[10px] text-slate-400 italic">Self-protected</span>
+                                ) : (
+                                  <Button
+                                    variant="danger"
+                                    size="sm"
+                                    onClick={() => setUserToRevoke(u)}
+                                    leftIcon={<UserX className="h-3 w-3" />}
+                                  >
+                                    Revoke Access
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      {usersList.length === 0 && !isUsersLoading && (
+                        <tr>
+                          <td colSpan={6} className="text-center py-6 text-mocha-400 italic">
+                            No officer accounts found. Officers appear here after registration or access request approval.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Revoke Access Confirmation Modal */}
+            {userToRevoke && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+                <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-sand-200 space-y-4 animate-in fade-in zoom-in duration-150">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                      <UserX className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-gov-slate">Revoke Officer Access</h4>
+                      <p className="text-xs text-mocha-500">Permanent security revocation</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-3.5 space-y-2 text-xs text-rose-900">
+                    <p className="font-semibold">
+                      Are you sure you want to permanently revoke access for this officer?
+                    </p>
+                    <div className="space-y-1 text-[11px] text-rose-800">
+                      <p><strong>Name:</strong> {userToRevoke.full_name}</p>
+                      <p><strong>Email:</strong> {userToRevoke.email}</p>
+                      <p><strong>Assigned Role:</strong> {ROLE_LABELS[userToRevoke.role as UserRole] || userToRevoke.role}</p>
+                      <p><strong>Department:</strong> {userToRevoke.department || 'N/A'}</p>
+                    </div>
+                    <p className="text-[10px] text-rose-700 pt-1">
+                      This will delete the officer's authentication credentials and terminate their permissions across BhoomiSetu immediately.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setUserToRevoke(null)}
+                      disabled={isRevoking}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={handleConfirmRevoke}
+                      isLoading={isRevoking}
+                      leftIcon={<Trash2 className="h-3.5 w-3.5" />}
+                    >
+                      Confirm Revoke Access
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Current Session Info */}
+            <div className="bg-white rounded-xl border border-sand-200 p-5 space-y-4 shadow-xs">
               <div>
                 <h3 className="font-bold text-gov-slate text-sm">
-                  Officer Directory &amp; Role Context
+                  Active Session Context
                 </h3>
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-mocha-500">
                   {session
-                    ? 'Signed-in officers act under their own profile. Identity and role are read from the session and cannot be changed here.'
-                    : "No real session exists in this build, so the evaluation role contexts below can be selected to explore each role's view of the application."}
+                    ? 'Signed-in officers act under their own authenticated profile.'
+                    : 'No real session exists in this build.'}
                 </p>
               </div>
 
-              {/* Signed-in session: identity is fixed, so no switching is offered. */}
+              {/* Signed-in session: identity is fixed */}
               {session && (
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
                   <div className="space-y-1">
@@ -289,23 +544,17 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
                       {session.jurisdiction
                         ? `Jurisdiction: ${session.jurisdiction}. `
                         : 'Jurisdiction: national scope. '}
-                      Role authorisation is enforced server-side on every request; this console
-                      only reflects it, and the role cannot be changed here.
+                      Role authorisation is enforced server-side on every request.
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* Signed out: say so plainly. There is no identity to present and
-                  no role to choose — authorisation is a property of the account,
-                  resolved from the verified token on the server. */}
               {!session && (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="rounded-xl border border-sand-200 bg-sand-50 p-4">
                   <p className="text-xs font-bold text-gov-slate">No account is signed in</p>
-                  <p className="mt-1 text-[11px] text-slate-600">
-                    Sign in to see the authenticated identity, role and jurisdiction that this
-                    console reflects. Roles are assigned by an administrator and cannot be selected
-                    in the browser.
+                  <p className="mt-1 text-[11px] text-mocha-600">
+                    Sign in to see your authenticated identity and territorial jurisdiction.
                   </p>
                 </div>
               )}
