@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import {
   checkSupabaseConnection,
   isSupabaseConfigured,
@@ -102,16 +103,32 @@ export function createApiApp() {
   });
 
   // SPA fallback for client routing (non-API routes)
+  // We inject a runtime config block so the browser receives Supabase credentials
+  // from the server's environment, even when VITE_* vars were not available at
+  // Docker build time (the common Render deployment scenario).
   app.get('*', (req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith('/api')) {
       return next();
     }
     const indexPath = path.join(distPath, 'index.html');
-    res.sendFile(indexPath, (err) => {
-      if (err) {
-        next();
-      }
-    });
+    if (!fs.existsSync(indexPath)) {
+      return next();
+    }
+    try {
+      let html = fs.readFileSync(indexPath, 'utf-8');
+      // Inject runtime public config that the frontend reads via window.__BHOOMISETU__
+      const runtimeConfig = {
+        SUPABASE_URL: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '',
+        SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
+        MAPTILER_API_KEY: process.env.VITE_MAPTILER_API_KEY || process.env.MAPTILER_API_KEY || '',
+      };
+      const injection = `<script>window.__BHOOMISETU__ = ${JSON.stringify(runtimeConfig)};</script>`;
+      html = html.replace('</head>', `${injection}\n</head>`);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(html);
+    } catch {
+      res.sendFile(indexPath, (err) => { if (err) next(); });
+    }
   });
 
   // Global Error Handler
