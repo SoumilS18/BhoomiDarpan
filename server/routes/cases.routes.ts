@@ -8,6 +8,7 @@ import { getLiveWeatherObservation } from '../services/weatherAdapter';
 import { geocodingService } from '../services/geocodingService';
 import { detectCrossSourceDiscrepancies, SourceCandidate } from '../services/discrepancyDetector';
 import { getProvenanceForEntity } from '../services/provenanceService';
+import { detectSpatialAndCadastralRelationships, getScopedCases } from '../services/spatialIntelligenceService';
 import { CaseExternalContextBundle, CaseDispute, AcquisitionCase } from '../../shared/types';
 import { CreateCaseSchema, AdvanceStageSchema, CreateDisputeSchema, UpdateDisputeSchema } from '../utils/validators';
 import { requireAuth, requireRole } from '../middleware/auth.middleware';
@@ -83,21 +84,28 @@ router.get('/', requireAuth, async (req: Request, res: Response) => {
       return res.status(500).json({ error: error.message });
     }
 
-    // Attach dynamically calculated metrics to every case
-    const enrichedCases = (cases || []).map((c: any) => {
-      const stageInstances = c.stage_instances || [];
-      const metrics = calculateCaseMetrics({
-        startDate: c.start_date,
-        expectedCompletionDate: c.expected_completion_date,
-        actualCompletionDate: c.actual_completion_date,
-        stageInstances,
-      });
+    // Attach dynamically calculated metrics and spatial relationships to every case
+    const validCasesList = cases || [];
+    const enrichedCases = await Promise.all(
+      validCasesList.map(async (c: any) => {
+        const stageInstances = c.stage_instances || [];
+        const metrics = calculateCaseMetrics({
+          startDate: c.start_date,
+          expectedCompletionDate: c.expected_completion_date,
+          actualCompletionDate: c.actual_completion_date,
+          stageInstances,
+        });
 
-      return {
-        ...c,
-        calculated_metrics: metrics,
-      };
-    });
+        // Detect spatial relationships with candidate active cases
+        const relationships = await detectSpatialAndCadastralRelationships(c, validCasesList);
+
+        return {
+          ...c,
+          calculated_metrics: metrics,
+          spatial_relationships: relationships,
+        };
+      })
+    );
 
     res.json({ cases: enrichedCases, count: enrichedCases.length });
   } catch (err: any) {
@@ -170,12 +178,16 @@ router.get('/:id', requireAuth, async (req: Request, res: Response) => {
       stageInstances: enrichedStages,
     });
 
+    const scopedCases = await getScopedCases(req.user);
+    const relationships = await detectSpatialAndCadastralRelationships(caseItem, scopedCases);
+
     res.json({
       case: {
         ...caseItem,
         stage_instances: enrichedStages,
         audit_logs: auditLogs || [],
         calculated_metrics: metrics,
+        spatial_relationships: relationships,
       },
     });
   } catch (err: any) {

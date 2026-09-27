@@ -156,6 +156,7 @@ export interface AcquisitionCase {
   documents?: CaseDocument[];
   audit_logs?: CaseEvent[];
   calculated_metrics?: CaseCalculatedMetrics;
+  spatial_relationships?: SpatialRelationship[];
 }
 
 export type StageInstanceStatus = 
@@ -1727,6 +1728,86 @@ export type SpatialGeometryStatus =
   | 'invalid_geometry'
   | 'administrative_enrichment_unavailable';
 
+export type SpatialRelationshipType =
+  | 'boundary_overlap'
+  | 'cadastral_collision'
+  | 'complete_enclosure'
+  | 'nearby'
+  | 'same_administrative_unit';
+
+export interface SpatialRelationshipRecommendation {
+  id: string;
+  type: 'boundary_review' | 'coordination_review' | 'field_resurvey' | string;
+  action_type?: string;
+  title: string;
+  description: string;
+  suggested_action: string;
+  priority?: 'high' | 'medium' | 'advisory';
+  statutory_guardrail?: string;
+}
+
+export interface SpatialRelationship {
+  id: string;
+  source_case_id: string;
+  source_case_number: string;
+  source_case_title: string;
+  source_project_id?: string;
+  source_project_name?: string;
+  target_case_id: string;
+  target_case_number: string;
+  target_case_title: string;
+  target_project_id?: string;
+  target_project_name?: string;
+  related_case_id?: string;
+  related_case_number?: string;
+  related_project_name?: string;
+  relationship_type: SpatialRelationshipType;
+  relationship_severity: 'warning' | 'alert' | 'advisory' | 'info';
+  intersection_area_hectares?: number;
+  source_overlap_percentage?: number; // % of source case area
+  target_overlap_percentage?: number; // % of target case area
+  overlap_pct?: number;
+  distance_km?: number;
+  shared_survey_numbers?: string[];
+  shared_khata_numbers?: string[];
+  shared_cadastral_identifiers?: Array<{
+    survey_number?: string;
+    khata_number?: string;
+    landowner_names?: string;
+    area_acres?: number;
+  }>;
+  shared_geography: {
+    state: string;
+    district: string;
+    tehsil?: string;
+    village: string;
+    state_lgd_code?: string;
+    district_lgd_code?: string;
+    subdistrict_lgd_code?: string;
+    village_lgd_code?: string;
+  };
+  shared_admin_unit?: {
+    village?: string;
+    village_lgd_code?: string;
+    district?: string;
+    state?: string;
+  };
+  intersection_geojson?: any; // GeoJSON geometry of the overlap polygon
+  evidence_summary: string;
+  recommendations: SpatialRelationshipRecommendation[];
+  detected_at: string;
+}
+
+export interface PortfolioSpatialRelationshipsSummary {
+  total_relationships: number;
+  total_relationships_detected?: number;
+  boundary_overlaps_count: number;
+  cadastral_collisions_count: number;
+  cases_requiring_review_count: number;
+  cases_requiring_spatial_review?: string[];
+  relationships: SpatialRelationship[];
+}
+
 export interface CaseSpatialContext {
   case_id: string;
   case_number: string;
@@ -1759,6 +1840,7 @@ export interface CaseSpatialContext {
     status: string;
     risk_level?: string;
   }>;
+  spatial_relationships?: SpatialRelationship[];
   administrative_hierarchy: {
     state: string;
     district: string;

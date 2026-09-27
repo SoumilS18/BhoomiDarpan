@@ -771,6 +771,24 @@ export function getAuthorizedScopeFilter(user?: AuthenticatedUser): AuthorizedSc
         scopeDescription: `Revenue Inspector Scope: State LGD Code ${stateCode}`,
       };
     }
+    if ((user as any).jurisdiction_district) {
+      const dist = String((user as any).jurisdiction_district).trim();
+      return {
+        isRestricted: true,
+        allowedDistricts: [dist],
+        userRole: user.role,
+        scopeDescription: `Revenue Inspector Scope: District ${dist}`,
+      };
+    }
+    if ((user as any).jurisdiction_state) {
+      const st = String((user as any).jurisdiction_state).trim();
+      return {
+        isRestricted: true,
+        allowedStates: [st],
+        userRole: user.role,
+        scopeDescription: `Revenue Inspector Scope: State ${st}`,
+      };
+    }
     if (user.department && user.department.startsWith('state:')) {
       const state = user.department.replace('state:', '').trim();
       return {

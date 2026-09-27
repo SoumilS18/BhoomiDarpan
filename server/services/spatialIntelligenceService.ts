@@ -10,6 +10,10 @@ import {
   NearbySpatialEntity,
   SpatialGeometryStatus,
   DataProvenance,
+  SpatialRelationship,
+  SpatialRelationshipType,
+  SpatialRelationshipRecommendation,
+  PortfolioSpatialRelationshipsSummary,
 } from '../../shared/types';
 import { AuthenticatedUser } from '../middleware/auth.middleware';
 import { getAuthorizedScopeFilter, AuthorizedScopeFilter } from './portfolioAnalyzer';
@@ -234,6 +238,341 @@ export function calculateBoundingBox(geojson: any): [number, number, number, num
 }
 
 /**
+ * Computes metric surface area in square meters for a closed coordinate ring `[[lng, lat], ...]`.
+ * Uses geodesic projection conversion factors based on mean latitude and Shoelace formula.
+ */
+export function calculateRingAreaSqMeters(ring: [number, number][]): number {
+  if (!ring || ring.length < 3) return 0;
+  let avgLat = 0;
+  for (let i = 0; i < ring.length; i++) {
+    avgLat += ring[i][1];
+  }
+  avgLat /= ring.length;
+
+  const latRad = (avgLat * Math.PI) / 180;
+  const mPerDegLat = 111132.954 - 559.822 * Math.cos(2 * latRad) + 1.175 * Math.cos(4 * latRad);
+  const mPerDegLng = 111132.954 * Math.cos(latRad);
+
+  let signedArea = 0;
+  for (let i = 0; i < ring.length - 1; i++) {
+    const x0 = ring[i][0] * mPerDegLng;
+    const y0 = ring[i][1] * mPerDegLat;
+    const x1 = ring[i + 1][0] * mPerDegLng;
+    const y1 = ring[i + 1][1] * mPerDegLat;
+    signedArea += x0 * y1 - x1 * y0;
+  }
+  return 0.5 * Math.abs(signedArea);
+}
+
+/**
+ * Computes metric surface area in Hectares for any GeoJSON geometry (Polygon / MultiPolygon).
+ * Returns area in Hectares rounded to 2 decimal places.
+ */
+export function calculateGeometryAreaHectares(geojson: any): number {
+  if (!geojson) return 0;
+  const geom =
+    geojson.type === 'Feature'
+      ? geojson.geometry
+      : geojson.type === 'FeatureCollection'
+      ? geojson.features[0]?.geometry
+      : geojson;
+
+  if (!geom || !geom.type || !Array.isArray(geom.coordinates)) return 0;
+
+  try {
+    if (geom.type === 'Polygon') {
+      const rings = geom.coordinates;
+      if (!Array.isArray(rings) || rings.length === 0) return 0;
+      const exteriorRing = rings[0];
+      if (!Array.isArray(exteriorRing) || exteriorRing.length < 3) return 0;
+
+      let exteriorArea = calculateRingAreaSqMeters(exteriorRing);
+      let holesArea = 0;
+      for (let h = 1; h < rings.length; h++) {
+        if (Array.isArray(rings[h]) && rings[h].length >= 3) {
+          holesArea += calculateRingAreaSqMeters(rings[h]);
+        }
+      }
+      const netSqMeters = Math.max(0, exteriorArea - holesArea);
+      return Math.round((netSqMeters / 10000) * 100) / 100;
+    }
+
+    if (geom.type === 'MultiPolygon') {
+      let totalSqMeters = 0;
+      for (const polyCoords of geom.coordinates) {
+        if (!Array.isArray(polyCoords) || polyCoords.length === 0) continue;
+        const exterior = polyCoords[0];
+        if (!Array.isArray(exterior) || exterior.length < 3) continue;
+        let polyArea = calculateRingAreaSqMeters(exterior);
+        for (let h = 1; h < polyCoords.length; h++) {
+          if (Array.isArray(polyCoords[h]) && polyCoords[h].length >= 3) {
+            polyArea -= calculateRingAreaSqMeters(polyCoords[h]);
+          }
+        }
+        totalSqMeters += Math.max(0, polyArea);
+      }
+      return Math.round((totalSqMeters / 10000) * 100) / 100;
+    }
+  } catch {
+    return 0;
+  }
+
+  return 0;
+}
+
+/**
+ * Checks whether two statutory bounding boxes intersect.
+ */
+export function doBoundingBoxesIntersect(
+  bboxA: [number, number, number, number] | null,
+  bboxB: [number, number, number, number] | null
+): boolean {
+  if (!bboxA || !bboxB) return false;
+  const [minLngA, minLatA, maxLngA, maxLatA] = bboxA;
+  const [minLngB, minLatB, maxLngB, maxLatB] = bboxB;
+  return (
+    minLngA <= maxLngB &&
+    maxLngA >= minLngB &&
+    minLatA <= maxLatB &&
+    maxLatA >= minLatB
+  );
+}
+
+/**
+ * Sutherland-Hodgman Polygon Clipping algorithm for computing intersection polygon of two coordinate rings.
+ * Returns clipped ring coordinates `[[lng, lat], ...]`.
+ */
+export function clipPolygonSutherlandHodgman(
+  subjectRing: [number, number][],
+  clipRing: [number, number][]
+): [number, number][] {
+  if (!subjectRing || subjectRing.length < 3 || !clipRing || clipRing.length < 3) {
+    return [];
+  }
+
+  const cleanSubject =
+    subjectRing[0][0] === subjectRing[subjectRing.length - 1][0] &&
+    subjectRing[0][1] === subjectRing[subjectRing.length - 1][1]
+      ? subjectRing.slice(0, subjectRing.length - 1)
+      : [...subjectRing];
+
+  const cleanClip =
+    clipRing[0][0] === clipRing[clipRing.length - 1][0] &&
+    clipRing[0][1] === clipRing[clipRing.length - 1][1]
+      ? clipRing.slice(0, clipRing.length - 1)
+      : [...clipRing];
+
+  let clipSignedArea = 0;
+  for (let i = 0; i < cleanClip.length; i++) {
+    const next = cleanClip[(i + 1) % cleanClip.length];
+    clipSignedArea += cleanClip[i][0] * next[1] - next[0] * cleanClip[i][1];
+  }
+  const isCCW = clipSignedArea >= 0;
+
+  function isInside(p: [number, number], cp1: [number, number], cp2: [number, number]): boolean {
+    const cross = (cp2[0] - cp1[0]) * (p[1] - cp1[1]) - (cp2[1] - cp1[1]) * (p[0] - cp1[0]);
+    return isCCW ? cross >= -1e-9 : cross <= 1e-9;
+  }
+
+  function computeIntersection(
+    s: [number, number],
+    e: [number, number],
+    cp1: [number, number],
+    cp2: [number, number]
+  ): [number, number] {
+    const dc = [cp1[0] - cp2[0], cp1[1] - cp2[1]];
+    const dp = [s[0] - e[0], s[1] - e[1]];
+    const n1 = cp1[0] * cp2[1] - cp1[1] * cp2[0];
+    const n2 = s[0] * e[1] - s[1] * e[0];
+    const n3 = dc[0] * dp[1] - dc[1] * dp[0];
+
+    if (Math.abs(n3) < 1e-12) return [(s[0] + e[0]) / 2, (s[1] + e[1]) / 2];
+
+    const x = (n1 * dp[0] - n2 * dc[0]) / n3;
+    const y = (n1 * dp[1] - n2 * dc[1]) / n3;
+    return [Math.round(x * 1e6) / 1e6, Math.round(y * 1e6) / 1e6];
+  }
+
+  let outputList: [number, number][] = [...cleanSubject];
+
+  for (let j = 0; j < cleanClip.length; j++) {
+    const cp1 = cleanClip[j];
+    const cp2 = cleanClip[(j + 1) % cleanClip.length];
+    const inputList = outputList;
+    outputList = [];
+
+    if (inputList.length === 0) break;
+
+    let s = inputList[inputList.length - 1];
+
+    for (let i = 0; i < inputList.length; i++) {
+      const e = inputList[i];
+      if (isInside(e, cp1, cp2)) {
+        if (isInside(s, cp1, cp2)) {
+          outputList.push(e);
+        } else {
+          outputList.push(computeIntersection(s, e, cp1, cp2));
+          outputList.push(e);
+        }
+      } else if (isInside(s, cp1, cp2)) {
+        outputList.push(computeIntersection(s, e, cp1, cp2));
+      }
+      s = e;
+    }
+  }
+
+  if (outputList.length >= 3) {
+    const first = outputList[0];
+    const last = outputList[outputList.length - 1];
+    if (first[0] !== last[0] || first[1] !== last[1]) {
+      outputList.push([first[0], first[1]]);
+    }
+    return outputList;
+  }
+
+  return [];
+}
+
+/**
+ * Computes polygon intersection between two GeoJSON boundary geometries.
+ * Calculates intersection geometry, intersection area in Hectares, and overlap percentage relative to both cases.
+ */
+export function computeGeometryIntersection(
+  geomA: any,
+  geomB: any
+): {
+  intersectionGeoJSON: any | null;
+  intersectionAreaHectares: number;
+  sourceOverlapPct: number;
+  targetOverlapPct: number;
+} {
+  const empty = {
+    intersectionGeoJSON: null,
+    intersectionAreaHectares: 0,
+    sourceOverlapPct: 0,
+    targetOverlapPct: 0,
+  };
+
+  if (!geomA || !geomB) return empty;
+
+  const bboxA = calculateBoundingBox(geomA);
+  const bboxB = calculateBoundingBox(geomB);
+  if (!bboxA || !bboxB || !doBoundingBoxesIntersect(bboxA, bboxB)) {
+    return empty;
+  }
+
+  const unwrap = (g: any) =>
+    g.type === 'Feature'
+      ? g.geometry
+      : g.type === 'FeatureCollection'
+      ? g.features[0]?.geometry
+      : g;
+
+  const gA = unwrap(geomA);
+  const gB = unwrap(geomB);
+  if (!gA || !gB || !gA.coordinates || !gB.coordinates) return empty;
+
+  const areaA = calculateGeometryAreaHectares(gA);
+  const areaB = calculateGeometryAreaHectares(gB);
+
+  // Extract exterior rings
+  const ringA = gA.type === 'Polygon' ? gA.coordinates[0] : gA.coordinates[0]?.[0];
+  const ringB = gB.type === 'Polygon' ? gB.coordinates[0] : gB.coordinates[0]?.[0];
+
+  if (!Array.isArray(ringA) || ringA.length < 3 || !Array.isArray(ringB) || ringB.length < 3) {
+    return empty;
+  }
+
+  // Clip A against B
+  let clipped = clipPolygonSutherlandHodgman(ringA, ringB);
+  if (clipped.length < 3) {
+    // Try clipping B against A in case of reversed nesting
+    clipped = clipPolygonSutherlandHodgman(ringB, ringA);
+  }
+
+  if (clipped.length >= 3) {
+    const interAreaSqM = calculateRingAreaSqMeters(clipped);
+    const interAreaHa = Math.round((interAreaSqM / 10000) * 100) / 100;
+
+    if (interAreaHa > 0) {
+      const sourcePct = areaA > 0 ? Math.min(100, Math.round((interAreaHa / areaA) * 1000) / 10) : 0;
+      const targetPct = areaB > 0 ? Math.min(100, Math.round((interAreaHa / areaB) * 1000) / 10) : 0;
+
+      return {
+        intersectionGeoJSON: {
+          type: 'Polygon',
+          coordinates: [clipped],
+        },
+        intersectionAreaHectares: interAreaHa,
+        sourceOverlapPct: sourcePct,
+        targetOverlapPct: targetPct,
+      };
+    }
+  }
+
+  return empty;
+}
+
+/**
+ * Detects duplicate cadastral survey/khata numbers across active parcels in the same village context.
+ */
+export function detectCadastralCollisions(
+  parcelsA: Parcel[],
+  parcelsB: Parcel[],
+  villageA?: string,
+  villageB?: string
+): Array<{ survey_number?: string; khata_number?: string; landowner_names?: string; area_acres?: number }> & {
+  sharedSurveyNumbers: string[];
+  sharedKhataNumbers: string[];
+  hasCollision: boolean;
+} {
+  const matches: any = [];
+  matches.sharedSurveyNumbers = [];
+  matches.sharedKhataNumbers = [];
+  matches.hasCollision = false;
+
+  if (villageA && villageB && villageA.trim().toLowerCase() !== villageB.trim().toLowerCase()) {
+    return matches;
+  }
+
+  const normalize = (s?: string) => (s || '').trim().toLowerCase().replace(/^0+/, '');
+
+  for (const pA of parcelsA) {
+    const sA = normalize(pA.survey_number);
+    const kA = normalize(pA.khata_number);
+    if (!sA && !kA) continue;
+
+    for (const pB of parcelsB) {
+      const sB = normalize(pB.survey_number);
+      const kB = normalize(pB.khata_number);
+
+      const surveyMatch = Boolean(sA && sB && sA === sB);
+      const khataMatch = Boolean(kA && kB && kA === kB);
+
+      if (surveyMatch || khataMatch) {
+        if (!matches.some((m: any) => normalize(m.survey_number) === sA && normalize(m.khata_number) === kA)) {
+          matches.push({
+            survey_number: pA.survey_number || pB.survey_number,
+            khata_number: pA.khata_number || pB.khata_number,
+            landowner_names: pA.landowner_names || pB.landowner_names,
+            area_acres: Number(pA.area_acres || pB.area_acres || 0),
+          });
+          if (surveyMatch && pA.survey_number && !matches.sharedSurveyNumbers.includes(pA.survey_number)) {
+            matches.sharedSurveyNumbers.push(pA.survey_number);
+          }
+          if (khataMatch && pA.khata_number && !matches.sharedKhataNumbers.includes(pA.khata_number)) {
+            matches.sharedKhataNumbers.push(pA.khata_number);
+          }
+        }
+      }
+    }
+  }
+
+  matches.hasCollision = matches.length > 0;
+  return matches;
+}
+
+/**
  * Ray-casting algorithm for Point-in-Polygon test.
  * Point: [lat, lng]. Ring: [[lng, lat], [lng, lat], ...]
  */
@@ -391,14 +730,26 @@ let inMemoryCases: AcquisitionCase[] = [];
 let inMemoryProjects: Project[] = [];
 let inMemoryParcels: Parcel[] = [];
 
-export function seedSpatialMemoryStore(data: {
-  cases?: AcquisitionCase[];
-  projects?: Project[];
-  parcels?: Parcel[];
-}) {
-  if (data.cases) inMemoryCases = [...data.cases];
-  if (data.projects) inMemoryProjects = [...data.projects];
-  if (data.parcels) inMemoryParcels = [...data.parcels];
+export function seedSpatialMemoryStore(
+  data:
+    | {
+        cases?: AcquisitionCase[];
+        projects?: Project[];
+        parcels?: Parcel[];
+      }
+    | AcquisitionCase[],
+  projectsArg?: Project[],
+  parcelsArg?: Parcel[]
+) {
+  if (Array.isArray(data)) {
+    inMemoryCases = [...data];
+    if (projectsArg) inMemoryProjects = [...projectsArg];
+    if (parcelsArg) inMemoryParcels = [...parcelsArg];
+  } else if (data && typeof data === 'object') {
+    if (data.cases) inMemoryCases = [...data.cases];
+    if (data.projects) inMemoryProjects = [...data.projects];
+    if (data.parcels) inMemoryParcels = [...data.parcels];
+  }
 }
 
 export function clearSpatialMemoryStore() {
@@ -415,7 +766,9 @@ export async function getScopedCases(user?: AuthenticatedUser): Promise<Acquisit
 
   let cases: AcquisitionCase[] = [];
 
-  if (isSupabaseConfigured) {
+  if (inMemoryCases.length > 0) {
+    cases = [...inMemoryCases];
+  } else if (isSupabaseConfigured) {
     try {
       const supabase = getSupabase();
       let query = supabase.from('acquisition_cases').select('*').order('created_at', { ascending: false });
@@ -441,13 +794,6 @@ export async function getScopedCases(user?: AuthenticatedUser): Promise<Acquisit
     }
   }
 
-  // Merge in-memory cases if present
-  for (const imc of inMemoryCases) {
-    if (!cases.some((c) => c.id === imc.id)) {
-      cases.push(imc);
-    }
-  }
-
   if (scope.isRestricted) {
     cases = cases.filter((c) => {
       if (scope.projectIds && !scope.projectIds.includes(c.project_id)) return false;
@@ -468,7 +814,9 @@ export async function getScopedProjects(user?: AuthenticatedUser): Promise<Proje
 
   let projects: Project[] = [];
 
-  if (isSupabaseConfigured) {
+  if (inMemoryProjects.length > 0) {
+    projects = [...inMemoryProjects];
+  } else if (isSupabaseConfigured) {
     try {
       const supabase = getSupabase();
       let query = supabase.from('projects').select('*').order('name', { ascending: true });
@@ -483,13 +831,6 @@ export async function getScopedProjects(user?: AuthenticatedUser): Promise<Proje
       }
     } catch (err: any) {
       console.warn('[SpatialIntelligence] DB projects query failed, using memory store:', err.message);
-    }
-  }
-
-  // Merge in-memory projects if present
-  for (const imp of inMemoryProjects) {
-    if (!projects.some((p) => p.id === imp.id)) {
-      projects.push(imp);
     }
   }
 
@@ -592,7 +933,10 @@ export async function getCaseSpatialContext(
     nearbyCases.sort((a, b) => a.distance_km - b.distance_km);
   }
 
-  // 7. Provenance trail
+  // 7. Detect Spatial and Cadastral Relationships
+  const spatialRelationships = await detectSpatialAndCadastralRelationships(targetCase, scopedCases);
+
+  // 8. Provenance trail
   const now = new Date().toISOString();
   const provenance: DataProvenance = {
     id: `prov-spatial-${targetCase.id}`,
@@ -608,6 +952,7 @@ export async function getCaseSpatialContext(
     metadata: {
       data_quality_score: geomEval.qualityScore,
       is_authoritative: Boolean(targetCase.geojson_boundary),
+      detected_relationships_count: spatialRelationships.length,
     },
   };
 
@@ -636,6 +981,7 @@ export async function getCaseSpatialContext(
     },
     project_geometry_available: Boolean(project?.geojson_boundary),
     nearby_cases: nearbyCases.slice(0, 10),
+    spatial_relationships: spatialRelationships,
     administrative_hierarchy: {
       state: targetCase.state,
       district: targetCase.district,
@@ -644,6 +990,255 @@ export async function getCaseSpatialContext(
       lgd_status: lgdStatus,
     },
     provenance,
+  };
+}
+
+/**
+ * Detects meaningful spatial and cadastral relationships between a source case and all candidate cases.
+ * Calculates intersection area, percentage overlap, duplicate survey numbers, and review-oriented recommendations.
+ */
+export async function detectSpatialAndCadastralRelationships(
+  sourceCase: AcquisitionCase,
+  candidateCases: AcquisitionCase[],
+  parcelsMap?: Map<string, Parcel[]>
+): Promise<SpatialRelationship[]> {
+  const relationships: SpatialRelationship[] = [];
+  const sourceParcels = parcelsMap?.get(sourceCase.id) ?? (await getParcelsForCase(sourceCase.id));
+
+  for (const other of candidateCases) {
+    if (other.id === sourceCase.id) continue;
+
+    // 1. Check spatial boundary intersection
+    const geomIntersect = computeGeometryIntersection(sourceCase.geojson_boundary, other.geojson_boundary);
+
+    // 2. Check shared administrative geography
+    const sameVillage = Boolean(
+      (sourceCase.village && other.village && sourceCase.village.toLowerCase() === other.village.toLowerCase()) ||
+      (sourceCase.village_lgd_code && other.village_lgd_code && sourceCase.village_lgd_code === other.village_lgd_code)
+    );
+    const sameSubdistrict = Boolean(
+      (sourceCase.tehsil && other.tehsil && sourceCase.tehsil.toLowerCase() === other.tehsil.toLowerCase()) ||
+      (sourceCase.subdistrict_lgd_code && other.subdistrict_lgd_code && sourceCase.subdistrict_lgd_code === other.subdistrict_lgd_code)
+    );
+
+    // 3. Check shared cadastral parcels
+    let sharedCadastral: Array<{ survey_number?: string; khata_number?: string; landowner_names?: string; area_acres?: number }> = [];
+    if (sameVillage || sameSubdistrict) {
+      const otherParcels = parcelsMap?.get(other.id) ?? (await getParcelsForCase(other.id));
+      sharedCadastral = detectCadastralCollisions(sourceParcels, otherParcels);
+    }
+
+    let distKm: number | undefined;
+    let relType: SpatialRelationshipType | null = null;
+    let severity: 'warning' | 'alert' | 'advisory' | 'info' = 'info';
+
+    if (geomIntersect.intersectionAreaHectares > 0) {
+      if (geomIntersect.sourceOverlapPct >= 95 || geomIntersect.targetOverlapPct >= 95) {
+        relType = 'complete_enclosure';
+      } else {
+        relType = 'boundary_overlap';
+      }
+      severity = (geomIntersect.sourceOverlapPct >= 20 || geomIntersect.targetOverlapPct >= 20 || geomIntersect.intersectionAreaHectares >= 5) ? 'alert' : 'warning';
+    } else if (sharedCadastral.length > 0 && sameVillage) {
+      relType = 'cadastral_collision';
+      severity = 'warning';
+    } else {
+      // Proximity distance check
+      const centroidSource = computeAccurateCentroid(sourceCase.geojson_boundary);
+      const centroidOther = computeAccurateCentroid(other.geojson_boundary);
+      if (centroidSource && centroidOther) {
+        distKm = calculateHaversineDistance(centroidSource[0], centroidSource[1], centroidOther[0], centroidOther[1]);
+        if (distKm <= 5.0) {
+          relType = 'nearby';
+          severity = 'info';
+        }
+      }
+      if (!relType && sameVillage) {
+        relType = 'same_administrative_unit';
+        severity = 'advisory';
+      }
+    }
+
+    if (relType) {
+      const recs: SpatialRelationshipRecommendation[] = [];
+      const surveyListStr = sharedCadastral.map((p) => p.survey_number).filter(Boolean).join(', ');
+
+      if (relType === 'boundary_overlap' || relType === 'complete_enclosure') {
+        recs.push({
+          id: `rec-boundary-${sourceCase.id}-${other.id}`,
+          type: 'boundary_review',
+          title: `Conduct Boundary Demarcation Review with Case ${other.case_number}`,
+          description: `Calculated boundary intersection of ${geomIntersect.intersectionAreaHectares} Ha (${geomIntersect.sourceOverlapPct}% of this case) detected with active acquisition case "${other.title}" in ${other.village || 'shared locality'}. Review GIS boundary coordinates with the Competent Authority to resolve spatial demarcation overlap prior to statutory Section 19 declaration.`,
+          suggested_action: 'Open GIS Workspace to inspect overlapping boundary demarcation.',
+        });
+        if (sharedCadastral.length > 0) {
+          recs.push({
+            id: `rec-cadastral-${sourceCase.id}-${other.id}`,
+            type: 'field_resurvey',
+            title: `Verify Shared Cadastral Survey Numbers (${surveyListStr})`,
+            description: `Shared cadastral survey number(s) [${surveyListStr}] registered in both Case ${sourceCase.case_number} and Case ${other.case_number}. Field verification by Revenue Inspector recommended to establish parcel boundaries. Note: shared identifier detection is an administrative verification signal and does not assert a legal title conclusion.`,
+            suggested_action: 'Schedule field verification by Revenue Inspector in Case Workspace.',
+          });
+        }
+        recs.push({
+          id: `rec-coord-${sourceCase.id}-${other.id}`,
+          type: 'coordination_review',
+          title: `Convene Inter-Project Coordination Review for ${other.village || 'Shared Locality'}`,
+          description: `Multiple active acquisition schemes active in ${other.village || 'same jurisdiction'} (${sourceCase.title} & ${other.title}). Align statutory milestone dates to avoid redundant Gazette publication & compensation processing.`,
+          suggested_action: 'Initiate inter-project coordination review in Case Overview.',
+        });
+      } else if (relType === 'cadastral_collision') {
+        recs.push({
+          id: `rec-cadastral-${sourceCase.id}-${other.id}`,
+          type: 'field_resurvey',
+          title: `Verify Shared Cadastral Survey Numbers (${surveyListStr}) in ${other.village || 'village'}`,
+          description: `Shared cadastral survey identifier(s) [${surveyListStr}] detected across active cases in ${other.village || 'village'}. Field re-demarcation by Revenue Inspector recommended. Note: shared identifier detection is an administrative verification flag and does not assert a legal title conclusion.`,
+          suggested_action: 'Assign field verification task to Revenue Inspector in Case Workspace.',
+        });
+        recs.push({
+          id: `rec-coord-${sourceCase.id}-${other.id}`,
+          type: 'coordination_review',
+          title: `Coordinate Acquisition Schedule with Case ${other.case_number}`,
+          description: `Coordinate acquisition processing between Case ${sourceCase.case_number} and Case ${other.case_number} to prevent duplicate compensation claims on shared survey numbers.`,
+          suggested_action: 'Schedule joint review in Administration console.',
+        });
+      } else if (relType === 'nearby' || relType === 'same_administrative_unit') {
+        recs.push({
+          id: `rec-coord-${sourceCase.id}-${other.id}`,
+          type: 'coordination_review',
+          title: `Regional Milestone Alignment for ${other.village || other.district}`,
+          description: `Active acquisition case "${other.title}" operates in close proximity. Align survey teams and hearing dates for administrative efficiency.`,
+          suggested_action: 'Review regional progress in Portfolio Operations.',
+        });
+      }
+
+      let evidenceSummary = '';
+      if (relType === 'boundary_overlap' || relType === 'complete_enclosure') {
+        evidenceSummary = `Observed Fact: Case boundaries intersect. Calculated Metric: ${geomIntersect.intersectionAreaHectares} Hectares (${geomIntersect.sourceOverlapPct}% overlap with Case ${sourceCase.case_number}, ${geomIntersect.targetOverlapPct}% with Case ${other.case_number}). Administrative Locality: ${other.village}, ${other.district}, ${other.state}.`;
+        if (sharedCadastral.length > 0) {
+          evidenceSummary += ` Cadastral Evidence: Shared survey identifiers [${surveyListStr}] detected.`;
+        }
+      } else if (relType === 'cadastral_collision') {
+        evidenceSummary = `Cadastral Evidence: Shared survey identifiers [${surveyListStr}] registered across active cases in village ${other.village}, ${other.district}.`;
+      } else if (relType === 'nearby') {
+        evidenceSummary = `Proximity Evidence: Active case located nearby in ${other.village || other.district}.`;
+      } else {
+        evidenceSummary = `Administrative Evidence: Co-located in administrative unit ${other.village}, ${other.district}.`;
+      }
+
+      const surveyList = sharedCadastral.map((p) => p.survey_number).filter(Boolean) as string[];
+      const khataList = sharedCadastral.map((p) => p.khata_number).filter(Boolean) as string[];
+
+      relationships.push({
+        id: `rel-${sourceCase.id}-${other.id}`,
+        source_case_id: sourceCase.id,
+        source_case_number: sourceCase.case_number,
+        source_case_title: sourceCase.title,
+        source_project_id: sourceCase.project_id,
+        target_case_id: other.id,
+        target_case_number: other.case_number,
+        target_case_title: other.title,
+        target_project_id: other.project_id,
+        related_case_id: other.id,
+        related_case_number: other.case_number,
+        related_project_name: other.project?.name || other.project_id,
+        relationship_type: relType,
+        relationship_severity: severity,
+        intersection_area_hectares: geomIntersect.intersectionAreaHectares > 0 ? geomIntersect.intersectionAreaHectares : undefined,
+        source_overlap_percentage: geomIntersect.sourceOverlapPct > 0 ? geomIntersect.sourceOverlapPct : undefined,
+        target_overlap_percentage: geomIntersect.targetOverlapPct > 0 ? geomIntersect.targetOverlapPct : undefined,
+        overlap_pct: geomIntersect.sourceOverlapPct > 0 ? geomIntersect.sourceOverlapPct : undefined,
+        distance_km: distKm,
+        shared_survey_numbers: surveyList.length > 0 ? surveyList : undefined,
+        shared_khata_numbers: khataList.length > 0 ? khataList : undefined,
+        shared_cadastral_identifiers: sharedCadastral.length > 0 ? sharedCadastral : undefined,
+        shared_geography: {
+          state: other.state,
+          district: other.district,
+          tehsil: other.tehsil,
+          village: other.village,
+          state_lgd_code: other.state_lgd_code,
+          district_lgd_code: other.district_lgd_code,
+          subdistrict_lgd_code: other.subdistrict_lgd_code,
+          village_lgd_code: other.village_lgd_code,
+        },
+        shared_admin_unit: {
+          village: other.village,
+          village_lgd_code: other.village_lgd_code,
+          district: other.district,
+          state: other.state,
+        },
+        intersection_geojson: geomIntersect.intersectionGeoJSON,
+        evidence_summary: evidenceSummary,
+        recommendations: recs.map((r) => ({
+          ...r,
+          action_type: r.type,
+          statutory_guardrail: 'Advisory only. Statutory decisions require competent authority order under RFCTLARR Act.',
+        })),
+        detected_at: new Date().toISOString(),
+      });
+    }
+  }
+
+  relationships.sort((a, b) => {
+    const sevOrder = { alert: 0, warning: 1, advisory: 2, info: 3 };
+    const sevDiff = (sevOrder[a.relationship_severity] || 3) - (sevOrder[b.relationship_severity] || 3);
+    if (sevDiff !== 0) return sevDiff;
+    return (b.intersection_area_hectares || 0) - (a.intersection_area_hectares || 0);
+  });
+
+  return relationships;
+}
+
+/**
+ * Retrieves portfolio-wide spatial and cadastral relationships across all authorized cases.
+ */
+export async function getPortfolioSpatialRelationships(
+  user?: AuthenticatedUser
+): Promise<PortfolioSpatialRelationshipsSummary> {
+  const scopedCases = await getScopedCases(user);
+  const allRelationships: SpatialRelationship[] = [];
+  const visitedPairs = new Set<string>();
+
+  const parcelsMap = new Map<string, Parcel[]>();
+  for (const c of scopedCases) {
+    const pList = await getParcelsForCase(c.id);
+    parcelsMap.set(c.id, pList);
+  }
+
+  for (const c of scopedCases) {
+    const rels = await detectSpatialAndCadastralRelationships(c, scopedCases, parcelsMap);
+    for (const r of rels) {
+      const pairKey = [r.source_case_id, r.target_case_id].sort().join(':');
+      if (!visitedPairs.has(pairKey)) {
+        visitedPairs.add(pairKey);
+        allRelationships.push(r);
+      }
+    }
+  }
+
+  const boundaryOverlaps = allRelationships.filter(
+    (r) => r.relationship_type === 'boundary_overlap' || r.relationship_type === 'complete_enclosure'
+  ).length;
+  const cadastralCollisions = allRelationships.filter(
+    (r) => r.relationship_type === 'cadastral_collision' || (r.shared_cadastral_identifiers && r.shared_cadastral_identifiers.length > 0)
+  ).length;
+  const requiringReview = allRelationships.filter(
+    (r) => r.relationship_severity === 'alert' || r.relationship_severity === 'warning'
+  ).length;
+
+  const reviewCaseIds = Array.from(
+    new Set(allRelationships.flatMap((r) => [r.source_case_id, r.target_case_id]))
+  );
+
+  return {
+    total_relationships: allRelationships.length,
+    total_relationships_detected: allRelationships.length,
+    boundary_overlaps_count: boundaryOverlaps,
+    cadastral_collisions_count: cadastralCollisions,
+    cases_requiring_review_count: requiringReview,
+    cases_requiring_spatial_review: reviewCaseIds,
+    relationships: allRelationships,
   };
 }
 

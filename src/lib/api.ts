@@ -43,6 +43,8 @@ import {
   LgdSyncSummary,
   CaseEvent,
   AccessRequest,
+  SpatialRelationship,
+  PortfolioSpatialRelationshipsSummary,
 } from '../../shared/types';
 
 
@@ -1530,6 +1532,28 @@ export async function fetchGISLayers(): Promise<{ layers: SpatialLayerInfo[] }> 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Failed to fetch spatial layers (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function fetchPortfolioSpatialRelationships(): Promise<PortfolioSpatialRelationshipsSummary> {
+  const res = await fetch(`${API_BASE}/gis/spatial-relationships`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch portfolio spatial relationships (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function fetchCaseSpatialRelationships(
+  caseId: string
+): Promise<{ case_id: string; case_number: string; title: string; total_relationships: number; relationships: SpatialRelationship[] }> {
+  const res = await fetch(`${API_BASE}/gis/spatial-relationships/${encodeURIComponent(caseId)}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch case spatial relationships (${res.status})`);
   }
   return res.json();
 }

@@ -3,6 +3,7 @@ import { getSupabase, isSupabaseConfigured } from '../config/supabase';
 import { validateGeoJSON } from '../utils/geojsonValidator';
 import { logCaseEvent } from '../services/auditLogger';
 import { PARCEL_STATUS_COLORS } from '../../shared/utils/geojson';
+import { AcquisitionCase } from '../../shared/types';
 import { requireAuth, requireRole } from '../middleware/auth.middleware';
 import { authorizeUserForCase } from '../services/portfolioAnalyzer';
 import {
@@ -16,6 +17,8 @@ import {
   generateProjectsGeoJSON,
   generateParcelsGeoJSON,
   computeAccurateCentroid,
+  getPortfolioSpatialRelationships,
+  detectSpatialAndCadastralRelationships,
 } from '../services/spatialIntelligenceService';
 import { getSpatialPolicySync } from '../services/policyEngine';
 
@@ -156,6 +159,45 @@ const handleSpatialContext = async (req: Request, res: Response) => {
 router.get('/spatial-context/:caseId', requireAuth, handleSpatialContext);
 router.get('/gis/spatial-context/:caseId', requireAuth, handleSpatialContext);
 
+// GET /api/gis/spatial-relationships (or /spatial-relationships) - Portfolio-wide spatial & cadastral relationships
+const handlePortfolioRelationships = async (req: Request, res: Response) => {
+  try {
+    const summary = await getPortfolioSpatialRelationships(req.user);
+    res.json(summary);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+router.get('/spatial-relationships', requireAuth, handlePortfolioRelationships);
+router.get('/gis/spatial-relationships', requireAuth, handlePortfolioRelationships);
+
+// GET /api/gis/spatial-relationships/:caseId (or /spatial-relationships/:caseId) - Case-specific spatial & cadastral relationships
+const handleCaseRelationships = async (req: Request, res: Response) => {
+  try {
+    const rawCaseId = req.params.caseId;
+    const caseId = Array.isArray(rawCaseId) ? rawCaseId[0] : rawCaseId;
+    const scopedCases = await getScopedCases(req.user);
+    const sourceCase = scopedCases.find((c) => c.id === caseId);
+
+    if (!sourceCase) {
+      return res.status(404).json({ error: 'Case not found or outside authorized operational jurisdiction.' });
+    }
+
+    const relationships = await detectSpatialAndCadastralRelationships(sourceCase, scopedCases);
+    res.json({
+      case_id: sourceCase.id,
+      case_number: sourceCase.case_number,
+      title: sourceCase.title,
+      total_relationships: relationships.length,
+      relationships,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+router.get('/spatial-relationships/:caseId', requireAuth, handleCaseRelationships);
+router.get('/gis/spatial-relationships/:caseId', requireAuth, handleCaseRelationships);
+
 // GET /api/gis/nearby (or /nearby) - Proximity search around coordinate [lat, lng]
 const handleNearby = async (req: Request, res: Response) => {
   try {
@@ -288,6 +330,64 @@ router.get('/cases/:id/gis', requireAuth, async (req: Request, res: Response) =>
       }
     });
 
+    // 3. Detect and include Spatial & Cadastral Relationships
+    const scopedCases = await getScopedCases(req.user);
+    const fullSourceCase = (scopedCases.find((c) => c.id === caseId) || caseItem) as any as AcquisitionCase;
+    const relationships = await detectSpatialAndCadastralRelationships(fullSourceCase, scopedCases);
+
+    relationships.forEach((rel) => {
+      // Add intersection geometry feature if available
+      if (rel.intersection_geojson) {
+        features.push({
+          type: 'Feature',
+          id: `intersection-${rel.related_case_id}`,
+          properties: {
+            layer_type: 'relationship_intersection',
+            related_case_id: rel.related_case_id,
+            related_case_number: rel.related_case_number,
+            related_project_name: rel.related_project_name,
+            relationship_type: rel.relationship_type,
+            intersection_area_hectares: rel.intersection_area_hectares,
+            overlap_pct: rel.overlap_pct,
+            shared_survey_numbers: rel.shared_survey_numbers,
+            color: '#dc2626', // Red warning
+            fillColor: '#ef4444',
+          },
+          geometry: rel.intersection_geojson,
+        });
+      }
+
+      // Add related case boundary if overlapping
+      if (rel.relationship_type === 'boundary_overlap' || rel.relationship_type === 'complete_enclosure') {
+        const relatedCase = scopedCases.find((c) => c.id === rel.related_case_id);
+        if (relatedCase?.geojson_boundary) {
+          const relGeom =
+            relatedCase.geojson_boundary.type === 'Feature'
+              ? relatedCase.geojson_boundary.geometry
+              : relatedCase.geojson_boundary.type === 'FeatureCollection'
+              ? relatedCase.geojson_boundary.features[0]?.geometry
+              : relatedCase.geojson_boundary;
+
+          if (relGeom) {
+            features.push({
+              type: 'Feature',
+              id: `related-boundary-${rel.related_case_id}`,
+              properties: {
+                layer_type: 'related_case_boundary',
+                related_case_id: rel.related_case_id,
+                related_case_number: rel.related_case_number,
+                related_project_name: rel.related_project_name,
+                relationship_type: rel.relationship_type,
+                color: '#f59e0b', // Amber
+                fillColor: '#fbbf24',
+              },
+              geometry: relGeom,
+            });
+          }
+        }
+      }
+    });
+
     const featureCollection = {
       type: 'FeatureCollection',
       features,
@@ -298,6 +398,7 @@ router.get('/cases/:id/gis', requireAuth, async (req: Request, res: Response) =>
       has_geometry: features.length > 0,
       total_parcels: parcels?.length || 0,
       parcels_with_geometry: features.filter((f) => f.properties.layer_type === 'parcel').length,
+      spatial_relationships: relationships,
       gis_data: featureCollection,
     });
   } catch (err: any) {

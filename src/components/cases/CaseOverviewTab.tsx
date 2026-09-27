@@ -75,82 +75,118 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
       {/* ========================================================================= */}
       {/* 1. ACTION REQUIRED COCKPIT (IF ANY ACTION PENDING) */}
       {/* ========================================================================= */}
-      {(isDelayed || pendingDocs.length > 0 || disputedParcels.length > 0) && (
-        <div className="bg-amber-50/60 border border-amber-200/80 rounded-xl p-4 shadow-xs">
-          <div className="flex items-center gap-2 mb-2 text-amber-900 font-bold text-xs">
-            <Flame className="h-4 w-4 text-amber-700" />
-            <span>Immediate Operational Attention Required</span>
+      {(() => {
+        const spatialRelationships = (caseItem as any).spatial_relationships || [];
+        const criticalSpatialRel = spatialRelationships.find(
+          (r: any) => r.relationship_type === 'boundary_overlap' || r.relationship_type === 'complete_enclosure' || r.relationship_type === 'cadastral_collision'
+        );
+
+        if (!isDelayed && pendingDocs.length === 0 && disputedParcels.length === 0 && !criticalSpatialRel) {
+          return null;
+        }
+
+        return (
+          <div className="bg-amber-50/70 border border-amber-200/90 rounded-xl p-4 shadow-xs space-y-3">
+            <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+              <Flame className="h-4 w-4 text-amber-700" />
+              <span>Immediate Operational Attention Required</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              {/* Spatial Boundary Overlap / Collision Alert */}
+              {criticalSpatialRel && (
+                <div className="bg-white p-3 rounded-lg border border-rose-200 flex justify-between items-center shadow-2xs md:col-span-3">
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle className="h-4 w-4 text-rose-600 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-semibold text-rose-900 block text-xs">
+                        Spatial &amp; Cadastral Conflict Warning ({criticalSpatialRel.relationship_type === 'boundary_overlap' ? `${criticalSpatialRel.intersection_area_hectares} Ha / ${criticalSpatialRel.source_overlap_percentage}% Overlap` : 'Survey Collision'})
+                      </span>
+                      <span className="text-[11px] text-slate-600">
+                        {criticalSpatialRel.evidence_summary}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab('gis')}
+                    className="px-2.5 py-1 text-[11px] font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded transition-colors flex items-center gap-1 cursor-pointer shrink-0 ml-3"
+                  >
+                    <span>View Map</span>
+                    <ArrowRight className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+
+              {/* SLA Delay Alert */}
+              {isDelayed && (
+                <div className="bg-white p-3 rounded-lg border border-red-200 flex justify-between items-center">
+                  <div>
+                    <span className="font-semibold text-gov-red block">
+                      +{delayDays} Days Statutory SLA Delay
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      Projected: {metrics?.projected_completion_date}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab('workflow')}
+                    className="px-2 py-1 text-[11px] font-semibold text-white bg-gov-red hover:bg-red-700 rounded transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Workflow</span>
+                    <ArrowRight className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+
+              {/* Missing/Pending Docs */}
+              {pendingDocs.length > 0 && (
+                <div className="bg-white p-3 rounded-lg border border-amber-200 flex justify-between items-center">
+                  <div>
+                    <span className="font-semibold text-amber-800 block">
+                      {pendingDocs.length} Pending Document Verification{pendingDocs.length > 1 ? 's' : ''}
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      Prerequisite for stage advance
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab('documents')}
+                    className="px-2 py-1 text-[11px] font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Review</span>
+                    <ArrowRight className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+
+              {/* Disputed Parcels */}
+              {disputedParcels.length > 0 && (
+                <div className="bg-white p-3 rounded-lg border border-red-200 flex justify-between items-center">
+                  <div>
+                    <span className="font-semibold text-gov-red block">
+                      {disputedParcels.length} Active Cadastral Dispute{disputedParcels.length > 1 ? 's' : ''}
+                    </span>
+                    <span className="text-[10px] text-slate-500">
+                      Section 15 objections active
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onNavigateTab('disputes')}
+                    className="px-2 py-1 text-[11px] font-semibold text-white bg-gov-navy hover:bg-gov-blue rounded transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Disputes</span>
+                    <ArrowRight className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-            {/* SLA Delay Alert */}
-            {isDelayed && (
-              <div className="bg-white p-3 rounded-lg border border-red-200 flex justify-between items-center">
-                <div>
-                  <span className="font-semibold text-gov-red block">
-                    +{delayDays} Days Statutory SLA Delay
-                  </span>
-                  <span className="text-[10px] text-slate-500">
-                    Projected: {metrics?.projected_completion_date}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onNavigateTab('workflow')}
-                  className="px-2 py-1 text-[11px] font-semibold text-white bg-gov-red hover:bg-red-700 rounded transition-colors flex items-center gap-1 cursor-pointer"
-                >
-                  <span>Workflow</span>
-                  <ArrowRight className="h-3 w-3" />
-                </button>
-              </div>
-            )}
-
-            {/* Missing/Pending Docs */}
-            {pendingDocs.length > 0 && (
-              <div className="bg-white p-3 rounded-lg border border-amber-200 flex justify-between items-center">
-                <div>
-                  <span className="font-semibold text-amber-800 block">
-                    {pendingDocs.length} Pending Document Verification{pendingDocs.length > 1 ? 's' : ''}
-                  </span>
-                  <span className="text-[10px] text-slate-500">
-                    Prerequisite for stage advance
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onNavigateTab('documents')}
-                  className="px-2 py-1 text-[11px] font-semibold text-white bg-amber-600 hover:bg-amber-700 rounded transition-colors flex items-center gap-1 cursor-pointer"
-                >
-                  <span>Review</span>
-                  <ArrowRight className="h-3 w-3" />
-                </button>
-              </div>
-            )}
-
-            {/* Disputed Parcels */}
-            {disputedParcels.length > 0 && (
-              <div className="bg-white p-3 rounded-lg border border-red-200 flex justify-between items-center">
-                <div>
-                  <span className="font-semibold text-gov-red block">
-                    {disputedParcels.length} Active Cadastral Dispute{disputedParcels.length > 1 ? 's' : ''}
-                  </span>
-                  <span className="text-[10px] text-slate-500">
-                    Section 15 objections active
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onNavigateTab('disputes')}
-                  className="px-2 py-1 text-[11px] font-semibold text-white bg-gov-navy hover:bg-gov-blue rounded transition-colors flex items-center gap-1 cursor-pointer"
-                >
-                  <span>Disputes</span>
-                  <ArrowRight className="h-3 w-3" />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ========================================================================= */}
       {/* 2. THREE-PANEL OPERATIONAL GRID */}
@@ -347,6 +383,159 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* 2.5 SPATIAL & CADASTRAL RELATIONSHIP INTELLIGENCE & ADVISORY SECTION */}
+      {/* ========================================================================= */}
+      {caseItem.spatial_relationships && caseItem.spatial_relationships.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 shadow-xs">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <Layers className="h-4 w-4 text-gov-navy" />
+              <div>
+                <h3 className="font-bold text-gov-slate text-xs uppercase tracking-wider">
+                  Spatial &amp; Cadastral Relationship Intelligence
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Evidence-backed cross-case spatial intersection and cadastral collision detection
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono text-slate-400">
+                {caseItem.spatial_relationships.length} Relationship{caseItem.spatial_relationships.length > 1 ? 's' : ''} Detected
+              </span>
+              <button
+                type="button"
+                onClick={() => onNavigateTab('gis')}
+                className="px-2.5 py-1 text-xs font-semibold text-gov-navy bg-blue-50 hover:bg-blue-100 rounded border border-blue-200 transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <MapPin className="h-3.5 w-3.5 text-blue-600" />
+                <span>View on GIS Map</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {caseItem.spatial_relationships.map((rel, idx) => (
+              <div
+                key={idx}
+                className={`p-4 rounded-lg border text-xs space-y-3 ${
+                  rel.relationship_type === 'boundary_overlap' || rel.relationship_type === 'complete_enclosure'
+                    ? 'bg-rose-50/40 border-rose-200'
+                    : rel.relationship_type === 'cadastral_collision'
+                    ? 'bg-amber-50/40 border-amber-200'
+                    : 'bg-slate-50 border-slate-200'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-gov-slate font-mono text-sm">
+                      {rel.related_case_number}
+                    </span>
+                    <span className="text-slate-400">•</span>
+                    <span className="text-slate-600 font-medium">
+                      Project: {rel.related_project_name}
+                    </span>
+                  </div>
+                  <div>
+                    {rel.relationship_type === 'boundary_overlap' && (
+                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-800 border border-red-200">
+                        Boundary Overlap: {rel.overlap_pct}% ({rel.intersection_area_hectares} Ha)
+                      </span>
+                    )}
+                    {rel.relationship_type === 'complete_enclosure' && (
+                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-800 border border-red-200">
+                        Complete Spatial Enclosure
+                      </span>
+                    )}
+                    {rel.relationship_type === 'cadastral_collision' && (
+                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                        Shared Cadastral Identifiers
+                      </span>
+                    )}
+                    {rel.relationship_type === 'nearby' && (
+                      <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                        Adjacent Corridor ({rel.distance_km} km)
+                      </span>
+                    )}
+                    {rel.relationship_type === 'same_administrative_unit' && (
+                      <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                        Shared Revenue Village
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Evidence Summary Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-white p-3 rounded-md border border-slate-200/80">
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">
+                      Evidence &amp; Geometry
+                    </span>
+                    <p className="text-slate-700 mt-0.5 text-[11px]">
+                      {rel.evidence_summary}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">
+                      Cadastral / Survey Alignment
+                    </span>
+                    <div className="mt-0.5 text-[11px]">
+                      {rel.shared_survey_numbers && rel.shared_survey_numbers.length > 0 ? (
+                        <div className="text-red-700 font-mono font-medium">
+                          Survey Nos: {rel.shared_survey_numbers.join(', ')}
+                        </div>
+                      ) : (
+                        <span className="text-slate-500">No duplicate survey identifiers</span>
+                      )}
+                      {rel.shared_khata_numbers && rel.shared_khata_numbers.length > 0 && (
+                        <div className="text-slate-600 font-mono text-[10px]">
+                          Khata: {rel.shared_khata_numbers.join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase font-semibold block">
+                      Jurisdiction &amp; Provenance
+                    </span>
+                    <div className="mt-0.5 text-[11px] text-slate-600">
+                      <div>Village: <strong>{rel.shared_admin_unit?.village || rel.shared_geography?.village || 'N/A'}</strong></div>
+                      <div>LGD Code: <span className="font-mono">{rel.shared_admin_unit?.village_lgd_code || rel.shared_geography?.village_lgd_code || 'N/A'}</span></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Structured Advisory Recommendations */}
+                {rel.recommendations && rel.recommendations.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider block">
+                      Advisory Review Action Items (Non-destructive)
+                    </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {rel.recommendations.map((rec, rIdx) => (
+                        <div key={rIdx} className="bg-white/80 p-2.5 rounded border border-slate-200 text-[11px] space-y-1">
+                          <div className="flex items-center justify-between">
+                            <strong className="text-gov-navy font-semibold">{rec.title}</strong>
+                            <span className="text-[9px] px-1.5 py-0.2 rounded font-mono uppercase bg-slate-100 text-slate-600">
+                              {(rec.action_type || rec.type || 'Review').replace(/_/g, ' ')}
+                            </span>
+                          </div>
+                          <p className="text-slate-600 text-[10px]">{rec.description}</p>
+                          <div className="text-[9px] text-slate-400 italic pt-0.5">
+                            {rec.statutory_guardrail}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 3. LIVE EXTERNAL CONTEXT & MULTI-SOURCE SENSORY */}

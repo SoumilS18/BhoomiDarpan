@@ -900,29 +900,59 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
 
                         {/* Friction Flags */}
                         <td className="py-3 px-3 whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            {unverifiedDocsCount > 0 && (
-                              <span
-                                className="inline-flex items-center gap-0.5 bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] font-semibold"
-                                title={`${unverifiedDocsCount} unverified documents`}
-                              >
-                                <FileWarning className="h-3 w-3 text-amber-600" />
-                                <span>{unverifiedDocsCount} Docs</span>
-                              </span>
-                            )}
-                            {disputedParcelsCount > 0 && (
-                              <span
-                                className="inline-flex items-center gap-0.5 bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded text-[10px] font-semibold"
-                                title={`${disputedParcelsCount} disputed parcels`}
-                              >
-                                <Scale className="h-3 w-3 text-red-600" />
-                                <span>{disputedParcelsCount} Disputes</span>
-                              </span>
-                            )}
-                            {unverifiedDocsCount === 0 && disputedParcelsCount === 0 && (
-                              <span className="text-[10px] text-slate-400">Clear</span>
-                            )}
-                          </div>
+                          {(() => {
+                            const spatialRels = (item as any).spatial_relationships || [];
+                            const boundaryOverlap = spatialRels.find(
+                              (r: any) => r.relationship_type === 'boundary_overlap' || r.relationship_type === 'complete_enclosure'
+                            );
+                            const cadastralCollision = spatialRels.find(
+                              (r: any) => r.relationship_type === 'cadastral_collision' || (r.shared_cadastral_identifiers && r.shared_cadastral_identifiers.length > 0)
+                            );
+
+                            return (
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {boundaryOverlap && (
+                                  <span
+                                    className="inline-flex items-center gap-1 bg-rose-50 text-rose-800 border border-rose-200 px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                                    title={`Boundary Overlap: ${boundaryOverlap.intersection_area_hectares} Ha (${boundaryOverlap.source_overlap_percentage}%) with Case ${boundaryOverlap.target_case_number}`}
+                                  >
+                                    <AlertTriangle className="h-3 w-3 text-rose-600 shrink-0" />
+                                    <span>Overlap {boundaryOverlap.source_overlap_percentage ? `${boundaryOverlap.source_overlap_percentage}%` : `${boundaryOverlap.intersection_area_hectares}Ha`}</span>
+                                  </span>
+                                )}
+                                {cadastralCollision && !boundaryOverlap && (
+                                  <span
+                                    className="inline-flex items-center gap-1 bg-orange-50 text-orange-800 border border-orange-200 px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                                    title={`Shared survey numbers detected with Case ${cadastralCollision.target_case_number}`}
+                                  >
+                                    <Layers className="h-3 w-3 text-orange-600 shrink-0" />
+                                    <span>Survey Collision</span>
+                                  </span>
+                                )}
+                                {unverifiedDocsCount > 0 && (
+                                  <span
+                                    className="inline-flex items-center gap-0.5 bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                                    title={`${unverifiedDocsCount} unverified documents`}
+                                  >
+                                    <FileWarning className="h-3 w-3 text-amber-600 shrink-0" />
+                                    <span>{unverifiedDocsCount} Docs</span>
+                                  </span>
+                                )}
+                                {disputedParcelsCount > 0 && (
+                                  <span
+                                    className="inline-flex items-center gap-0.5 bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                                    title={`${disputedParcelsCount} disputed parcels`}
+                                  >
+                                    <Scale className="h-3 w-3 text-red-600 shrink-0" />
+                                    <span>{disputedParcelsCount} Disputes</span>
+                                  </span>
+                                )}
+                                {unverifiedDocsCount === 0 && disputedParcelsCount === 0 && !boundaryOverlap && !cadastralCollision && (
+                                  <span className="text-[10px] text-slate-400">Clear</span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
 
                         {/* Last Activity */}
@@ -1047,6 +1077,55 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
                                   </button>
                                 </div>
                               </div>
+
+                              {/* Spatial & Cadastral Relationship Evidence Banner */}
+                              {((item as any).spatial_relationships || []).length > 0 && (
+                                <div className="col-span-1 md:col-span-4 mt-2 p-3 bg-amber-50/80 border border-amber-200/90 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-2xs">
+                                  <div className="flex items-start gap-2.5 min-w-0">
+                                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                                    <div className="min-w-0">
+                                      <div className="text-xs font-semibold text-amber-950 flex flex-wrap items-center gap-1.5">
+                                        <span>Spatial &amp; Cadastral Relationship Detected</span>
+                                        {((item as any).spatial_relationships || []).map((rel: any, rIdx: number) => (
+                                          <span
+                                            key={rIdx}
+                                            className={clsx(
+                                              'text-[10px] font-semibold px-1.5 py-0.5 rounded border',
+                                              rel.relationship_severity === 'alert'
+                                                ? 'bg-rose-100 text-rose-800 border-rose-200'
+                                                : 'bg-amber-100 text-amber-800 border-amber-300'
+                                            )}
+                                          >
+                                            {rel.relationship_type === 'boundary_overlap' || rel.relationship_type === 'complete_enclosure'
+                                              ? `${rel.intersection_area_hectares} Ha (${rel.source_overlap_percentage}%) Overlap with ${rel.target_case_number}`
+                                              : `Collision with ${rel.target_case_number}`}
+                                          </span>
+                                        ))}
+                                      </div>
+                                      <p className="text-[11px] text-amber-900/90 mt-1 leading-relaxed">
+                                        {((item as any).spatial_relationships || [])[0]?.evidence_summary}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <button
+                                      type="button"
+                                      onClick={() => onSelectCase(item.id, 'gis')}
+                                      className="px-2.5 py-1 text-xs font-medium text-amber-900 bg-amber-100 hover:bg-amber-200 rounded-lg border border-amber-300 transition-colors flex items-center gap-1 shadow-2xs"
+                                    >
+                                      <Layers className="h-3 w-3" />
+                                      View GIS Map
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => onSelectCase(item.id, 'overview')}
+                                      className="px-2.5 py-1 text-xs font-semibold text-white bg-gov-navy hover:bg-gov-navy-mid rounded-lg transition-colors shadow-2xs"
+                                    >
+                                      Review Case Evidence
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </td>
                         </tr>

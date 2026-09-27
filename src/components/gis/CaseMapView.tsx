@@ -172,6 +172,26 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
         if (!feature) return {};
         const props = feature.properties || {};
 
+        if (props.layer_type === 'relationship_intersection') {
+          return {
+            color: '#dc2626', // Red
+            weight: 3,
+            dashArray: '4, 4',
+            fillColor: '#ef4444',
+            fillOpacity: 0.45,
+          };
+        }
+
+        if (props.layer_type === 'related_case_boundary') {
+          return {
+            color: '#d97706', // Amber-600
+            weight: 2.5,
+            dashArray: '5, 5',
+            fillColor: '#f59e0b',
+            fillOpacity: 0.1,
+          };
+        }
+
         if (props.layer_type === 'case_boundary') {
           return {
             color: '#1e3a8a', // Deep Gov Navy
@@ -197,7 +217,29 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
       onEachFeature: (feature, layer) => {
         const props = feature.properties || {};
 
-        if (props.layer_type === 'case_boundary') {
+        if (props.layer_type === 'relationship_intersection') {
+          layer.bindTooltip(
+            `<strong>⚠️ Spatial Overlap Zone:</strong> ${props.intersection_area_hectares} Ha (${props.overlap_pct}%)<br/>Intersecting Case: ${props.related_case_number}`,
+            { sticky: true }
+          );
+          layer.on('click', () => {
+            setSelectedFeatureProps({
+              type: 'relationship_intersection',
+              ...props,
+            });
+          });
+        } else if (props.layer_type === 'related_case_boundary') {
+          layer.bindTooltip(
+            `<strong>Adjacent/Overlapping Case:</strong> ${props.related_case_number}<br/>Project: ${props.related_project_name}`,
+            { sticky: true }
+          );
+          layer.on('click', () => {
+            setSelectedFeatureProps({
+              type: 'related_case_boundary',
+              ...props,
+            });
+          });
+        } else if (props.layer_type === 'case_boundary') {
           layer.bindTooltip(
             `<strong>Corridor Boundary:</strong> ${props.case_number || caseTitle}<br/>Area: ${props.total_area_hectares} Ha`,
             { sticky: true }
@@ -413,6 +455,14 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
                   <span className="capitalize text-slate-600">{cfg.label}</span>
                 </div>
               ))}
+              <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                <span className="h-3 w-5 border-2 border-dashed border-[#d97706] bg-amber-200/40 rounded-xs inline-block" />
+                <span className="font-medium text-amber-900">Adjacent / Candidate Corridor</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-3 w-5 border-2 border-dashed border-[#dc2626] bg-red-400/50 rounded-xs inline-block" />
+                <span className="font-bold text-red-900">Calculated Overlap Zone</span>
+              </div>
             </div>
           </div>
         )}
@@ -448,19 +498,89 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
 
           {/* Selected Feature Inspector */}
           {selectedFeatureProps ? (
-            <div className="bg-blue-50/60 rounded-lg p-3 border border-blue-200 text-xs space-y-2">
+            <div className={`rounded-lg p-3 border text-xs space-y-2 ${
+              selectedFeatureProps.type === 'relationship_intersection'
+                ? 'bg-red-50/70 border-red-200'
+                : selectedFeatureProps.type === 'related_case_boundary'
+                ? 'bg-amber-50/70 border-amber-200'
+                : 'bg-blue-50/60 border-blue-200'
+            }`}>
               <div className="flex items-center justify-between">
                 <span className="font-bold text-gov-navy uppercase text-[10px] tracking-wider">
-                  {selectedFeatureProps.type === 'boundary' ? 'Corridor Inspection' : 'Parcel Inspection'}
+                  {selectedFeatureProps.type === 'relationship_intersection'
+                    ? '⚠️ Spatial Overlap Zone'
+                    : selectedFeatureProps.type === 'related_case_boundary'
+                    ? 'Adjacent Corridor'
+                    : selectedFeatureProps.type === 'boundary'
+                    ? 'Corridor Inspection'
+                    : 'Parcel Inspection'}
                 </span>
                 {selectedFeatureProps.acquisition_status && (
                   <Badge variant="navy">
                     {selectedFeatureProps.acquisition_status.toUpperCase()}
                   </Badge>
                 )}
+                {selectedFeatureProps.type === 'relationship_intersection' && (
+                  <Badge variant="red">
+                    COLLISION DETECTED
+                  </Badge>
+                )}
               </div>
 
-              {selectedFeatureProps.type === 'boundary' ? (
+              {selectedFeatureProps.type === 'relationship_intersection' ? (
+                <div className="space-y-1.5 pt-1 text-[11px]">
+                  <div>
+                    <span className="text-red-700 font-semibold">Intersection Area:</span>
+                    <strong className="block text-red-950 font-mono text-xs">
+                      {selectedFeatureProps.intersection_area_hectares} Hectares ({selectedFeatureProps.overlap_pct}%)
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-600">Intersecting Case:</span>
+                    <strong className="block font-mono text-gov-navy">
+                      {selectedFeatureProps.related_case_number}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-600">Sponsoring Project:</span>
+                    <strong className="block text-gov-slate">
+                      {selectedFeatureProps.related_project_name}
+                    </strong>
+                  </div>
+                  {selectedFeatureProps.shared_survey_numbers?.length > 0 && (
+                    <div>
+                      <span className="text-slate-600">Shared Survey Numbers:</span>
+                      <strong className="block font-mono text-red-700">
+                        {selectedFeatureProps.shared_survey_numbers.join(', ')}
+                      </strong>
+                    </div>
+                  )}
+                  <p className="text-[10px] text-slate-500 italic mt-1 pt-1 border-t border-red-200">
+                    Calculated dynamically via polygon clipping. Non-destructive advisory evidence.
+                  </p>
+                </div>
+              ) : selectedFeatureProps.type === 'related_case_boundary' ? (
+                <div className="space-y-1.5 pt-1 text-[11px]">
+                  <div>
+                    <span className="text-slate-500">Related Case Reference:</span>
+                    <strong className="block font-mono text-gov-navy">
+                      {selectedFeatureProps.related_case_number}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Sponsoring Project:</span>
+                    <strong className="block text-gov-slate">
+                      {selectedFeatureProps.related_project_name}
+                    </strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-500">Relationship Type:</span>
+                    <strong className="block text-amber-900 capitalize">
+                      {(selectedFeatureProps.relationship_type || '').replace(/_/g, ' ')}
+                    </strong>
+                  </div>
+                </div>
+              ) : selectedFeatureProps.type === 'boundary' ? (
                 <div className="space-y-1.5 pt-1 text-[11px]">
                   <div>
                     <span className="text-slate-500">Corridor Title:</span>
@@ -519,7 +639,7 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
           ) : (
             <div className="bg-slate-50 p-3 rounded-lg border border-dashed border-slate-300 text-center text-xs text-slate-500">
               <Info className="h-4 w-4 mx-auto mb-1 text-slate-400" />
-              Click any parcel or boundary polygon on the map to inspect ownership and legal vitals.
+              Click any parcel, corridor boundary, or overlap collision zone on the map to inspect evidence.
             </div>
           )}
         </div>
