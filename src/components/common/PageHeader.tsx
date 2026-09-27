@@ -32,13 +32,13 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
     >
       <div className="min-w-0">
         {eyebrow && (
-          <div className="mb-1.5">{eyebrow}</div>
+          <div className="mb-1.5 flex items-center gap-2">{eyebrow}</div>
         )}
-        <h1 className="text-xl font-bold tracking-tight text-gov-slate">
+        <h1 className="text-xl font-bold tracking-tight text-mocha-900 font-sans">
           {title}
         </h1>
         {subtitle && (
-          <p className="mt-1 text-xs text-slate-500 max-w-2xl">{subtitle}</p>
+          <p className="mt-0.5 text-xs text-mocha-500 max-w-2xl leading-relaxed">{subtitle}</p>
         )}
       </div>
       {actions && (
@@ -57,7 +57,7 @@ export const PageEyebrow: React.FC<{ children: React.ReactNode; className?: stri
 }) => (
   <span
     className={clsx(
-      'inline-flex items-center gap-1.5 rounded border border-gov-navy/20 bg-gov-blue-soft px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gov-navy',
+      'inline-flex items-center gap-1.5 rounded-md border border-sand-300/80 bg-sand-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-terra-800 shadow-2xs',
       className
     )}
   >

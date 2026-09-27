@@ -109,16 +109,13 @@ export const IntelligencePage: React.FC<IntelligencePageProps> = ({
       {/* Page header */}
       <PageHeader
         eyebrow={
-          <>
-            <PageEyebrow>
-              <BrainCircuit className="h-3 w-3" />
-              Cross-Case Intelligence Hub
-            </PageEyebrow>
-            <span className="text-[11px] text-slate-500">National Hierarchy Telemetry</span>
-          </>
+          <PageEyebrow>
+            <BrainCircuit className="h-3 w-3" />
+            Cross-Case Intelligence
+          </PageEyebrow>
         }
-        title="Cross-Case Decision Intelligence & Hierarchy Drilldown"
-        subtitle="Systemic friction loci, delay patterns, risk concentration, and multi-tier administrative drilldown from National to Case level."
+        title="Cross-Case Decision Intelligence & Hierarchy"
+        subtitle="Systemic friction analysis, delay patterns, and administrative hierarchy drilldown."
         actions={
           <Button
             variant="outline"

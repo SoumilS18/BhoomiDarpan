@@ -226,17 +226,15 @@ export const GovernancePage: React.FC<GovernancePageProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-gov-navy bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-terra-800 bg-sand-100 border border-sand-300/80 px-2 py-0.5 rounded shadow-2xs">
               Institutional Governance
             </span>
-            <span className="text-xs text-slate-400">•</span>
-            <span className="text-[11px] text-slate-500">Day 5 Policy &amp; Notification Engine</span>
           </div>
-          <h2 className="text-xl font-bold text-gov-slate tracking-tight">
+          <h2 className="text-xl font-bold text-mocha-900 tracking-tight font-sans">
             Operational Governance &amp; Decision Support
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Configurable institutional policy evaluation, multi-tier automated escalations, and explainable evidence verification.
+          <p className="text-xs text-mocha-500 mt-0.5">
+            Configurable institutional policy evaluation, multi-tier automated escalations, and audit verification.
           </p>
         </div>
 

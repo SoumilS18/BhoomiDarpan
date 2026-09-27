@@ -109,16 +109,13 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
       {/* Page header */}
       <PageHeader
         eyebrow={
-          <>
-            <PageEyebrow>
-              <BarChart3 className="h-3 w-3" />
-              National Analytics Engine
-            </PageEyebrow>
-            <span className="text-[11px] text-slate-500">Decision Support Telemetry</span>
-          </>
+          <PageEyebrow>
+            <BarChart3 className="h-3 w-3" />
+            National Analytics
+          </PageEyebrow>
         }
         title="National Land Acquisition Analytics"
-        subtitle="Empirical distributions, temporal trends, administrative comparative performance, and verified intervention outcomes."
+        subtitle="Empirical distributions, temporal progression trends, and verified intervention outcomes."
         actions={
           <Button
             variant="outline"

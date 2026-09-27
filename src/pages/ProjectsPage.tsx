@@ -360,16 +360,13 @@ export const ProjectsPage: React.FC<ProjectsPageProps> = ({
       {/* Page header */}
       <PageHeader
         eyebrow={
-          <>
-            <PageEyebrow>
-              <Building2 className="h-3 w-3" />
-              Infrastructure Portfolio
-            </PageEyebrow>
-            <span className="text-[11px] text-slate-500">Corridor Aggregations</span>
-          </>
+          <PageEyebrow>
+            <Building2 className="h-3 w-3" />
+            Infrastructure Portfolio
+          </PageEyebrow>
         }
         title="Infrastructure Projects Portfolio"
-        subtitle="Sponsoring agencies, corridors, and project-level land acquisition budgets aggregated from real cases."
+        subtitle="Sponsoring agencies, infrastructure corridors, and project-level acquisition budgets."
         actions={
           <div className="flex items-center gap-2">
             <Button

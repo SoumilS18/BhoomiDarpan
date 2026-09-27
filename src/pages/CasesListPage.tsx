@@ -437,16 +437,9 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow={
-          <>
-            <PageEyebrow>National Digital Registry</PageEyebrow>
-            <span className="text-[11px] text-slate-500">
-              RFCTLARR 2013 Statutory Workspace
-            </span>
-          </>
-        }
+        eyebrow={<PageEyebrow>National Digital Registry</PageEyebrow>}
         title="Land Acquisition Case Registry"
-        subtitle="Operational registry workspace with real-time milestone tracking, SLA delay telemetry, and progressive statutory disclosure."
+        subtitle="Operational case management, milestone tracking, and statutory stage progression."
         actions={
           <>
             {/* View mode toggle */}
@@ -677,23 +670,15 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
         </div>
 
         {/* Results count indicator */}
-        <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-100 flex items-center justify-between">
+        <div className="text-[11px] text-mocha-600 pt-1 border-t border-sand-100 flex items-center justify-between">
           <span>
             Showing <strong>{filteredCases.length}</strong> of <strong>{cases.length}</strong>{' '}
             matching acquisition cases
           </span>
-          <span className="text-[10px] text-slate-400">
+          <span className="text-[10px] text-mocha-400">
             Sorted by {sortField.replace('_', ' ')} ({sortOrder.toUpperCase()})
           </span>
         </div>
-
-        {/* Honest split of where each filter is actually applied */}
-        <p className="text-[10px] leading-relaxed text-slate-400">
-          Geography (LGD), project, status, priority and search are applied by the server on every
-          load. Stage and delayed/critical views are applied to the{' '}
-          <strong className="text-slate-500">{cases.length}</strong> cases the server returned for
-          those criteria.
-        </p>
       </div>
 
       {/* Content Viewport */}

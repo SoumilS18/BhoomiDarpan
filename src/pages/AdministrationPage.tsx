@@ -145,41 +145,37 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-[#FFFDF9] p-5 rounded-xl border border-sand-200 shadow-gov">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-gov-navy bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-terra-800 bg-sand-100 border border-sand-300/80 px-2 py-0.5 rounded shadow-2xs">
               Institutional Governance
             </span>
-            <span className="text-xs text-slate-300">•</span>
-            <span className="text-[11px] text-slate-500">
-              System Configuration Console
-            </span>
           </div>
-          <h1 className="text-xl font-bold text-gov-slate tracking-tight">
+          <h1 className="text-xl font-bold text-mocha-900 tracking-tight font-sans">
             Administration &amp; System Governance
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-mocha-500 mt-0.5">
             Role visibility, statutory workflow templates, dynamic policy thresholds, external
             registry integrations, and the cross-case audit ledger.
           </p>
         </div>
       </div>
 
-      {/* Sub-Navigation Switcher (Section 22 Structure) */}
-      <div className="flex border-b border-slate-200 bg-white rounded-t-xl px-4 gap-6 text-xs font-medium overflow-x-auto shadow-xs">
+      {/* Sub-Navigation Switcher */}
+      <div className="flex border-b border-sand-200 bg-[#FFFDF9] rounded-t-xl px-4 gap-6 text-xs font-medium overflow-x-auto shadow-2xs">
         <button
           type="button"
           onClick={() => setActiveSubTab('requests')}
           className={clsx(
             'py-3.5 flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer',
             activeSubTab === 'requests'
-              ? 'border-gov-navy text-gov-navy font-bold'
-              : 'border-transparent text-slate-500 hover:text-gov-slate'
+              ? 'border-terra-700 text-terra-900 font-bold'
+              : 'border-transparent text-mocha-500 hover:text-mocha-900'
           )}
         >
-          <UserCheck className="h-4 w-4 text-emerald-600" />
-          <span>1. Access Requests &amp; Approvals</span>
+          <UserCheck className="h-4 w-4 text-emerald-700" />
+          <span>Access Requests &amp; Approvals</span>
         </button>
 
         <button
@@ -188,12 +184,12 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
           className={clsx(
             'py-3.5 flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer',
             activeSubTab === 'users'
-              ? 'border-gov-navy text-gov-navy font-bold'
-              : 'border-transparent text-slate-500 hover:text-gov-slate'
+              ? 'border-terra-700 text-terra-900 font-bold'
+              : 'border-transparent text-mocha-500 hover:text-mocha-900'
           )}
         >
-          <Users className="h-4 w-4 text-gov-navy" />
-          <span>2. Officer Roles &amp; Directory</span>
+          <Users className="h-4 w-4 text-terra-700" />
+          <span>Officer Roles &amp; Directory</span>
         </button>
 
         <button
@@ -202,12 +198,12 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
           className={clsx(
             'py-3.5 flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer',
             activeSubTab === 'workflows'
-              ? 'border-gov-navy text-gov-navy font-bold'
-              : 'border-transparent text-slate-500 hover:text-gov-slate'
+              ? 'border-terra-700 text-terra-900 font-bold'
+              : 'border-transparent text-mocha-500 hover:text-mocha-900'
           )}
         >
-          <GitBranch className="h-4 w-4 text-teal-600" />
-          <span>3. Workflow Configuration</span>
+          <GitBranch className="h-4 w-4 text-gold-600" />
+          <span>Workflow Configuration</span>
         </button>
 
         <button
@@ -216,12 +212,12 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
           className={clsx(
             'py-3.5 flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer',
             activeSubTab === 'policies'
-              ? 'border-gov-navy text-gov-navy font-bold'
-              : 'border-transparent text-slate-500 hover:text-gov-slate'
+              ? 'border-terra-700 text-terra-900 font-bold'
+              : 'border-transparent text-mocha-500 hover:text-mocha-900'
           )}
         >
           <ShieldAlert className="h-4 w-4 text-amber-600" />
-          <span>4. Policies &amp; Thresholds</span>
+          <span>Policies &amp; Thresholds</span>
         </button>
 
         <button
@@ -230,12 +226,12 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
           className={clsx(
             'py-3.5 flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer',
             activeSubTab === 'integrations'
-              ? 'border-gov-navy text-gov-navy font-bold'
-              : 'border-transparent text-slate-500 hover:text-gov-slate'
+              ? 'border-terra-700 text-terra-900 font-bold'
+              : 'border-transparent text-mocha-500 hover:text-mocha-900'
           )}
         >
-          <Database className="h-4 w-4 text-blue-600" />
-          <span>5. External Integrations</span>
+          <Database className="h-4 w-4 text-terra-700" />
+          <span>External Integrations</span>
         </button>
 
         <button
@@ -244,12 +240,12 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
           className={clsx(
             'py-3.5 flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer',
             activeSubTab === 'audit'
-              ? 'border-gov-navy text-gov-navy font-bold'
-              : 'border-transparent text-slate-500 hover:text-gov-slate'
+              ? 'border-terra-700 text-terra-900 font-bold'
+              : 'border-transparent text-mocha-500 hover:text-mocha-900'
           )}
         >
-          <History className="h-4 w-4 text-purple-600" />
-          <span>6. System Audit Ledger</span>
+          <History className="h-4 w-4 text-mocha-600" />
+          <span>System Audit Ledger</span>
         </button>
       </div>
 

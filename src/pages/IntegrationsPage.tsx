@@ -243,18 +243,17 @@ export const IntegrationsPage: React.FC = () => {
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-sand-200 pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-gov-navy text-white rounded">
+            <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-terra-700 text-white rounded shadow-2xs">
               System Core
             </span>
-            <span className="text-xs text-slate-500 font-mono">Day 1 Foundation</span>
           </div>
-          <h1 className="text-2xl font-bold text-gov-slate mt-1 tracking-tight">
+          <h1 className="text-2xl font-bold text-mocha-900 mt-1 tracking-tight font-sans">
             Data Source Registry &amp; Integration Diagnostics
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-mocha-500 mt-0.5">
             Institutional ledger of external providers, operational telemetry, provenance governance, and administrative data ingestion.
           </p>
         </div>
