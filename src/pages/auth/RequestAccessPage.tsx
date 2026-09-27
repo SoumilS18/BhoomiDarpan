@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { AlertCircle, Loader2, Send, ShieldCheck } from 'lucide-react';
 import { AuthShell, AuthField } from '../../components/layout/auth/AuthShell';
 import { Button } from '../../components/common/Button';
-import { GeographySourceNote } from '../../components/common/GeographySourceNote';
 import { NoticeBox, PublicList } from '../../components/layout/public/PublicSections';
 import {
   fetchAccessRequestStatus,
@@ -380,7 +379,6 @@ export const RequestAccessPage: React.FC = () => {
               {geographyError}
             </p>
           )}
-          <GeographySourceNote className="mb-3" />
           <div className="grid gap-4 sm:grid-cols-2">
             <AuthField id="ra-state" label="State / UT" required error={field('state')}>
               <select

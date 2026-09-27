@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { PortfolioFilterParams, PortfolioOperationsData, AdministrativeUnit } from '../../../shared/types';
 import { Filter, RotateCcw, Search, X } from 'lucide-react';
 import { fetchDistricts, fetchSubDistricts, fetchVillages } from '../../lib/api';
-import { GeographySourceNote } from '../common/GeographySourceNote';
 
 interface PortfolioFilterBarProps {
   filters: PortfolioFilterParams;
@@ -146,7 +145,6 @@ export const PortfolioFilterBar: React.FC<PortfolioFilterBarProps> = ({
 
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-3.5 space-y-3 shadow-xs">
-      <GeographySourceNote />
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-2.5 text-xs">
         {/* Search */}
         <div className="relative col-span-1 sm:col-span-2 md:col-span-1 xl:col-span-2">

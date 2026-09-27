@@ -13,7 +13,6 @@ import { CaseCard } from '../components/cases/CaseCard';
 import { EmptyState } from '../components/common/EmptyState';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
-import { GeographySourceNote } from '../components/common/GeographySourceNote';
 import {
   FolderKanban,
   Plus,
@@ -548,7 +547,6 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
         </div>
 
         {/* Structured Dropdown Filters */}
-        <GeographySourceNote className="mb-1" />
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-xs">
           {/* State */}
           <select
