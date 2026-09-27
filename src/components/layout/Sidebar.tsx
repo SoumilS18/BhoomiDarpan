@@ -11,8 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
-  UserCheck,
-  ShieldAlert,
+  Layers,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuth } from '../../context/AuthContext';
@@ -32,7 +31,7 @@ const NAV_ICONS: Record<IconKey, React.ComponentType<{ className?: string }>> = 
   intelligence: Sparkles,
   analytics: BarChart3,
   notifications: Bell,
-  governance: ShieldAlert,
+  governance: ShieldCheck,
   admin: Settings,
 };
 
@@ -40,10 +39,22 @@ interface SidebarProps {
   /** Module resolved from the matched route; drives the active highlight. */
   activeModule: ModuleId | null;
   caseCount?: number;
+  /**
+   * Below the `lg` breakpoint the sidebar is an overlay drawer instead of a
+   * permanent rail. This flag drives its open/closed position.
+   */
+  mobileOpen?: boolean;
+  /** Closes the mobile drawer (backdrop click, Escape, or navigation). */
+  onCloseMobile?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ activeModule, caseCount }) => {
-  const { activePersona } = useAuth();
+export const Sidebar: React.FC<SidebarProps> = ({
+  activeModule,
+  caseCount,
+  mobileOpen = false,
+  onCloseMobile,
+}) => {
+  const { activePersona, session } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [unreadAlerts, setUnreadAlerts] = useState<number>(0);
 
@@ -77,36 +88,68 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeModule, caseCount }) => 
   };
 
   return (
-    <aside
-      aria-label="Primary Application Navigation"
-      className={clsx(
-        'bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 transition-all duration-200 select-none z-20',
-        isCollapsed ? 'w-18 py-4 px-2' : 'w-64 py-5 px-3'
+    <>
+      {/* Mobile-only scrim behind the overlay drawer. */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-[45] bg-gov-navy-dark/60 lg:hidden"
+          onClick={onCloseMobile}
+          aria-hidden="true"
+        />
       )}
-    >
-      {/* Top Navigation Items */}
-      <div className="space-y-4">
-        {/* Workspace Title & Collapse Toggle */}
-        <div className="flex items-center justify-between px-2">
-          {!isCollapsed ? (
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Operations Workspace
-              </span>
-              <span className="text-[11px] font-semibold text-gov-slate">
-                RFCTLARR 2013 Compliance
-              </span>
+      <aside
+        id="primary-application-navigation"
+        aria-label="Primary Application Navigation"
+        className={clsx(
+          'flex shrink-0 flex-col justify-between bg-gov-navy-dark text-slate-300 transition-all duration-200 select-none z-20',
+          isCollapsed ? 'w-[68px] py-4 px-2' : 'w-64 py-5 px-3',
+          // Below `lg` the sidebar leaves the document flow and becomes an
+          // overlay drawer toggled from the header's navigation button.
+          'max-lg:fixed max-lg:inset-y-0 max-lg:left-0 max-lg:z-[46] max-lg:overflow-y-auto',
+          mobileOpen ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full'
+        )}
+      >
+      {/* Top: brand + navigation */}
+      <div className="space-y-5">
+        {/* Branding */}
+        <div
+          className={clsx(
+            'flex items-center gap-2.5',
+            isCollapsed && 'flex-col'
+          )}
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white ring-1 ring-white/15">
+            <Layers className="h-5 w-5" />
+          </div>
+          {!isCollapsed && (
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="truncate text-sm font-bold tracking-tight text-white">
+                  BhoomiSetu
+                </span>
+                <span className="rounded border border-white/20 bg-white/10 px-1.5 py-px text-[9px] font-semibold text-slate-200">
+                  भूमिसेतु
+                </span>
+              </div>
+              <p className="truncate text-[10px] text-slate-400">
+                Land Acquisition Decision Support
+              </p>
             </div>
-          ) : (
-            <div className="mx-auto text-[10px] font-bold text-gov-navy">
-              BS
-            </div>
+          )}
+        </div>
+
+        {/* Nav section label + collapse toggle */}
+        <div className="flex items-center justify-between px-1">
+          {!isCollapsed && (
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+              Operations
+            </span>
           )}
           <button
             type="button"
             onClick={() => setIsCollapsed(!isCollapsed)}
             aria-label={isCollapsed ? 'Expand navigation sidebar' : 'Collapse navigation sidebar'}
-            className="p-1 rounded-md text-slate-400 hover:text-gov-slate hover:bg-slate-100 transition-colors cursor-pointer"
+            className="rounded-md p-1 text-slate-500 transition-colors hover:bg-white/10 hover:text-white cursor-pointer"
             title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {isCollapsed ? (
@@ -117,66 +160,68 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeModule, caseCount }) => 
           </button>
         </div>
 
-        {/* Navigation Destination List */}
+        {/* Navigation destination list */}
         <nav className="space-y-1">
           {destinations.map((dest) => {
             const Icon = NAV_ICONS[dest.iconKey];
             const isActive = activeModule === dest.module;
             const badge = resolveBadge(dest.badgeSource);
-            const badgeVariant = dest.badgeSource === 'unreadNotifications' ? 'red' : 'navy';
 
             return (
               <Link
                 key={dest.id}
                 to={dest.path}
+                onClick={onCloseMobile}
                 aria-current={isActive ? 'page' : undefined}
                 title={isCollapsed ? `${dest.title} (${dest.description ?? ''})` : undefined}
                 className={clsx(
-                  'w-full flex items-center rounded-lg text-xs font-medium transition-all text-left cursor-pointer group relative',
-                  isCollapsed ? 'justify-center p-3' : 'justify-between px-3 py-2.5',
+                  'group relative flex w-full items-center rounded-lg text-xs font-medium transition-colors text-left cursor-pointer',
+                  isCollapsed ? 'justify-center p-3' : 'gap-3 px-3 py-2.5',
                   isActive
-                    ? 'bg-gov-navy text-white shadow-sm font-semibold'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-gov-slate'
+                    ? 'bg-white/10 font-semibold text-white'
+                    : 'text-slate-300 hover:bg-white/5 hover:text-white'
                 )}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <Icon
-                    className={clsx(
-                      'h-4 w-4 shrink-0 transition-colors',
-                      isActive ? 'text-amber-400' : 'text-slate-400 group-hover:text-gov-navy'
-                    )}
-                  />
-                  {!isCollapsed && (
-                    <div className="truncate">
-                      <div className="truncate leading-tight">{dest.title}</div>
-                      {dest.hindiLabel && (
-                        <div
-                          className={clsx(
-                            'text-[10px] leading-none mt-0.5 font-normal',
-                            isActive ? 'text-blue-200' : 'text-slate-400'
-                          )}
-                        >
-                          {dest.hindiLabel}
-                        </div>
-                      )}
-                    </div>
+                {/* Active indicator */}
+                <span
+                  className={clsx(
+                    'absolute left-0 top-1/2 h-5 w-1 -translate-y-1/2 rounded-r bg-amber-400 transition-opacity',
+                    isActive ? 'opacity-100' : 'opacity-0'
                   )}
-                </div>
+                  aria-hidden="true"
+                />
+                <Icon
+                  className={clsx(
+                    'h-4 w-4 shrink-0 transition-colors',
+                    isActive ? 'text-amber-400' : 'text-slate-400 group-hover:text-slate-200'
+                  )}
+                />
+                {!isCollapsed && (
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate leading-tight">{dest.title}</div>
+                    {dest.hindiLabel && (
+                      <div
+                        className={clsx(
+                          'mt-0.5 text-[10px] leading-none font-normal',
+                          isActive ? 'text-slate-300' : 'text-slate-500'
+                        )}
+                      >
+                        {dest.hindiLabel}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Badge indicator */}
                 {badge !== null && badge !== undefined && (
                   <span
                     className={clsx(
-                      'text-[10px] px-2 py-0.5 rounded-full font-bold tabular-nums shrink-0',
+                      'shrink-0 rounded-full px-1.5 text-[10px] font-bold tabular-nums',
                       isCollapsed
-                        ? 'absolute top-1 right-1 h-2 w-2 p-0 rounded-full bg-red-500'
-                        : badgeVariant === 'red'
-                        ? isActive
-                          ? 'bg-red-500 text-white'
-                          : 'bg-red-100 text-red-700'
+                        ? 'absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center bg-red-500 p-0 text-white'
                         : isActive
-                        ? 'bg-blue-800 text-amber-300'
-                        : 'bg-slate-100 text-slate-700'
+                        ? 'bg-amber-400/90 text-gov-navy-dark'
+                        : 'bg-white/10 text-slate-200'
                     )}
                   >
                     {!isCollapsed ? badge : ''}
@@ -188,50 +233,65 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeModule, caseCount }) => 
         </nav>
       </div>
 
-      {/* Bottom Identity & Statutory Compliance Card */}
-      <div className="pt-4 border-t border-slate-100 space-y-3">
-        {/* Active Officer Identity Pill */}
+      {/* Bottom: identity + statutory note */}
+      <div className={clsx('space-y-3 border-t border-white/10 pt-4', isCollapsed && 'px-0.5')}>
+        {/* Active officer identity */}
         <div
           className={clsx(
-            'rounded-lg border border-slate-200 bg-slate-50/70 p-2.5 text-xs transition-all',
+            'rounded-lg border border-white/10 bg-white/5 p-2.5 text-xs',
             isCollapsed && 'p-2 text-center'
           )}
         >
           <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-full bg-gov-navy/10 text-gov-navy flex items-center justify-center font-bold text-xs shrink-0">
-              <UserCheck className="h-4 w-4 text-gov-navy" />
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-400/15 text-[11px] font-bold text-amber-300 ring-1 ring-white/10">
+              {activePersona.name
+                .split(' ')
+                .map((n) => n[0])
+                .filter(Boolean)
+                .slice(0, 2)
+                .join('')
+                .toUpperCase()}
             </div>
             {!isCollapsed && (
               <div className="min-w-0 flex-1">
-                <p className="font-semibold text-gov-slate text-xs truncate">
+                <p className="truncate text-xs font-semibold text-white">
                   {activePersona.name}
                 </p>
-                <p className="text-[10px] text-slate-500 truncate">
+                <p className="truncate text-[10px] text-slate-400">
                   {activePersona.label}
                 </p>
               </div>
             )}
           </div>
           {!isCollapsed && (
-            <div className="mt-2 pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-400">
-              <span className="truncate">{activePersona.department}</span>
+            <div className="mt-2 border-t border-white/10 pt-2">
+              <p className="truncate text-[10px] text-slate-500">
+                {activePersona.department}
+              </p>
+              <span className="mt-1.5 inline-flex items-center gap-1 rounded bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-300">
+                <span
+                  className={`h-1 w-1 rounded-full ${session ? 'bg-emerald-400' : 'bg-slate-500'}`}
+                />
+                {session ? 'Signed-in session' : 'No active session'}
+              </span>
             </div>
           )}
         </div>
 
-        {/* SLA Compliance Note */}
+        {/* Statutory note */}
         {!isCollapsed && (
-          <div className="rounded-lg bg-emerald-50/50 p-2.5 border border-emerald-200/60 text-[11px] text-slate-600">
-            <div className="font-semibold text-gov-slate flex items-center gap-1.5 mb-0.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-              <span className="text-xs">Statutory Engine</span>
+          <div className="rounded-lg border border-white/10 bg-white/5 p-2.5 text-[11px] text-slate-400">
+            <div className="mb-0.5 flex items-center gap-1.5 font-semibold text-slate-300">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+              <span className="text-xs">RFCTLARR 2013</span>
             </div>
-            <p className="text-[10px] text-slate-500 leading-snug">
-              Rigid audit trail with zero fabricated signals.
+            <p className="text-[10px] leading-snug text-slate-500">
+              Statutory engine with rigid audit trail and zero fabricated signals.
             </p>
           </div>
         )}
       </div>
-    </aside>
+      </aside>
+    </>
   );
 };

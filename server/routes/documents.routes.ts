@@ -134,7 +134,7 @@ router.post('/cases/:id/documents', requireAuth, requireRole(['admin', 'project_
 });
 
 // GET /api/cases/:id/documents - Get all documents for a case
-router.get('/cases/:id/documents', async (req: Request, res: Response) => {
+router.get('/cases/:id/documents', requireAuth, async (req: Request, res: Response) => {
   try {
     if (!isSupabaseConfigured) {
       return res.status(503).json({ error: 'Supabase not configured' });
@@ -392,7 +392,10 @@ router.post('/documents/:id/validate', requireAuth, requireRole(['admin', 'proje
 });
 
 // GET /api/documents/files/:filename - Serve locally uploaded files
-router.get('/documents/files/:filename', (req: Request, res: Response) => {
+// Serves raw uploaded bytes. Unauthenticated by design would let anyone who
+// can guess a filename read case documents, so the session is checked first;
+// the client never links here directly (it fetches with `getAuthHeaders`).
+router.get('/documents/files/:filename', requireAuth, (req: Request, res: Response) => {
   const rawParam = req.params.filename;
   const filename = path.basename(typeof rawParam === 'string' ? rawParam : (rawParam as any)[0]);
   const filePath = path.join(UPLOADS_DIR, filename);

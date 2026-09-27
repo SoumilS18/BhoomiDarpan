@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { getSupabase, isSupabaseConfigured } from '../config/supabase';
+import { isTestEnvironment } from '../config/runtimeEnv';
 import { UserRole } from '../../shared/types';
 
 export interface AuthenticatedUser {
@@ -30,7 +31,13 @@ const VALID_ROLES: UserRole[] = [
 ];
 
 /**
- * Parses authentication credentials from Bearer JWT or evaluation persona headers.
+ * Parses authentication credentials from a Bearer JWT.
+ *
+ * Identity and role come ONLY from a token that Supabase verifies plus the
+ * profile row stored for that account. There is deliberately no header a
+ * caller can send to choose its own role: the previous `X-Eval-Role` persona
+ * path was reachable from any non-production process, so a plain
+ * `X-Eval-Role: admin` request reached the admin audit ledger unauthenticated.
  */
 export async function authenticateRequest(req: Request): Promise<AuthenticatedUser | null> {
   const authHeader = req.headers.authorization;
@@ -38,7 +45,10 @@ export async function authenticateRequest(req: Request): Promise<AuthenticatedUs
   // 1. If Bearer token is provided
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1]?.trim();
-    if (process.env.NODE_ENV !== 'production' && token.startsWith('valid-test-token-')) {
+    // Fixture tokens exist so the in-process test harness can exercise role
+    // guards without a live IdP. They are accepted only while the process IS
+    // that harness — never by a dev or production server.
+    if (isTestEnvironment() && token?.startsWith('valid-test-token-')) {
       if (token === 'valid-test-token-admin') {
         return { id: 'test-admin-id', role: 'admin', full_name: 'Test Administrator' };
       }
@@ -81,8 +91,8 @@ export async function authenticateRequest(req: Request): Promise<AuthenticatedUs
         console.warn('[AuthMiddleware] Supabase auth check error:', err);
         return null;
       }
-    } else {
-      // Mock/test JWT verification in offline test harness
+    } else if (isTestEnvironment()) {
+      // Offline test harness (no Supabase configured): fixture tokens only.
       if (token === 'valid-test-token-admin') {
         return { id: 'test-admin-id', role: 'admin', full_name: 'Test Administrator' };
       }
@@ -94,30 +104,41 @@ export async function authenticateRequest(req: Request): Promise<AuthenticatedUs
       }
       return null;
     }
+
+    return null;
   }
 
-  // 2. Evaluation / Institutional Role Switcher header support (Development & test environments only)
-  const isDevOrTest = process.env.NODE_ENV !== 'production';
-  const evalRole = (req.headers['x-eval-role'] || req.headers['x-test-user-role']) as string;
-  if (isDevOrTest && evalRole && VALID_ROLES.includes(evalRole as UserRole)) {
-    const rawUserId = req.headers['x-eval-user-id'] || req.headers['x-test-user-id'];
-    const evalUserId = (Array.isArray(rawUserId) ? rawUserId[0] : rawUserId) || `eval-${evalRole}-id`;
+  // 2. Test-harness personas. These used to be accepted by ANY process whose
+  //    NODE_ENV was not 'production' — which meant the ordinary dev server
+  //    granted `X-Eval-Role: admin` (and a fixture bearer token) to anyone who
+  //    asked. They now exist only while the automated harness is running, so a
+  //    real server has exactly one authentication path: a verified token.
+  if (isTestEnvironment()) {
+    const evalRole = (req.headers['x-eval-role'] || req.headers['x-test-user-role']) as string;
+    if (evalRole && VALID_ROLES.includes(evalRole as UserRole)) {
+      const rawUserId = req.headers['x-eval-user-id'] || req.headers['x-test-user-id'];
+      const evalUserId = (Array.isArray(rawUserId) ? rawUserId[0] : rawUserId) || `eval-${evalRole}-id`;
 
-    const rawUserName = req.headers['x-eval-user-name'] || req.headers['x-test-user-name'];
-    const evalUserName = (Array.isArray(rawUserName) ? rawUserName[0] : rawUserName) || `Officer (${evalRole})`;
+      const rawUserName = req.headers['x-eval-user-name'] || req.headers['x-test-user-name'];
+      const evalUserName = (Array.isArray(rawUserName) ? rawUserName[0] : rawUserName) || `Officer (${evalRole})`;
 
-    const rawDept = req.headers['x-eval-department'];
-    const evalDepartment = (Array.isArray(rawDept) ? rawDept[0] : rawDept) || undefined;
+      const rawDept = req.headers['x-eval-department'];
+      const evalDepartment = (Array.isArray(rawDept) ? rawDept[0] : rawDept) || undefined;
 
-    return {
-      id: String(evalUserId),
-      role: evalRole as UserRole,
-      full_name: String(evalUserName),
-      department: evalDepartment ? String(evalDepartment) : undefined,
-      is_eval_persona: true,
-    };
+      return {
+        id: String(evalUserId),
+        role: evalRole as UserRole,
+        full_name: String(evalUserName),
+        department: evalDepartment ? String(evalDepartment) : undefined,
+        is_eval_persona: true,
+      };
+    }
   }
 
+  // 3. No credential was supplied. Client-chosen roles are never accepted
+  //    outside the harness: a header such as `X-Eval-Role: admin` is ignored
+  //    outright, so the only way to obtain a role is a verified session plus
+  //    the profile stored for that account.
   return null;
 }
 
@@ -141,12 +162,12 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return next();
   }
 
-  // If evaluation headers are supplied
-  if (evalRole) {
+  // Test-harness personas only — never a running server.
+  if (evalRole && isTestEnvironment()) {
     const user = await authenticateRequest(req);
     if (!user) {
       return res.status(401).json({
-        error: `Invalid evaluation role specified: "${evalRole}"`,
+        error: `Invalid test role specified: "${evalRole}"`,
         code: 'AUTH_INVALID_ROLE',
       });
     }
@@ -154,9 +175,9 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     return next();
   }
 
-  // No credentials supplied
+  // No credentials supplied (or a role header was presented without one)
   return res.status(401).json({
-    error: 'Authentication required. Please provide a valid Authorization Bearer token or select an evaluation role.',
+    error: 'Authentication required. Please provide a valid Authorization Bearer token.',
     code: 'AUTH_REQUIRED',
   });
 }

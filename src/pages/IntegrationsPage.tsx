@@ -613,9 +613,9 @@ export const IntegrationsPage: React.FC = () => {
             onChange={(e) => setImportDataText(e.target.value)}
             placeholder={
               importFormat === 'json'
-                ? '[\n  {\n    "unit_type": "state",\n    "code": "MH",\n    "name": "Maharashtra"\n  }\n]'
+                ? '[\n  {\n    "unit_type": "state",\n    "code": "LGD_STATE_CODE",\n    "name": "LGD_OFFICIAL_NAME"\n  }\n]'
                 : importFormat === 'csv'
-                ? 'unit_type,code,name,state_code\nstate,MH,Maharashtra,\ndistrict,PUN,Pune,MH'
+                ? 'unit_type,code,name,state_code\nstate,LGD_STATE_CODE,LGD_OFFICIAL_NAME,'
                 : '{\n  "type": "FeatureCollection",\n  "features": []\n}'
             }
             className="w-full font-mono text-xs border border-slate-300 rounded-lg p-3 bg-slate-50 focus:bg-white transition"

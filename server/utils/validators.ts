@@ -55,6 +55,14 @@ export const CreateProjectSchema = z.object({
   subdistrict_lgd_code: z.string().max(50).optional().nullable(),
 });
 
+export const CreateSubDistrictSchema = z.object({
+  name: z.string().min(2, 'Sub-district name must be at least 2 characters').max(150),
+  code: z.string().min(1, 'Sub-district / Tehsil code is required').max(50),
+  state_code: z.string().min(1, 'State code is required').max(50),
+  district_code: z.string().min(1, 'District code is required').max(50),
+  local_name: z.string().max(150).optional().nullable(),
+});
+
 export const RunSimulationSchema = z.object({
   name: z.string().min(3, 'Simulation name must be at least 3 characters').max(100),
   description: z.string().max(500).optional(),

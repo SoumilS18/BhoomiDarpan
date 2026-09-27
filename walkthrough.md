@@ -280,7 +280,7 @@ Ran 47 tests across 9 files. [111.00ms]
 ## Day 4: National & Portfolio Operations Layer
 1. Composite indexes on `acquisition_cases`, `case_stage_instances`, `case_risk_assessments`.
 2. Portfolio operations engine (`portfolioAnalyzer.ts`) calculating genuine KPI aggregations, attention queue, systemic bottlenecks, and spatial centroids.
-3. Command Center dashboard UI (`PortfolioKPIs`, `PortfolioFilterBar`, `AttentionQueue`, `PortfolioVisualizations`, `PortfolioMapView`, `PortfolioBottlenecks`, `WorkflowPerformanceView`).
+3. Command Center dashboard UI (`PortfolioFilterBar`, `AttentionQueue`, `PortfolioVisualizations`, `PortfolioMapView`, `PortfolioBottlenecks`, `WorkflowPerformanceView`).
 
 ---
 
@@ -408,7 +408,7 @@ Day 3 strengthens BhoomiSetu's intelligence layer into a genuine, explainable, d
   - Returns baseline vs simulated comparison with net days saved, new completion dates, and explicit lists of `assumptions_applied` and `evidence_used`.
 
 - **User Interface Extensions**:
-  - [`CaseIntelligenceTab.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/intelligence/CaseIntelligenceTab.tsx): Orchestrates the intelligence workspace with active refresh.
+  - [`CaseDetailPage.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/pages/CaseDetailPage.tsx): Orchestrates the per-case intelligence workspace (risk, bottlenecks, downstream impact, recommendations, simulator) with active refresh.
   - [`RiskOverviewCard.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/intelligence/RiskOverviewCard.tsx): Displays predictive delay forecasts, empirical velocity, factor explainability table, and excluded evidence logs.
   - [`RootCausePanel.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/intelligence/RootCausePanel.tsx): Renders color-coded badges for all 5 cause classifications and handles `insufficient_evidence` states.
   - [`DownstreamImpactView.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/intelligence/DownstreamImpactView.tsx): Distinguishes direct vs propagated delay and visualizes schedule slack days.

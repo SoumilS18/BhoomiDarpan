@@ -43,13 +43,20 @@ const handleCases = async (req: Request, res: Response) => {
     let cases = await getScopedCases(req.user);
 
     // Apply query filters
-    const { state, district, project_id, status, risk_level, bbox, has_geometry } = req.query;
+    const { state, district, subdistrict, tehsil, village, project_id, status, risk_level, bbox, has_geometry } = req.query;
 
     if (state && typeof state === 'string') {
-      cases = cases.filter((c) => c.state.toLowerCase() === state.toLowerCase());
+      cases = cases.filter((c) => (c.state && c.state.toLowerCase() === state.toLowerCase()) || c.state_lgd_code === state);
     }
     if (district && typeof district === 'string') {
-      cases = cases.filter((c) => c.district.toLowerCase() === district.toLowerCase());
+      cases = cases.filter((c) => (c.district && c.district.toLowerCase() === district.toLowerCase()) || c.district_lgd_code === district);
+    }
+    const sub = subdistrict || tehsil;
+    if (sub && typeof sub === 'string') {
+      cases = cases.filter((c) => (c.tehsil && c.tehsil.toLowerCase() === sub.toLowerCase()) || c.subdistrict_lgd_code === sub);
+    }
+    if (village && typeof village === 'string') {
+      cases = cases.filter((c) => (c.village && c.village.toLowerCase() === village.toLowerCase()) || c.village_lgd_code === village);
     }
     if (project_id && typeof project_id === 'string') {
       cases = cases.filter((c) => c.project_id === project_id);
@@ -62,6 +69,8 @@ const handleCases = async (req: Request, res: Response) => {
     }
     if (has_geometry === 'true') {
       cases = cases.filter((c) => Boolean(c.geojson_boundary));
+    } else if (has_geometry === 'false') {
+      cases = cases.filter((c) => !c.geojson_boundary);
     }
 
     // Bounding box filter: bbox=minLng,minLat,maxLng,maxLat
@@ -192,7 +201,7 @@ router.get('/gis/layers', requireAuth, handleLayers);
 // ============================================================================
 
 // GET /api/cases/:id/gis - Get combined FeatureCollection of case boundary & parcels
-router.get('/cases/:id/gis', async (req: Request, res: Response) => {
+router.get('/cases/:id/gis', requireAuth, async (req: Request, res: Response) => {
   try {
     if (!isSupabaseConfigured) {
       return res.status(503).json({ error: 'Supabase not configured' });

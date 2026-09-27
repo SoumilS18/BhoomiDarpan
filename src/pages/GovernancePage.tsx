@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
+  NOTIFICATION_EVENT_TYPE_LABELS,
+  NOTIFICATION_EVENT_TYPE_VALUES,
+  NOTIFICATION_SEVERITY_LABELS,
+  NOTIFICATION_SEVERITY_VALUES,
+} from '../lib/domainLabels';
+import {
   ShieldAlert,
   Sliders,
   Bell,
@@ -154,11 +160,11 @@ export const GovernancePage: React.FC<GovernancePageProps> = ({
     try {
       const notif = actionDialog.notification;
       if (actionDialog.type === 'resolve') {
-        await resolveNotification(notif.id, actionInput || 'Remediation completed by authorized officer.', activePersona.name);
+        await resolveNotification(notif.id, actionInput || 'Marked resolved by authorized officer.', activePersona.name);
       } else if (actionDialog.type === 'dismiss') {
-        await dismissNotification(notif.id, actionInput || 'Dismissed as non-actionable upon institutional review.', activePersona.name);
+        await dismissNotification(notif.id, actionInput || 'Dismissed by authorized officer.', activePersona.name);
       } else if (actionDialog.type === 'escalate') {
-        await escalateNotification(notif.id, actionInput || 'Manual officer escalation to supervisory authority.');
+        await escalateNotification(notif.id, actionInput || 'Escalated to supervisory authority by officer.');
       }
       setActionDialog(null);
       setActionInput('');
@@ -357,10 +363,11 @@ export const GovernancePage: React.FC<GovernancePageProps> = ({
                 className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-[11px] text-slate-700 shadow-2xs"
               >
                 <option value="all">All Severities</option>
-                <option value="urgent">Urgent</option>
-                <option value="critical">Critical</option>
-                <option value="warning">Warning</option>
-                <option value="info">Info</option>
+                {[...NOTIFICATION_SEVERITY_VALUES].reverse().map((s) => (
+                  <option key={s} value={s}>
+                    {NOTIFICATION_SEVERITY_LABELS[s]}
+                  </option>
+                ))}
               </select>
 
               <select
@@ -369,16 +376,11 @@ export const GovernancePage: React.FC<GovernancePageProps> = ({
                 className="bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-[11px] text-slate-700 shadow-2xs"
               >
                 <option value="all">All Categories</option>
-                <option value="critical_risk">Critical Risk</option>
-                <option value="stage_overdue">Milestone Overdue / Bottleneck</option>
-                <option value="predicted_delay">Predicted Schedule Delay</option>
-                <option value="blocked_dependency">Blocked Prerequisite</option>
-                <option value="document_awaiting_verification">Document Awaiting Verification</option>
-                <option value="cadastral_dispute">Cadastral Dispute</option>
-                <option value="stale_external_data">Stale External Data</option>
-                <option value="data_discrepancy">Cross-Source Discrepancy</option>
-                <option value="downstream_impact">Downstream DAG Impact</option>
-                <option value="unresolved_recommendation">Unimplemented Advisory</option>
+                {NOTIFICATION_EVENT_TYPE_VALUES.map((t) => (
+                  <option key={t} value={t}>
+                    {NOTIFICATION_EVENT_TYPE_LABELS[t]}
+                  </option>
+                ))}
               </select>
             </div>
 

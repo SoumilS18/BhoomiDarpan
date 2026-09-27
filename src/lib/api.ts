@@ -41,29 +41,44 @@ import {
   ObservedImpact,
   LgdSyncStatus,
   LgdSyncSummary,
+  CaseEvent,
 } from '../../shared/types';
 
 const API_BASE = '/api';
 
-let currentPersonaHeaders: Record<string, string> = {
-  'x-eval-role': 'lao',
-  'x-eval-user-name': 'Dr. Vikramaditya Rao, IAS',
-  'x-eval-user-id': 'eval-lao-id',
-};
+/**
+ * Real Supabase session token (or null).
+ *
+ * The browser sends NOTHING but this bearer token. It deliberately does not
+ * send any `x-eval-*` role context: an evaluation/impersonation context is a
+ * server-side test harness only, and letting the client choose its own role
+ * header would be client-side role spoofing. With no token the request is
+ * simply unauthenticated, and the API answers 401 exactly as it would for any
+ * other anonymous caller.
+ */
+let currentAuthToken: string | null = null;
 
-export function setApiPersona(role: string, name?: string, id?: string) {
-  currentPersonaHeaders = {
-    'x-eval-role': role,
-    'x-eval-user-name': name || `Officer (${role})`,
-    'x-eval-user-id': id || `eval-${role}-id`,
-  };
+export function setApiAuthToken(token: string | null) {
+  currentAuthToken = token;
 }
 
 export function getAuthHeaders(): HeadersInit {
-  return {
-    'Content-Type': 'application/json',
-    ...currentPersonaHeaders,
-  };
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (currentAuthToken) {
+    headers.Authorization = `Bearer ${currentAuthToken}`;
+  }
+  return headers;
+}
+
+/**
+ * Authorization only, with NO Content-Type.
+ *
+ * Multipart uploads (FormData) must let the browser pick the boundary itself —
+ * sending `application/json` there would break the parse on the server. Every
+ * other call should use {@link getAuthHeaders}.
+ */
+export function getAuthHeaderOnly(): Record<string, string> {
+  return currentAuthToken ? { Authorization: `Bearer ${currentAuthToken}` } : {};
 }
 
 export interface HealthResponse {
@@ -86,18 +101,32 @@ export async function fetchHealth(): Promise<HealthResponse> {
 export async function fetchCases(params?: {
   state?: string;
   district?: string;
+  subdistrict?: string;
+  village?: string;
   status?: string;
   priority?: string;
   search?: string;
+  project_id?: string;
+  state_lgd_code?: string;
+  district_lgd_code?: string;
+  subdistrict_lgd_code?: string;
+  village_lgd_code?: string;
 }): Promise<{ cases: AcquisitionCase[]; count: number }> {
   const query = new URLSearchParams();
   if (params?.state) query.set('state', params.state);
   if (params?.district) query.set('district', params.district);
+  if (params?.subdistrict) query.set('subdistrict', params.subdistrict);
+  if (params?.village) query.set('village', params.village);
   if (params?.status) query.set('status', params.status);
   if (params?.priority) query.set('priority', params.priority);
   if (params?.search) query.set('search', params.search);
+  if (params?.project_id) query.set('project_id', params.project_id);
+  if (params?.state_lgd_code) query.set('state_lgd_code', params.state_lgd_code);
+  if (params?.district_lgd_code) query.set('district_lgd_code', params.district_lgd_code);
+  if (params?.subdistrict_lgd_code) query.set('subdistrict_lgd_code', params.subdistrict_lgd_code);
+  if (params?.village_lgd_code) query.set('village_lgd_code', params.village_lgd_code);
 
-  const res = await fetch(`${API_BASE}/cases?${query.toString()}`);
+  const res = await fetch(`${API_BASE}/cases?${query.toString()}`, { headers: getAuthHeaders() });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || `Failed to fetch cases (${res.status})`);
@@ -106,7 +135,7 @@ export async function fetchCases(params?: {
 }
 
 export async function fetchCaseById(id: string): Promise<{ case: AcquisitionCase }> {
-  const res = await fetch(`${API_BASE}/cases/${id}`);
+  const res = await fetch(`${API_BASE}/cases/${id}`, { headers: getAuthHeaders() });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || `Failed to fetch case details (${res.status})`);
@@ -120,9 +149,13 @@ export async function createCase(payload: {
   title: string;
   description?: string;
   state: string;
+  state_lgd_code?: string;
   district: string;
+  district_lgd_code?: string;
   tehsil?: string;
+  subdistrict_lgd_code?: string;
   village: string;
+  village_lgd_code?: string;
   total_area_hectares: number;
   estimated_compensation?: number;
   priority?: string;
@@ -139,7 +172,7 @@ export async function createCase(payload: {
 }): Promise<{ success: boolean; case: AcquisitionCase }> {
   const res = await fetch(`${API_BASE}/cases`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -194,7 +227,7 @@ export async function evaluateStage(
 }
 
 export async function fetchWorkflows(): Promise<{ workflows: Workflow[] }> {
-  const res = await fetch(`${API_BASE}/workflows`);
+  const res = await fetch(`${API_BASE}/workflows`, { headers: getAuthHeaders() });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || `Failed to fetch workflows (${res.status})`);
@@ -203,7 +236,7 @@ export async function fetchWorkflows(): Promise<{ workflows: Workflow[] }> {
 }
 
 export async function fetchProjects(): Promise<{ projects: Project[] }> {
-  const res = await fetch(`${API_BASE}/projects`);
+  const res = await fetch(`${API_BASE}/projects`, { headers: getAuthHeaders() });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || `Failed to fetch projects (${res.status})`);
@@ -211,8 +244,34 @@ export async function fetchProjects(): Promise<{ projects: Project[] }> {
   return res.json();
 }
 
+export async function createProject(payload: {
+  code: string;
+  name: string;
+  description?: string;
+  project_type: string;
+  sponsoring_agency: string;
+  estimated_budget?: number | null;
+  target_completion_date?: string | null;
+  state: string;
+  district?: string | null;
+  state_lgd_code?: string | null;
+  district_lgd_code?: string | null;
+  subdistrict_lgd_code?: string | null;
+}): Promise<{ project: Project }> {
+  const res = await fetch(`${API_BASE}/projects`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || `Failed to create project (${res.status})`);
+  }
+  return data;
+}
+
 export async function fetchDashboardAnalytics(): Promise<{ analytics: DashboardAnalytics }> {
-  const res = await fetch(`${API_BASE}/analytics/dashboard`);
+  const res = await fetch(`${API_BASE}/analytics/dashboard`, { headers: getAuthHeaders() });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || `Failed to fetch analytics (${res.status})`);
@@ -227,6 +286,11 @@ export async function fetchPortfolioOperations(
   if (filters?.project_id) query.append('project_id', filters.project_id);
   if (filters?.state) query.append('state', filters.state);
   if (filters?.district) query.append('district', filters.district);
+  if (filters?.state_lgd_code) query.append('state_lgd_code', filters.state_lgd_code);
+  if (filters?.district_lgd_code) query.append('district_lgd_code', filters.district_lgd_code);
+  if (filters?.subdistrict_lgd_code)
+    query.append('subdistrict_lgd_code', filters.subdistrict_lgd_code);
+  if (filters?.village_lgd_code) query.append('village_lgd_code', filters.village_lgd_code);
   if (filters?.workflow_id) query.append('workflow_id', filters.workflow_id);
   if (filters?.status) query.append('status', filters.status);
   if (filters?.risk_level) query.append('risk_level', filters.risk_level);
@@ -358,7 +422,7 @@ export interface CaseGISResponse {
 }
 
 export async function fetchCaseGIS(caseId: string): Promise<CaseGISResponse> {
-  const res = await fetch(`${API_BASE}/cases/${caseId}/gis`);
+  const res = await fetch(`${API_BASE}/cases/${caseId}/gis`, { headers: getAuthHeaders() });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || `Failed to fetch GIS data (${res.status})`);
@@ -373,7 +437,7 @@ export async function updateCaseGeoJSON(
 ): Promise<{ success: boolean; message: string; bbox?: number[] }> {
   const res = await fetch(`${API_BASE}/cases/${caseId}/geojson`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ geojson, actorName }),
   });
   if (!res.ok) {
@@ -399,7 +463,7 @@ export async function createParcel(
 ): Promise<{ parcel: any }> {
   const res = await fetch(`${API_BASE}/cases/${caseId}/parcels`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -426,7 +490,7 @@ export async function updateParcel(
 ): Promise<{ parcel: any }> {
   const res = await fetch(`${API_BASE}/cases/${caseId}/parcels/${parcelId}`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -439,6 +503,7 @@ export async function updateParcel(
 export async function deleteParcel(caseId: string, parcelId: string): Promise<{ success: boolean }> {
   const res = await fetch(`${API_BASE}/cases/${caseId}/parcels/${parcelId}`, {
     method: 'DELETE',
+    headers: getAuthHeaderOnly(),
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
@@ -452,7 +517,7 @@ export async function deleteParcel(caseId: string, parcelId: string): Promise<{ 
 // -------------------------------------------------------------
 
 export async function fetchCaseDocuments(caseId: string): Promise<{ documents: any[] }> {
-  const res = await fetch(`${API_BASE}/cases/${caseId}/documents`);
+  const res = await fetch(`${API_BASE}/cases/${caseId}/documents`, { headers: getAuthHeaders() });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
     throw new Error(errorData.error || `Failed to fetch documents (${res.status})`);
@@ -466,6 +531,7 @@ export async function uploadCaseDocument(
 ): Promise<{ document: any }> {
   const res = await fetch(`${API_BASE}/cases/${caseId}/documents`, {
     method: 'POST',
+    headers: getAuthHeaderOnly(),
     body: formData,
   });
   if (!res.ok) {
@@ -486,7 +552,7 @@ export async function processDocument(
 }> {
   const res = await fetch(`${API_BASE}/documents/${documentId}/process`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify({ rawContentText }),
   });
   const data = await res.json().catch(() => ({}));
@@ -511,7 +577,7 @@ export async function validateDocument(
 }> {
   const res = await fetch(`${API_BASE}/documents/${documentId}/validate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getAuthHeaders(),
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
@@ -873,26 +939,178 @@ export async function reverseGeocode(
   return res.json();
 }
 
+// ---------------------------------------------------------------------------
+// Administrative geography — authoritative LGD only, no substituted data.
+//
+// There used to be a bundled `GEOGRAPHY_SNAPSHOT` fallback here: whenever the
+// API errored, the client quietly answered with a 176-unit reference subset.
+// That is worse than an empty dropdown, because it looks exactly like working
+// production data while quietly mis-describing the country (Uttar Pradesh
+// showed 9 districts, Maharashtra 11).
+//
+// Now the API is the only source. Every response carries `provenance` from the
+// server (`status`, `authoritative`, `counts`, `requires`, `message`), and when
+// the authoritative LGD hierarchy has not been ingested the client renders an
+// explicit `unavailable` state instead of inventing geography.
+// ---------------------------------------------------------------------------
+
+/**
+ * True only while the server reports rows that are, in fact, authoritative LGD.
+ * Temporary reference / mixed rows map to `unavailable` at this coarse level
+ * (the richer `status` below is what the UI displays).
+ */
+export type GeographySource = 'authoritative' | 'unavailable';
+
+/** Mirrors `GeographyProvenance` returned by `GET /api/geography/status`. */
+export interface GeographyProvenance {
+  status: 'authoritative' | 'temporary_reference' | 'mixed' | 'requires_credentials' | 'unavailable';
+  source: string;
+  authoritative: boolean;
+  units_in_database: number;
+  counts: { states: number; districts: number; sub_districts: number; villages: number };
+  /**
+   * Per-source row totals the server observed in `administrative_units` — the
+   * evidence behind `status`, so the client can verify rather than trust.
+   */
+  source_rows?: { lgd_india: number; lgd_reference_mirror: number; other: number };
+  active_source?: 'lgd_india' | 'lgd_reference_mirror' | 'mixed' | 'none';
+  requires: string | null;
+  message: string;
+}
+
+let geographySource: GeographySource = 'unavailable';
+let geographyProvenance: GeographyProvenance | null = null;
+const geographySourceListeners = new Set<(source: GeographySource) => void>();
+
+export const getGeographySource = (): GeographySource => geographySource;
+
+/** Last provenance object received from the API, or `null` before the first call. */
+export const getGeographyProvenance = (): GeographyProvenance | null => geographyProvenance;
+
+export const subscribeGeographySource = (
+  listener: (source: GeographySource) => void
+): (() => void) => {
+  geographySourceListeners.add(listener);
+  return () => {
+    geographySourceListeners.delete(listener);
+  };
+};
+
+const applyProvenance = (provenance: GeographyProvenance | undefined): GeographySource => {
+  geographyProvenance = provenance ?? geographyProvenance;
+  const next: GeographySource =
+    provenance && provenance.authoritative ? 'authoritative' : 'unavailable';
+  if (geographySource !== next) {
+    geographySource = next;
+    geographySourceListeners.forEach((listener) => listener(next));
+  }
+  return next;
+};
+
+/** Records an unreachable/unusable geography API as an honest unavailable state. */
+const markGeographyUnavailable = (reason: unknown): GeographySource => {
+  console.warn('[geography] Authoritative LGD source unavailable.', reason);
+  return applyProvenance({
+    status: 'unavailable',
+    source: 'Local Government Directory (LGD), Ministry of Panchayati Raj',
+    authoritative: false,
+    units_in_database: 0,
+    counts: { states: 0, districts: 0, sub_districts: 0, villages: 0 },
+    source_rows: { lgd_india: 0, lgd_reference_mirror: 0, other: 0 },
+    active_source: 'none',
+    requires: 'Reachable API or LGD_DATA_GOV_API_KEY + sync',
+    message: 'Authoritative LGD source unavailable. No partial geography is substituted.',
+  });
+};
+
+/** Human-readable helper for empty-state copy in the UI. */
+export const geographySourceHint = (provenance: GeographyProvenance | null): string => {
+  if (provenance?.message) return provenance.message;
+  if (provenance?.requires) return `Requires: ${provenance.requires}`;
+  return 'Authoritative LGD source unavailable.';
+};
+
+export async function fetchGeographyStatus(): Promise<GeographyProvenance> {
+  try {
+    const res = await fetch(`${API_BASE}/geography/status`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const provenance = (await res.json())?.provenance as GeographyProvenance | undefined;
+    applyProvenance(provenance);
+    if (provenance) return provenance;
+  } catch (err) {
+    markGeographyUnavailable(err);
+  }
+  throw new Error('Geography status unavailable');
+}
+
 export async function fetchStates(): Promise<{ states: AdministrativeUnit[]; count: number }> {
-  const res = await fetch(`${API_BASE}/geography/states`, { headers: getAuthHeaders() });
-  if (!res.ok) throw new Error('Failed to fetch administrative states');
-  return res.json();
+  try {
+    const res = await fetch(`${API_BASE}/geography/states`, { headers: getAuthHeaders() });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    applyProvenance(data.provenance);
+    if (!Array.isArray(data.states)) throw new Error('Malformed states response');
+    // An empty list here is the truthful answer while the source is not
+    // ingested — never replaced with bundled reference geography.
+    return { states: data.states, count: data.states.length };
+  } catch (err) {
+    markGeographyUnavailable(err);
+    return { states: [], count: 0 };
+  }
 }
 
 export async function fetchDistricts(stateCode: string): Promise<{ districts: AdministrativeUnit[]; count: number }> {
-  const res = await fetch(`${API_BASE}/geography/districts?state=${encodeURIComponent(stateCode)}`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) throw new Error(`Failed to fetch districts for state ${stateCode}`);
-  return res.json();
+  try {
+    const res = await fetch(`${API_BASE}/geography/districts?state=${encodeURIComponent(stateCode)}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    applyProvenance(data.provenance);
+    if (!Array.isArray(data.districts)) throw new Error('Malformed districts response');
+    return { districts: data.districts, count: data.districts.length };
+  } catch (err) {
+    markGeographyUnavailable(err);
+    return { districts: [], count: 0 };
+  }
 }
 
 export async function fetchSubDistricts(districtCode: string): Promise<{ subdistricts: AdministrativeUnit[]; count: number }> {
-  const res = await fetch(`${API_BASE}/geography/subdistricts?district=${encodeURIComponent(districtCode)}`, {
+  try {
+    const res = await fetch(`${API_BASE}/geography/subdistricts?district=${encodeURIComponent(districtCode)}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    applyProvenance(data.provenance);
+    if (!Array.isArray(data.subdistricts)) throw new Error('Malformed sub-districts response');
+    return { subdistricts: data.subdistricts, count: data.subdistricts.length };
+  } catch (err) {
+    markGeographyUnavailable(err);
+    return { subdistricts: [], count: 0 };
+  }
+}
+
+export async function createSubDistrict(payload: {
+  name: string;
+  code: string;
+  state_code: string;
+  district_code: string;
+  local_name?: string | null;
+}): Promise<{ success: boolean; subdistrict: AdministrativeUnit }> {
+  const res = await fetch(`${API_BASE}/geography/subdistricts`, {
+    method: 'POST',
     headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(`Failed to fetch sub-districts for district ${districtCode}`);
-  return res.json();
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || `Failed to create sub-district (${res.status})`);
+  }
+  if (data.provenance) {
+    applyProvenance(data.provenance);
+  }
+  return data;
 }
 
 export async function fetchLocalities(subDistrictCode: string): Promise<{ localities: AdministrativeUnit[]; count: number }> {
@@ -919,12 +1137,30 @@ export async function fetchVillages(
   if (options.limit) params.set('limit', String(options.limit));
   if (options.search) params.set('search', options.search);
 
-  const qs = params.toString() ? `?${params.toString()}` : '';
-  const res = await fetch(`${API_BASE}/administration/subdistricts/${encodeURIComponent(subDistrictCode)}/villages${qs}`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) throw new Error(`Failed to fetch villages for sub-district ${subDistrictCode}`);
-  return res.json();
+  try {
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`${API_BASE}/administration/subdistricts/${encodeURIComponent(subDistrictCode)}/villages${qs}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    applyProvenance(data.provenance);
+    if (!Array.isArray(data.villages)) throw new Error('Malformed villages response');
+    return data;
+  } catch (err) {
+    markGeographyUnavailable(err);
+    const limit = options.limit && options.limit > 0 ? options.limit : 200;
+    const page = options.page && options.page > 0 ? options.page : 1;
+    // Honest empty page: the village tier is never fabricated client-side.
+    return {
+      sub_district_code: subDistrictCode,
+      villages: [],
+      total: 0,
+      page,
+      limit,
+      totalPages: 1,
+    };
+  }
 }
 
 export async function searchAdministration(
@@ -946,6 +1182,34 @@ export async function fetchLgdSyncStatus(): Promise<LgdSyncStatus> {
     headers: getAuthHeaders(),
   });
   if (!res.ok) throw new Error('Failed to fetch LGD sync status');
+  return res.json();
+}
+
+/**
+ * Cross-case audit ledger for the administration console.
+ *
+ * `source` is part of the contract: `'database'` means the records came from
+ * the persisted `case_events` table, `'memory'` means only this server
+ * process's buffer was available. Callers must surface that distinction
+ * instead of presenting an in-process buffer as a durable ledger.
+ */
+export async function fetchAdministrationAudit(params: {
+  limit?: number;
+  event_type?: string;
+  case_id?: string;
+} = {}): Promise<{ events: CaseEvent[]; source: 'database' | 'memory'; count: number }> {
+  const query = new URLSearchParams();
+  if (params.limit) query.append('limit', String(params.limit));
+  if (params.event_type) query.append('event_type', params.event_type);
+  if (params.case_id) query.append('case_id', params.case_id);
+  const qs = query.toString();
+  const res = await fetch(`${API_BASE}/administration/audit${qs ? `?${qs}` : ''}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch audit ledger (${res.status})`);
+  }
   return res.json();
 }
 
@@ -1011,6 +1275,71 @@ export async function importStructuredData(payload: {
   return res.json();
 }
 
+// ============================================================================
+// PUBLIC ACCOUNT-ACCESS REQUEST API
+// ============================================================================
+
+export interface AccessRequestStatus {
+  available: boolean;
+  code: string;
+  message: string;
+}
+
+export interface AccessRequestPayload {
+  fullName: string;
+  email: string;
+  organization: string;
+  department?: string;
+  designation?: string;
+  contactPhone?: string;
+  stateCode?: string;
+  districtCode?: string;
+  justification: string;
+  requestedRole?: string;
+}
+
+/**
+ * Asks the API whether an access-request workflow actually exists in this
+ * deployment. The page renders a real form only when the backend says it does
+ * — availability is never assumed at build time.
+ */
+export async function fetchAccessRequestStatus(): Promise<AccessRequestStatus> {
+  const res = await fetch(`${API_BASE}/auth/request-access/status`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    return {
+      available: false,
+      code: 'NOT_CONFIGURED',
+      message: 'No access-request workflow is configured for this deployment.',
+    };
+  }
+  return res.json();
+}
+
+export async function submitAccessRequest(
+  payload: AccessRequestPayload
+): Promise<{ success: boolean; request: { id: string; status: string }; message: string }> {
+  const res = await fetch(`${API_BASE}/auth/request-access`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const body = await res.json().catch(() => ({}) as any);
+  if (!res.ok) {
+    const err = new Error(body?.error || 'The access request could not be submitted.') as Error & {
+      code?: string;
+      fields?: Record<string, string>;
+      status?: number;
+    };
+    err.code = body?.code;
+    err.fields = body?.fields;
+    err.status = res.status;
+    throw err;
+  }
+  return body;
+}
+
 export const api = {
   fetchHealth,
   fetchDiagnostics,
@@ -1057,7 +1386,8 @@ export const api = {
   fetchCaseDisputes,
   createCaseDispute,
   updateCaseDispute,
-  setApiPersona,
+  fetchAccessRequestStatus,
+  submitAccessRequest,
 };
 
 // ============================================================================

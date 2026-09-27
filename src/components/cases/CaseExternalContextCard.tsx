@@ -133,7 +133,7 @@ export const CaseExternalContextCard: React.FC<CaseExternalContextCardProps> = (
             {/* Source Badge */}
             <span className="inline-flex items-center gap-1 font-mono text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              Source: {observation?.provider || 'Open-Meteo'}
+              Source: {observation?.provider || 'Unavailable'}
             </span>
 
             {/* Freshness Badge */}
@@ -218,7 +218,7 @@ export const CaseExternalContextCard: React.FC<CaseExternalContextCardProps> = (
                 <span>Precipitation</span>
               </div>
               <div className="text-base font-bold text-slate-800">
-                {values.precipitation_mm !== undefined ? `${values.precipitation_mm} mm` : '0 mm'}
+                {values.precipitation_mm !== undefined ? `${values.precipitation_mm} mm` : 'N/A'}
               </div>
               <div className="text-[10px] text-slate-400 font-mono">Current hour</div>
             </div>
@@ -251,10 +251,10 @@ export const CaseExternalContextCard: React.FC<CaseExternalContextCardProps> = (
                 <span>Condition</span>
               </div>
               <div className="text-xs font-bold text-slate-800 truncate" title={values.weather_condition}>
-                {values.weather_condition || 'Normal'}
+                {values.weather_condition || 'N/A'}
               </div>
               <div className="text-[10px] text-slate-400 font-mono">
-                {values.weather_code !== undefined ? `WMO ${values.weather_code}` : 'Verified'}
+                {values.weather_code !== undefined ? `WMO ${values.weather_code}` : '—'}
               </div>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import { getSupabase, isSupabaseConfigured } from '../config/supabase';
+import { isTestEnvironment } from '../config/runtimeEnv';
 import { DataProvenance, ProvenanceType, VerificationStatus, FreshnessState } from '../../shared/types';
 
 const IN_MEMORY_PROVENANCE: DataProvenance[] = [];
@@ -42,7 +43,9 @@ export async function recordProvenance(params: RecordProvenanceParams): Promise<
 
   IN_MEMORY_PROVENANCE.push(newRecord);
 
-  if (isSupabaseConfigured) {
+  // Provenance rows are only meaningful for entities that really exist in this
+  // project; test fixtures reference entities that do not.
+  if (isSupabaseConfigured && !isTestEnvironment()) {
     try {
       const client = getSupabase();
       const { data, error } = await client

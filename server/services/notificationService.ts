@@ -1,4 +1,5 @@
 import { getSupabase, isSupabaseConfigured } from '../config/supabase';
+import { isTestEnvironment } from '../config/runtimeEnv';
 import {
   CaseNotification,
   NotificationSeverity,
@@ -219,7 +220,8 @@ export async function evaluateOperationalTriggers(
 
     inMemoryNotifications.set(newNotif.id, newNotif);
 
-    if (isSupabaseConfigured) {
+    // Fixtures generate notifications for fabricated cases; keep them in memory.
+    if (isSupabaseConfigured && !isTestEnvironment()) {
       try {
         const supabase = getSupabase();
         await supabase.from('case_notifications').insert({

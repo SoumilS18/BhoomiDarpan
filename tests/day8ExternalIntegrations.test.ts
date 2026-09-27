@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
+import { startLiveApi, LiveApi } from './helpers/liveApi';
 import {
   DEFAULT_INTEGRATION_POLICY,
   getIntegrationPolicy,
@@ -42,7 +43,17 @@ import {
   StructuredExtractionSchema,
 } from '../server/services/documentExtractor';
 
-const TEST_API_BASE = 'http://localhost:3001/api';
+let liveApi: LiveApi | null = null;
+let TEST_API_BASE = '';
+
+beforeAll(async () => {
+  liveApi = await startLiveApi();
+  TEST_API_BASE = `${liveApi.url}/api`;
+}, 30000);
+
+afterAll(async () => {
+  await liveApi?.close();
+});
 
 describe('Day 8: External Provider Integration Architecture Suite', () => {
   beforeEach(() => {

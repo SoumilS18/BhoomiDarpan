@@ -1,6 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { CaseDispute, DisputeType, DisputeStatus, Parcel } from '../../../shared/types';
 import { fetchCaseDisputes, createCaseDispute, updateCaseDispute } from '../../lib/api';
+import {
+  DISPUTE_STATUS_VALUES,
+  DISPUTE_TYPE_VALUES,
+  disputeStatusLabel,
+  disputeTypeLabel,
+} from '../../lib/domainLabels';
 import { useAuth } from '../../context/AuthContext';
 import { Card, CardContent } from '../common/Card';
 import { Button } from '../common/Button';
@@ -110,22 +116,9 @@ export const DisputesTab: React.FC<DisputesTabProps> = ({
     }
   };
 
-  const getDisputeTypeLabel = (type: DisputeType) => {
-    switch (type) {
-      case 'title_ownership':
-        return 'Title Ownership & Succession Claim';
-      case 'compensation_quantum':
-        return 'Compensation Quantum Enhancement';
-      case 'boundary_encroachment':
-        return 'Cadastral Boundary Encroachment';
-      case 'statutory_eligibility':
-        return 'Section 15 Statutory Objection & Eligibility';
-      case 'tribunal_reference':
-        return 'Tribunal Reference (Section 64/76)';
-      default:
-        return type;
-    }
-  };
+  // Type labels come from the central registry so the UI can never disagree
+  // with the enum the API accepts.
+  const getDisputeTypeLabel = (type: DisputeType) => disputeTypeLabel(type);
 
   const getStatusBadge = (status: DisputeStatus, stayOrder?: boolean) => {
     if (stayOrder || status === 'referred_to_authority') {
@@ -262,7 +255,7 @@ export const DisputesTab: React.FC<DisputesTabProps> = ({
 
                   <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                     <span className="text-[10px] text-slate-400">
-                      Logged by: {disp.logged_by || 'Revenue Inspector'} • ID: {disp.id.slice(0, 10)}
+                      Logged by: {disp.logged_by || '—'} • ID: {disp.id.slice(0, 10)}
                     </span>
 
                     {disp.status !== 'settled' && disp.status !== 'dismissed' && (
@@ -274,11 +267,19 @@ export const DisputesTab: React.FC<DisputesTabProps> = ({
                               onChange={(e) => setResolutionStatus(e.target.value as DisputeStatus)}
                               className="rounded border border-slate-300 p-1 text-xs bg-white"
                             >
-                              <option value="settled">Settled / Award Clear</option>
-                              <option value="hearing_scheduled">Hearing Scheduled</option>
-                              <option value="under_investigation">Under Field Investigation</option>
-                              <option value="referred_to_authority">Referred to Land Tribunal</option>
-                              <option value="dismissed">Dismiss Objection</option>
+                              {/*
+                                Every resolution target is a real `DisputeStatus`
+                                member sourced from the central registry; the two
+                                intake statuses (filed / under_review) are not
+                                offered because they are not resolutions.
+                              */}
+                              {DISPUTE_STATUS_VALUES.filter(
+                                (s) => s !== 'filed' && s !== 'under_review'
+                              ).map((s) => (
+                                <option key={s} value={s}>
+                                  {disputeStatusLabel(s)}
+                                </option>
+                              ))}
                             </select>
                             <input
                               type="text"
@@ -365,11 +366,11 @@ export const DisputesTab: React.FC<DisputesTabProps> = ({
                     onChange={(e) => setDisputeType(e.target.value as DisputeType)}
                     className="w-full rounded-md border border-slate-300 p-2 text-xs focus:border-gov-navy focus:outline-none bg-white"
                   >
-                    <option value="statutory_eligibility">Section 15 Statutory Objection</option>
-                    <option value="title_ownership">Title Ownership &amp; Succession</option>
-                    <option value="compensation_quantum">Compensation Quantum Enhancement</option>
-                    <option value="boundary_encroachment">Cadastral Boundary Encroachment</option>
-                    <option value="tribunal_reference">Tribunal Reference (Section 64/76)</option>
+                    {DISPUTE_TYPE_VALUES.map((t) => (
+                      <option key={t} value={t}>
+                        {disputeTypeLabel(t)}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

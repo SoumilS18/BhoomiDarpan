@@ -1,4 +1,5 @@
 import { getSupabase, isSupabaseConfigured } from '../config/supabase';
+import { isTestEnvironment } from '../config/runtimeEnv';
 import {
   DataDiscrepancy,
   DiscrepancyType,
@@ -216,7 +217,9 @@ export async function detectCrossSourceDiscrepancies(params: {
 export async function persistDiscrepancy(d: DataDiscrepancy): Promise<DataDiscrepancy> {
   IN_MEMORY_DISCREPANCIES.push(d);
 
-  if (isSupabaseConfigured) {
+  // Fixtures detect discrepancies against fabricated entities; those must not
+  // be recorded as discrepancies in the live project.
+  if (isSupabaseConfigured && !isTestEnvironment()) {
     try {
       const client = getSupabase();
       const { data, error } = await client

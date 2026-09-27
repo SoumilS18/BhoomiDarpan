@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth, AVAILABLE_PERSONAS } from '../context/AuthContext';
-import { fetchPolicies, updatePolicyByKey } from '../lib/api';
-import { SystemPolicy } from '../../shared/types';
+import { useAuth } from '../context/AuthContext';
+import { fetchPolicies, updatePolicyByKey, fetchAdministrationAudit } from '../lib/api';
+import { SystemPolicy, CaseEvent, UserRole } from '../../shared/types';
+import { ROLE_LABELS, ROLE_ORDER } from '../lib/domainLabels';
+import { navRoutesForRole, ROUTES } from '../router';
 import { WorkflowConfigPage } from './WorkflowConfigPage';
 import { IntegrationsPage } from './IntegrationsPage';
 import { Button } from '../components/common/Button';
@@ -32,6 +34,17 @@ type AdminSubTab = AdminSection;
 
 const ADMIN_SECTIONS: AdminSection[] = ['users', 'workflows', 'policies', 'integrations', 'audit'];
 
+/**
+ * Sidebar destinations, in registry order.
+ *
+ * The access matrix below is DERIVED from this list crossed with each role's
+ * `roles` entry in the route registry. Nothing is transcribed by hand, so the
+ * table can never drift from what the sidebar actually offers. The registry
+ * governs navigation visibility only — API authorisation is enforced
+ * server-side on every request and is not a UI concern.
+ */
+const NAV_ROUTES = ROUTES.filter((route) => route.nav && route.area !== 'public');
+
 interface AdministrationPageProps {
   /** Section requested by the current URL. */
   section?: string;
@@ -42,7 +55,7 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
   section,
   onSectionChange,
 }) => {
-  const { activePersona, setActivePersona } = useAuth();
+  const { activePersona, session } = useAuth();
 
   // Derived from the URL, so each console section is deep-linkable.
   const activeSubTab: AdminSubTab = ADMIN_SECTIONS.includes(section as AdminSection)
@@ -67,11 +80,38 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
     }
   };
 
+  // Global audit ledger — real records from `case_events`.
+  const [auditEvents, setAuditEvents] = useState<CaseEvent[]>([]);
+  const [auditSource, setAuditSource] = useState<'database' | 'memory' | null>(null);
+  const [isAuditLoading, setIsAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+
+  const loadAudit = async () => {
+    setIsAuditLoading(true);
+    setAuditError(null);
+    try {
+      const res = await fetchAdministrationAudit({ limit: 100 });
+      setAuditEvents(res.events || []);
+      setAuditSource(res.source);
+    } catch (err: any) {
+      setAuditError(err.message || 'Failed to load the audit ledger.');
+      setAuditEvents([]);
+      setAuditSource(null);
+    } finally {
+      setIsAuditLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (activeSubTab === 'policies') {
       loadPolicies();
     }
-  }, [activeSubTab]);
+    if (activeSubTab === 'audit') {
+      loadAudit();
+    }
+    // Re-run on role change: the ledger endpoint is role-gated, so a stale
+    // "Access Denied" from the previous role must not survive a switch.
+  }, [activeSubTab, activePersona.role]);
 
   const handleStartEditPolicy = (p: SystemPolicy) => {
     setEditingPolicyKey(p.id);
@@ -113,7 +153,8 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
             Administration &amp; System Governance
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Role-based access control, statutory workflow templates, dynamic policy thresholds, external registry integrations, and immutable audit logs.
+            Role visibility, statutory workflow templates, dynamic policy thresholds, external
+            registry integrations, and the cross-case audit ledger.
           </p>
         </div>
       </div>
@@ -199,123 +240,143 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
             <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 shadow-xs">
               <div>
                 <h3 className="font-bold text-gov-slate text-sm">
-                  Role-Based Access Control (RBAC) &amp; Officer Directory
+                  Officer Directory &amp; Role Context
                 </h3>
                 <p className="text-[11px] text-slate-500">
-                  Switch the active administrative persona to simulate authorized workflows, territorial boundaries, and statutory decision scopes.
+                  {session
+                    ? 'Signed-in officers act under their own profile. Identity and role are read from the session and cannot be changed here.'
+                    : "No real session exists in this build, so the evaluation role contexts below can be selected to explore each role's view of the application."}
                 </p>
               </div>
 
-              {/* Persona Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
-                {AVAILABLE_PERSONAS.map((p) => {
-                  const isActive = activePersona.role === p.role;
-                  return (
-                    <div
-                      key={p.role}
-                      onClick={() => setActivePersona(p)}
-                      className={clsx(
-                        'p-4 rounded-xl border transition-all cursor-pointer flex flex-col justify-between',
-                        isActive
-                          ? 'border-gov-navy ring-2 ring-gov-navy/20 bg-blue-50/20 shadow-xs'
-                          : 'border-slate-200 bg-white hover:border-slate-300'
-                      )}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span
-                            className={clsx(
-                              'text-[10px] font-bold px-2 py-0.5 rounded-full border',
-                              p.badgeColor
-                            )}
-                          >
-                            {p.role.toUpperCase()}
-                          </span>
-                          {isActive && (
-                            <span className="flex items-center gap-1 text-[11px] font-bold text-gov-navy">
-                              <CheckCircle2 className="h-3.5 w-3.5" />
-                              Active
-                            </span>
-                          )}
-                        </div>
-
-                        <h4 className="font-bold text-gov-slate text-xs mt-2">{p.name}</h4>
-                        <div className="text-[11px] text-gov-navy font-medium mt-0.5">{p.label}</div>
-                      </div>
-
-                      <div className="mt-3 pt-2 border-t border-slate-100 text-[10px] text-slate-400">
-                        {p.department}
-                      </div>
+              {/* Signed-in session: identity is fixed, so no switching is offered. */}
+              {session && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <UserCheck className="h-4 w-4 text-emerald-700" />
+                      <span className="text-xs font-bold text-emerald-900">
+                        {activePersona.name}
+                      </span>
+                      <Badge variant="emerald">{ROLE_LABELS[activePersona.role]}</Badge>
                     </div>
-                  );
-                })}
+                    <p className="text-[11px] text-emerald-800">
+                      {session.email}
+                      {activePersona.department ? ` • ${activePersona.department}` : ''}
+                    </p>
+                    <p className="text-[10px] text-emerald-700">
+                      {session.jurisdiction
+                        ? `Jurisdiction: ${session.jurisdiction}. `
+                        : 'Jurisdiction: national scope. '}
+                      Role authorisation is enforced server-side on every request; this console
+                      only reflects it, and the role cannot be changed here.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Signed out: say so plainly. There is no identity to present and
+                  no role to choose — authorisation is a property of the account,
+                  resolved from the verified token on the server. */}
+              {!session && (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-bold text-gov-slate">No account is signed in</p>
+                  <p className="mt-1 text-[11px] text-slate-600">
+                    Sign in to see the authenticated identity, role and jurisdiction that this
+                    console reflects. Roles are assigned by an administrator and cannot be selected
+                    in the browser.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Role registry — one row per real backend role */}
+            <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-3 shadow-xs">
+              <div>
+                <h3 className="font-bold text-gov-slate text-sm">Role Registry</h3>
+                <p className="text-[11px] text-slate-500">
+                  Every role the API recognises, rendered from the shared role definitions.
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider text-[10px] border-b border-slate-200">
+                      <th className="py-2.5 px-3">Role Key</th>
+                      <th className="py-2.5 px-3">Display Label</th>
+                      <th className="py-2.5 px-3">Currently Active</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {ROLE_ORDER.map((role) => (
+                      <tr key={role}>
+                        <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600">{role}</td>
+                        <td className="py-2.5 px-3 font-semibold text-gov-slate">
+                          {ROLE_LABELS[role]}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {activePersona.role === role ? (
+                            <span className="flex items-center gap-1 text-emerald-700 font-bold">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Active
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
 
-            {/* Statutory Permission Matrix */}
+            {/* Navigation visibility, derived from the route registry */}
             <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-3 shadow-xs">
-              <h3 className="font-bold text-gov-slate text-sm">
-                Institutional Statutory Permission Matrix
-              </h3>
+              <div>
+                <h3 className="font-bold text-gov-slate text-sm">Navigation Visibility by Role</h3>
+                <p className="text-[11px] text-slate-500">
+                  Generated from the route registry — a destination is shown for a role when that
+                  role is listed on the route. This governs the sidebar only: every API request is
+                  authorised independently on the server, and the registry is not a permission
+                  control.
+                </p>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider text-[10px] border-b border-slate-200">
                       <th className="py-2.5 px-3">Role</th>
-                      <th className="py-2.5 px-3">Territorial Scope</th>
-                      <th className="py-2.5 px-3">Initiate Cases</th>
-                      <th className="py-2.5 px-3">Advance Stages</th>
-                      <th className="py-2.5 px-3">Verify Documents</th>
-                      <th className="py-2.5 px-3">Advisory Actions</th>
-                      <th className="py-2.5 px-3">System Policies</th>
+                      {NAV_ROUTES.map((route) => (
+                        <th key={route.id} className="py-2.5 px-3 text-center">
+                          {route.title}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    <tr>
-                      <td className="py-2.5 px-3 font-semibold text-gov-slate">System Administrator (NIC)</td>
-                      <td className="py-2.5 px-3">National Portfolio</td>
-                      <td className="py-2.5 px-3 text-emerald-700 font-bold">Yes</td>
-                      <td className="py-2.5 px-3 text-emerald-700 font-bold">Yes (Override)</td>
-                      <td className="py-2.5 px-3 text-emerald-700 font-bold">Yes</td>
-                      <td className="py-2.5 px-3 text-emerald-700 font-bold">Yes</td>
-                      <td className="py-2.5 px-3 text-emerald-700 font-bold">Full Access</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 px-3 font-semibold text-gov-slate">Land Acquisition Officer (LAO)</td>
-                      <td className="py-2.5 px-3">District Authority</td>
-                      <td className="py-2.5 px-3 text-emerald-700 font-bold">Yes</td>
-                      <td className="py-2.5 px-3 text-emerald-700 font-bold">Yes</td>
-                      <td className="py-2.5 px-3 text-emerald-700 font-bold">Yes</td>
-                      <td className="py-2.5 px-3 text-emerald-700 font-bold">Yes</td>
-                      <td className="py-2.5 px-3 text-slate-400">Read Only</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 px-3 font-semibold text-gov-slate">State Competent Authority</td>
-                      <td className="py-2.5 px-3">State / Ministry</td>
-                      <td className="py-2.5 px-3 text-slate-400">No</td>
-                      <td className="py-2.5 px-3 text-emerald-700 font-bold">Approval Stages</td>
-                      <td className="py-2.5 px-3 text-emerald-700 font-bold">Audit View</td>
-                      <td className="py-2.5 px-3 text-emerald-700 font-bold">Yes</td>
-                      <td className="py-2.5 px-3 text-slate-400">Read Only</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 px-3 font-semibold text-gov-slate">Project Nodal Officer</td>
-                      <td className="py-2.5 px-3">Corridor Bound</td>
-                      <td className="py-2.5 px-3 text-emerald-700 font-bold">Yes</td>
-                      <td className="py-2.5 px-3 text-slate-400">Designated Only</td>
-                      <td className="py-2.5 px-3 text-slate-400">View Only</td>
-                      <td className="py-2.5 px-3 text-emerald-700 font-bold">Yes</td>
-                      <td className="py-2.5 px-3 text-slate-400">No</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2.5 px-3 font-semibold text-gov-slate">Revenue Inspector / Surveyor</td>
-                      <td className="py-2.5 px-3">Tehsil Cadastre</td>
-                      <td className="py-2.5 px-3 text-slate-400">No</td>
-                      <td className="py-2.5 px-3 text-emerald-700 font-bold">Survey Only</td>
-                      <td className="py-2.5 px-3 text-emerald-700 font-bold">Upload &amp; Extract</td>
-                      <td className="py-2.5 px-3 text-slate-400">No</td>
-                      <td className="py-2.5 px-3 text-slate-400">No</td>
-                    </tr>
+                    {ROLE_ORDER.map((role) => {
+                      const visibleIds = new Set(navRoutesForRole(role).map((r) => r.id));
+                      return (
+                        <tr key={role}>
+                          <td className="py-2.5 px-3 font-semibold text-gov-slate whitespace-nowrap">
+                            {ROLE_LABELS[role as UserRole]}
+                          </td>
+                          {NAV_ROUTES.map((route) => (
+                            <td
+                              key={route.id}
+                              className={clsx(
+                                'py-2.5 px-3 text-center font-bold',
+                                visibleIds.has(route.id)
+                                  ? 'text-emerald-700'
+                                  : 'text-slate-300 font-normal'
+                              )}
+                            >
+                              {visibleIds.has(route.id) ? 'Yes' : '—'}
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -433,12 +494,96 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
 
         {/* SUBTAB 5: SYSTEM AUDIT LEDGER */}
         {activeSubTab === 'audit' && (
-          <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-xs space-y-3 shadow-xs">
-            <History className="h-10 w-10 text-slate-400 mx-auto" />
-            <h3 className="font-bold text-gov-slate text-sm">System Audit &amp; Outcome Ledger</h3>
-            <p className="text-slate-500 max-w-md mx-auto leading-relaxed">
-              Audit events are recorded continuously with actor provenance, statutory justifications, and timestamp immutability.
-              Per-case chronological audit records can be inspected in the History &amp; Audit tab of each case workspace.
+          <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 shadow-xs">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="font-bold text-gov-slate text-sm">System Audit Ledger</h3>
+                <p className="text-[11px] text-slate-500">
+                  Most recent audit events across every case, read live from the audit log. Per-case
+                  chronological detail remains available in each case's History &amp; Audit tab.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={loadAudit}
+                disabled={isAuditLoading}
+                leftIcon={
+                  <RefreshCw className={clsx('h-3 w-3', isAuditLoading && 'animate-spin')} />
+                }
+              >
+                Refresh
+              </Button>
+            </div>
+
+            {/* Storage provenance — stated, never implied */}
+            {auditSource === 'memory' && (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[11px] leading-relaxed text-amber-900">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700" />
+                <span>
+                  The persistent audit store is unavailable to this server process, so the entries
+                  below come from the in-memory buffer and are not durable across restarts.
+                </span>
+              </div>
+            )}
+
+            {auditError && (
+              <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-[11px] text-red-800">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{auditError}</span>
+              </div>
+            )}
+
+            {isAuditLoading && auditEvents.length === 0 && (
+              <div className="py-10 text-center text-xs text-slate-500">Loading audit records…</div>
+            )}
+
+            {!isAuditLoading && !auditError && auditEvents.length === 0 && (
+              <div className="py-10 text-center text-xs text-slate-500">
+                No audit events recorded yet.
+              </div>
+            )}
+
+            {auditEvents.length > 0 && (
+              <div className="max-h-[32rem] overflow-auto rounded-lg border border-slate-200">
+                <table className="w-full text-left text-[11px] border-collapse">
+                  <thead className="sticky top-0 z-10 bg-slate-50 text-slate-600 font-semibold uppercase tracking-wider text-[10px] border-b border-slate-200">
+                    <tr>
+                      <th className="py-2.5 px-3">Timestamp</th>
+                      <th className="py-2.5 px-3">Event</th>
+                      <th className="py-2.5 px-3">Title</th>
+                      <th className="py-2.5 px-3">Actor</th>
+                      <th className="py-2.5 px-3">Case</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {auditEvents.map((ev) => (
+                      <tr key={ev.id} className="hover:bg-slate-50/80">
+                        <td className="py-2.5 px-3 font-mono text-[10px] text-slate-500 whitespace-nowrap">
+                          {ev.created_at ? new Date(ev.created_at).toLocaleString('en-IN') : '—'}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="font-mono text-[10px] font-semibold text-gov-navy bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded">
+                            {ev.event_type}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-gov-slate font-medium">{ev.title}</td>
+                        <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
+                          {ev.actor_name || '—'}
+                        </td>
+                        <td className="py-2.5 px-3 font-mono text-[10px] text-slate-500">
+                          {ev.case_id || '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <p className="text-[10px] text-slate-400">
+              Showing {auditEvents.length} of the most recent records available to this session.
             </p>
           </div>
         )}

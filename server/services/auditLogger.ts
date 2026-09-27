@@ -1,4 +1,5 @@
 import { getSupabase, isSupabaseConfigured } from '../config/supabase';
+import { isTestEnvironment } from '../config/runtimeEnv';
 import { CaseEvent } from '../../shared/types';
 
 // In-memory audit log store for offline resilience and automated testing
@@ -31,7 +32,10 @@ export async function logCaseEvent(params: {
 
   inMemoryAuditLogs.push(localEvent);
 
-  if (!isSupabaseConfigured) {
+  // The test harness reads the same service-role credentials as the server.
+  // Audit rows created by fixtures must stay in memory — they are not events
+  // that happened in the real project.
+  if (!isSupabaseConfigured || isTestEnvironment()) {
     return localEvent;
   }
 

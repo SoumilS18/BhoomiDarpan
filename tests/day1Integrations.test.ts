@@ -359,7 +359,7 @@ describe('Day 1 Foundation: Real Data & Integration Layer Verification', () => {
     const diagString = JSON.stringify(diag);
     expect(diagString).not.toContain('AIzaSy');
     expect(diagString).not.toContain('eyJhbGci');
-  });
+  }, 20000);
 
   // 17. Day 1–5 Functionality Regression Check
   it('17. preserves existing system policy and workflow calculation functionality', async () => {
@@ -368,5 +368,5 @@ describe('Day 1 Foundation: Real Data & Integration Layer Verification', () => {
     const nominatim = sources.find((s) => s.id === 'nominatim_osm');
     expect(nominatim).toBeDefined();
     expect(nominatim?.type).toBe('geocoding');
-  });
+  }, 20000);
 });

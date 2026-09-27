@@ -24,12 +24,24 @@ const router = Router();
 
 /**
  * Helper to extract and sanitize query filter parameters.
+ *
+ * NOTE: every key here is also read by `applyScopeAndQueryParams` /
+ * `analyzePortfolioOperations` in portfolioAnalyzer — the two lists must stay
+ * in step or a control shown in the UI would silently reach nothing.
  */
 function extractPortfolioFilters(req: Request): PortfolioFilterParams {
   return {
     project_id: req.query.project_id ? String(req.query.project_id) : undefined,
     state: req.query.state ? String(req.query.state) : undefined,
     district: req.query.district ? String(req.query.district) : undefined,
+    state_lgd_code: req.query.state_lgd_code ? String(req.query.state_lgd_code) : undefined,
+    district_lgd_code: req.query.district_lgd_code
+      ? String(req.query.district_lgd_code)
+      : undefined,
+    subdistrict_lgd_code: req.query.subdistrict_lgd_code
+      ? String(req.query.subdistrict_lgd_code)
+      : undefined,
+    village_lgd_code: req.query.village_lgd_code ? String(req.query.village_lgd_code) : undefined,
     workflow_id: req.query.workflow_id ? String(req.query.workflow_id) : undefined,
     status: req.query.status ? String(req.query.status) : undefined,
     risk_level: req.query.risk_level ? String(req.query.risk_level) : undefined,

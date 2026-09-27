@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { updateCaseGeoJSON } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
 import { Upload, AlertCircle, CheckCircle, FileText, Code } from 'lucide-react';
 
 interface GeoJSONImportModalProps {
@@ -18,7 +19,9 @@ export const GeoJSONImportModal: React.FC<GeoJSONImportModalProps> = ({
   onSuccess,
 }) => {
   const [jsonText, setJsonText] = useState('');
-  const [actorName, setActorName] = useState('GIS Specialist');
+  // Audit actor follows the signed-in identity and is not user-editable.
+  const { activePersona } = useAuth();
+  const [actorName] = useState(activePersona.name);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -142,13 +145,15 @@ export const GeoJSONImportModal: React.FC<GeoJSONImportModalProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-semibold text-gov-slate mb-1">
-              Officer / GIS Specialist
+              Recorded As (Audit Actor)
             </label>
             <input
               type="text"
               value={actorName}
-              onChange={(e) => setActorName(e.target.value)}
-              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-gov-navy"
+              readOnly
+              aria-readonly="true"
+              title="Taken from the signed-in profile; cannot be edited"
+              className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 bg-slate-50 text-slate-600 focus:outline-none"
             />
           </div>
 

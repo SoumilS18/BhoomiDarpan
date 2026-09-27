@@ -12,6 +12,7 @@ import {
   LgdSyncStatus,
 } from '../../shared/types';
 import { getSupabase, isSupabaseConfigured } from '../config/supabase';
+import { isTestEnvironment } from '../config/runtimeEnv';
 import { logCaseEvent } from './auditLogger';
 import {
   registerAdministrativeUnit,
@@ -20,6 +21,18 @@ import {
   getUnitsCountByTier,
   inMemoryUnitsStore,
 } from './administrativeGeographyService';
+import {
+  getActiveGeographySource,
+  type GeographySourceDescriptor,
+} from '../config/geographySourceRegistry';
+import { ingestReferenceTier } from './referenceGeographyProvider';
+import type { NormalizedLgdRecord } from './geographyProviderContract';
+
+/**
+ * Re-exported for existing callers: the record shape is shared with every
+ * geography provider, so it now lives beside the provider contract.
+ */
+export type { NormalizedLgdRecord };
 
 // Canonical mapping between LGD tiers and DB unit_type
 export const TIER_TO_UNIT_TYPE: Record<LgdAdministrativeTier, AdminUnitType> = {
@@ -37,21 +50,6 @@ export const UNIT_TYPE_TO_TIER: Record<string, LgdAdministrativeTier> = {
   village: 'villages',
 };
 
-export interface NormalizedLgdRecord {
-  unit_type: AdminUnitType;
-  code: string;
-  name: string;
-  local_name?: string | null;
-  parent_code?: string | null;
-  state_code?: string | null;
-  district_code?: string | null;
-  sub_district_code?: string | null;
-  census_code?: string | null;
-  source_resource_id: string;
-  last_updated?: string | null;
-  metadata?: Record<string, any>;
-}
-
 // Global synchronization lock
 let isSyncLocked = false;
 let currentLockOwner: string | null = null;
@@ -59,6 +57,18 @@ let lockAcquiredAt: string | null = null;
 
 // In-memory sync history log for auditability & telemetry
 const SYNC_HISTORY: LgdSyncSummary[] = [];
+
+/**
+ * Offset each tier stopped at when a run ended `partial`. A subsequent sync
+ * resumes from here instead of re-reading pages that were already ingested.
+ * Cleared per tier once that tier reconciles against the authoritative total.
+ */
+const RESUME_OFFSETS: Partial<Record<LgdAdministrativeTier, number>> = {};
+
+/** Read-only view of the current resume offsets (for status reporting). */
+export function getLgdResumeOffsets(): Partial<Record<LgdAdministrativeTier, number>> {
+  return { ...RESUME_OFFSETS };
+}
 
 /**
  * Normalizes raw records returned by data.gov.in LGD APIs into canonical normalized objects.
@@ -205,6 +215,12 @@ export interface IngestionOptions {
   filters?: Record<string, string>;
   recordsOverride?: any[]; // Used for deterministic test mocking
   interruptAfterBatches?: number; // Used for controlled interrupted sync testing
+  /**
+   * Deterministic CSV fixture for the temporary reference provider. Set only
+   * by tests — HTTP requests cannot supply it, so ingestion can never be
+   * redirected onto caller-supplied geography.
+   */
+  referenceCsvLines?: string[];
 }
 
 /**
@@ -221,6 +237,21 @@ export async function ingestLgdTier(
   const batchSize = Math.min(1000, Math.max(1, options.batchSize || config.batchSize || 100));
   const maxRecords = options.maxRecordsPerTier;
 
+  // The active source decides how this tier is read (Phase C). The official
+  // path pages through data.gov.in; the temporary reference path streams a
+  // dated archive. Everything downstream — hierarchy validation, idempotent
+  // upsert, reconciliation, audit — is shared.
+  const activeSource: GeographySourceDescriptor = getActiveGeographySource();
+  if (activeSource.id === 'lgd_reference_mirror' && !options.recordsOverride) {
+    const { summary: refSummary } = await ingestReferenceTier(tier, {
+      batchSize: options.batchSize,
+      maxRecordsPerTier: options.maxRecordsPerTier,
+      referenceCsvLines: options.referenceCsvLines,
+      actor: options.actor,
+    });
+    return refSummary;
+  }
+
   const summary: LgdSyncTierSummary = {
     tier,
     resource_id: resourceId,
@@ -236,19 +267,122 @@ export async function ingestLgdTier(
     validation_errors: [],
   };
 
-  let rawRecords: any[] = [];
+  // Per-tier resume offsets. A run interrupted mid-tier can restart on the
+  // exact page it stopped at instead of re-reading everything from offset 0.
+  let receivedTotal = 0;
+
+  /**
+   * Validation errors are capped: a single bad page in the 720k-row village
+   * tier must not grow an unbounded in-memory list. Every rejection is still
+   * counted on the summary; only the detail list is bounded.
+   */
+  const MAX_REPORTED_ERRORS = 500;
+  let suppressedErrors = 0;
+  const pushError = (entry: { code: string; message: string; data?: any }) => {
+    if (summary.validation_errors.length < MAX_REPORTED_ERRORS) {
+      summary.validation_errors.push(entry);
+    } else {
+      suppressedErrors++;
+    }
+  };
+
+  /**
+   * Streams one page of raw records straight into storage the moment it
+   * arrives: normalise -> resolve parent -> idempotent upsert. Nothing is
+   * written to disk and the whole tier is never buffered in memory at once.
+   */
+  const ingestPage = async (page: any[], indexOffset: number): Promise<void> => {
+    for (let i = 0; i < page.length; i++) {
+      const raw = page[i];
+      const index = indexOffset + i;
+      const normalized = normalizeLgdSourceRecord(tier, raw, resourceId);
+
+      if (!normalized) {
+        summary.records_rejected++;
+        pushError({
+          code: 'SCHEMA_NORMALIZATION_FAILED',
+          message: `Failed to normalize LGD record at index ${index}`,
+          data: raw,
+        });
+        continue;
+      }
+
+      // 1. Hierarchy integrity verification: resolve parent if expected
+      let parentUnitId: string | null = null;
+
+      if (normalized.parent_code) {
+        const parentUnitType: AdminUnitType =
+          tier === 'districts' ? 'state' : tier === 'subDistricts' ? 'district' : 'sub_district';
+
+        const parentUnit = await getAdministrativeUnitByCode(normalized.parent_code, parentUnitType);
+
+        if (!parentUnit) {
+          summary.orphan_records++;
+          summary.records_rejected++;
+          pushError({
+            code: 'MISSING_PARENT_HIERARCHY',
+            message: `Parent unit (${parentUnitType} code "${normalized.parent_code}") not found for ${unitType} "${normalized.name}" (code: ${normalized.code})`,
+            data: normalized,
+          });
+          continue; // Strictly reject orphan records
+        }
+
+        parentUnitId = parentUnit.id;
+      }
+
+      // 2. Check existing record for idempotent change detection / de-duplication
+      const existing = await getAdministrativeUnitByCode(normalized.code, unitType);
+
+      const payload = {
+        parent_id: parentUnitId,
+        unit_type: normalized.unit_type,
+        code: normalized.code,
+        name: normalized.name,
+        local_name: normalized.local_name,
+        state_code: normalized.state_code,
+        district_code: normalized.district_code,
+        sub_district_code: normalized.sub_district_code,
+        census_code: normalized.census_code,
+        is_active: true,
+        source_id: activeSource.id,
+        source_resource_id: normalized.source_resource_id,
+        last_synced_at: new Date().toISOString(),
+        metadata: normalized.metadata,
+      };
+
+      if (existing) {
+        // A row currently attributed to a different registered source (e.g. a
+        // temporary reference row being replaced by the official LGD sync) must
+        // be re-stamped even when its content is identical, so provenance always
+        // reflects where the data actually came from.
+        const sourceChanged = (existing.source_id ?? null) !== activeSource.id;
+        if (!sourceChanged && isRecordIdentical(existing, normalized, parentUnitId)) {
+          summary.records_unchanged++;
+          continue;
+        }
+        await registerAdministrativeUnit(payload);
+        summary.records_updated++;
+      } else {
+        await registerAdministrativeUnit(payload);
+        summary.records_inserted++;
+      }
+    }
+  };
 
   if (options.recordsOverride && Array.isArray(options.recordsOverride)) {
-    rawRecords = options.recordsOverride;
+    const rawRecords = options.recordsOverride;
     summary.total_available = rawRecords.length;
+    summary.records_received = rawRecords.length;
+    summary.complete = true;
+    await ingestPage(rawRecords, 0);
   } else {
-    // Paginated fetch from authoritative data.gov.in API
-    let offset = Math.max(0, options.startOffset ?? 0);
+    // Paginated fetch from the authoritative data.gov.in API, streamed page by page
+    let offset = Math.max(0, options.startOffset ?? RESUME_OFFSETS[tier] ?? 0);
     let keepFetching = true;
     let batchesProcessed = 0;
 
     while (keepFetching) {
-      const currentLimit = maxRecords ? Math.min(batchSize, maxRecords - rawRecords.length) : batchSize;
+      const currentLimit = maxRecords ? Math.min(batchSize, maxRecords - receivedTotal) : batchSize;
       if (currentLimit <= 0) break;
 
       try {
@@ -268,9 +402,13 @@ export async function ingestLgdTier(
           break;
         }
 
-        for (const rec of pageRecords) {
-          rawRecords.push(rec);
-        }
+        const pageIndex = offset;
+        summary.records_received += pageRecords.length;
+        receivedTotal += pageRecords.length;
+
+        // Persist this page before requesting the next one, so an interrupted
+        // run has already committed everything below `offset + pageRecords.length`.
+        await ingestPage(pageRecords, pageIndex);
 
         offset += pageRecords.length;
         batchesProcessed++;
@@ -282,109 +420,60 @@ export async function ingestLgdTier(
         }
 
         // Stop if we received fewer records than requested or reached max records limit or total
-        if (pageRecords.length < currentLimit || offset >= response.total || (maxRecords && rawRecords.length >= maxRecords)) {
+        if (
+          pageRecords.length < currentLimit ||
+          offset >= response.total ||
+          (maxRecords && receivedTotal >= maxRecords)
+        ) {
           keepFetching = false;
         }
       } catch (fetchErr: any) {
-        summary.status = rawRecords.length > 0 ? 'partial' : 'failed';
-        summary.validation_errors.push({
+        summary.status = receivedTotal > 0 ? 'partial' : 'failed';
+        pushError({
           code: 'API_FETCH_ERROR',
           message: `LGD API fetch error at offset ${offset}: ${fetchErr.message}`,
         });
         keepFetching = false;
       }
     }
+
+    // Resume bookkeeping: a completed tier has nothing left to resume from.
+    summary.next_offset = offset;
+    summary.complete =
+      summary.status === 'completed' &&
+      (summary.total_available === 0 || offset >= summary.total_available);
+
+    if (summary.complete) {
+      delete RESUME_OFFSETS[tier];
+    } else {
+      RESUME_OFFSETS[tier] = offset;
+    }
   }
 
-  summary.records_received = rawRecords.length;
+  if (suppressedErrors > 0) {
+    pushError({
+      code: 'VALIDATION_ERRORS_TRUNCATED',
+      message: `${suppressedErrors} further validation error(s) were counted but not listed (cap of ${MAX_REPORTED_ERRORS} reported entries).`,
+    });
+  }
 
-  // Process and upsert records sequentially to maintain hierarchy integrity
-  for (let i = 0; i < rawRecords.length; i++) {
-    const raw = rawRecords[i];
-    const normalized = normalizeLgdSourceRecord(tier, raw, resourceId);
-
-    if (!normalized) {
-      summary.records_rejected++;
-      summary.validation_errors.push({
-        code: 'SCHEMA_NORMALIZATION_FAILED',
-        message: `Failed to normalize LGD record at index ${i}`,
-        data: raw,
-      });
-      continue;
-    }
-
-    // 1. Hierarchy integrity verification: resolve parent if expected
-    let parentUnitId: string | null = null;
-
-    if (normalized.parent_code) {
-      const parentUnitType: AdminUnitType =
-        tier === 'districts' ? 'state' : tier === 'subDistricts' ? 'district' : 'sub_district';
-
-      const parentUnit = await getAdministrativeUnitByCode(normalized.parent_code, parentUnitType);
-
-      if (!parentUnit) {
-        summary.orphan_records++;
-        summary.records_rejected++;
-        summary.validation_errors.push({
-          code: 'MISSING_PARENT_HIERARCHY',
-          message: `Parent unit (${parentUnitType} code "${normalized.parent_code}") not found for ${unitType} "${normalized.name}" (code: ${normalized.code})`,
-          data: normalized,
-        });
-        continue; // Strictly reject orphan records
-      }
-
-      parentUnitId = parentUnit.id;
-    }
-
-    // 2. Check existing record for idempotent change detection
-    const existing = await getAdministrativeUnitByCode(normalized.code, unitType);
-
-    if (existing) {
-      if (isRecordIdentical(existing, normalized, parentUnitId)) {
-        summary.records_unchanged++;
-        continue;
-      }
-
-      // Record changed -> perform update
-      await registerAdministrativeUnit({
-        parent_id: parentUnitId,
-        unit_type: normalized.unit_type,
-        code: normalized.code,
-        name: normalized.name,
-        local_name: normalized.local_name,
-        state_code: normalized.state_code,
-        district_code: normalized.district_code,
-        sub_district_code: normalized.sub_district_code,
-        census_code: normalized.census_code,
-        is_active: true,
-        source_id: 'lgd_india',
-        source_resource_id: normalized.source_resource_id,
-        last_synced_at: new Date().toISOString(),
-        metadata: normalized.metadata,
-      });
-
-      summary.records_updated++;
-    } else {
-      // New record -> perform insert
-      await registerAdministrativeUnit({
-        parent_id: parentUnitId,
-        unit_type: normalized.unit_type,
-        code: normalized.code,
-        name: normalized.name,
-        local_name: normalized.local_name,
-        state_code: normalized.state_code,
-        district_code: normalized.district_code,
-        sub_district_code: normalized.sub_district_code,
-        census_code: normalized.census_code,
-        is_active: true,
-        source_id: 'lgd_india',
-        source_resource_id: normalized.source_resource_id,
-        last_synced_at: new Date().toISOString(),
-        metadata: normalized.metadata,
-      });
-
-      summary.records_inserted++;
-    }
+  // Reconcile what landed in storage against the authoritative source total.
+  try {
+    const rowsInDatabase = await getUnitsCountByTier(unitType);
+    summary.count_verification = {
+      source_total: summary.total_available,
+      rows_in_database: rowsInDatabase,
+      matched: summary.total_available > 0 && rowsInDatabase === summary.total_available,
+      checked_at: new Date().toISOString(),
+    };
+  } catch {
+    // A failed reconciliation must never be reported as a passing one.
+    summary.count_verification = {
+      source_total: summary.total_available,
+      rows_in_database: -1,
+      matched: false,
+      checked_at: new Date().toISOString(),
+    };
   }
 
   summary.duration_ms = Date.now() - startTime;
@@ -411,13 +500,20 @@ export async function executeAuthoritativeLgdSync(options: IngestionOptions = {}
   const startedAt = new Date().toISOString();
   const startTime = Date.now();
 
+  // Which source this run is reading is recorded on the summary itself: a run
+  // against the temporary reference mirror must stay distinguishable from an
+  // authoritative LGD synchronisation after the fact (Phases C and G).
+  const activeSource = getActiveGeographySource();
+  const sourceNoun =
+    activeSource.authority === 'authoritative' ? 'Authoritative LGD' : 'Temporary reference geography';
+
   await logCaseEvent({
     case_id: null,
     event_type: 'LGD_SYNC_STARTED',
-    title: 'LGD Ingestion Synchronization Started',
-    description: `Authoritative LGD sync started by ${currentLockOwner}. Sync ID: ${syncId}`,
+    title: `${sourceNoun} synchronisation started`,
+    description: `${sourceNoun} sync started by ${currentLockOwner} from source "${activeSource.label}". Sync ID: ${syncId}`,
     actor_name: currentLockOwner,
-    metadata: { sync_id: syncId, options },
+    metadata: { sync_id: syncId, source_id: activeSource.id, source_authority: activeSource.authority, options },
   });
 
   const tiersToSync: LgdAdministrativeTier[] = options.tier
@@ -438,6 +534,9 @@ export async function executeAuthoritativeLgdSync(options: IngestionOptions = {}
     total_orphans: 0,
     tiers: {},
     validation_errors: [],
+    source_id: activeSource.id,
+    source_label: activeSource.label,
+    source_authority: activeSource.authority,
   };
 
   try {
@@ -465,25 +564,95 @@ export async function executeAuthoritativeLgdSync(options: IngestionOptions = {}
     summary.completed_at = new Date().toISOString();
     summary.duration_ms = Date.now() - startTime;
 
+    // Overall completeness reconciliation (Phase K). Every tier reports how it
+    // obtained its total; the run is only complete when all of them did.
+    const tierSummaries = Object.values(summary.tiers);
+    const observed = tierSummaries.reduce((sum, t) => sum + (t.completeness?.source_rows_observed ?? 0), 0);
+    const missing = tierSummaries.reduce((sum, t) => sum + (t.completeness?.rows_missing_from_database ?? 0), 0);
+    const fromOtherSources = tierSummaries.reduce(
+      (sum, t) => sum + (t.completeness?.rows_from_other_sources ?? 0),
+      0
+    );
+    const orphans = tierSummaries.reduce((sum, t) => sum + (t.completeness?.orphan_rows_rejected ?? 0), 0);
+    const completeTiers = tierSummaries.filter((t) => t.completeness?.complete).length;
+    const integrity: 'verified' | 'failed' | 'not_checked' =
+      tierSummaries.length === 0
+        ? 'not_checked'
+        : tierSummaries.every((t) => t.completeness?.parent_integrity === 'verified')
+          ? 'verified'
+          : tierSummaries.some((t) => t.completeness?.parent_integrity === 'failed')
+            ? 'failed'
+            : 'not_checked';
+
+    summary.reconciliation = {
+      complete: summary.status === 'completed' && completeTiers === tierSummaries.length,
+      tiers_checked: tierSummaries.length,
+      tiers_complete: completeTiers,
+      source_rows_observed: observed,
+      rows_missing_from_database: missing,
+      rows_from_other_sources: fromOtherSources,
+      orphan_rows_rejected: orphans,
+      parent_integrity: integrity,
+      source_total_kind: tierSummaries.every((t) => t.completeness?.source_total_kind === 'observed_rows')
+        ? 'observed_rows'
+        : tierSummaries.some((t) => t.completeness?.source_total_kind === 'advertised_by_source')
+          ? 'advertised_by_source'
+          : 'not_provided',
+      note:
+        'Totals come from what was actually read out of the active source. Where a source does ' +
+        'not publish a machine-readable row count, that is stated rather than replaced with a ' +
+        'published or reference expectation.',
+      checked_at: summary.completed_at,
+    };
+
     // Record sync in history
     SYNC_HISTORY.unshift(summary);
     if (SYNC_HISTORY.length > 20) SYNC_HISTORY.pop();
 
-    // Update data_sources table for lgd_india
-    if (isSupabaseConfigured) {
+    // Update data_sources table for lgd_india.
+    //
+    // Three rules, each of which was violated before:
+    //   1. Never write from the test harness (same service-role credentials
+    //      as the server — a mocked sync previously recorded "operational").
+    //   2. "operational" must be evidence, not optimism: it requires rows that
+    //      were actually inserted/updated/verified in the database. Receiving
+    //      records is not the same as persisting them (orphans are rejected).
+    //   3. Merge metadata instead of replacing it, so provenance written by the
+    //      migration (license, canonical_provider, server_side_only) survives.
+    if (isSupabaseConfigured && !isTestEnvironment()) {
       try {
         const supabase = getSupabase();
-        await supabase
+
+        const rowsPersisted =
+          summary.total_inserted + summary.total_updated + summary.total_unchanged > 0;
+
+        const { data: currentRow } = await supabase
           .from('data_sources')
-          .update({
-            status: summary.status === 'failed' ? 'error' : 'operational',
-            updated_at: summary.completed_at,
-            metadata: {
-              last_sync: summary,
-              last_synced_at: summary.completed_at,
-            },
-          })
-          .eq('id', 'lgd_india');
+          .select('metadata')
+          .eq('id', 'lgd_india')
+          .maybeSingle();
+        const previousMetadata =
+          (currentRow?.metadata as Record<string, any> | null) ?? {};
+
+        const patch: Record<string, any> = {
+          status:
+            summary.status === 'failed'
+              ? 'error'
+              : rowsPersisted
+                ? 'operational'
+                : 'not_configured',
+          updated_at: summary.completed_at,
+          metadata: {
+            ...previousMetadata,
+            last_sync: summary,
+            last_synced_at: summary.completed_at,
+          },
+        };
+        if (rowsPersisted && summary.status !== 'failed') {
+          patch.last_successful_sync = summary.completed_at;
+        }
+
+        await supabase.from('data_sources').update(patch).eq('id', 'lgd_india');
       } catch {}
     }
 
@@ -567,6 +736,7 @@ export async function getLgdSyncStatus(): Promise<LgdSyncStatus> {
       villages: villageCount,
       total: totalCount,
     },
+    resume_offsets: { ...RESUME_OFFSETS },
     sync_history: SYNC_HISTORY.slice(0, 10),
   };
 }
@@ -579,4 +749,7 @@ export function resetLgdSyncLockForTests() {
   currentLockOwner = null;
   lockAcquiredAt = null;
   SYNC_HISTORY.length = 0;
+  for (const key of Object.keys(RESUME_OFFSETS) as LgdAdministrativeTier[]) {
+    delete RESUME_OFFSETS[key];
+  }
 }

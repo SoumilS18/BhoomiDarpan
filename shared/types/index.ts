@@ -1383,6 +1383,42 @@ export interface LgdSyncTierSummary {
   duration_ms: number;
   status: 'completed' | 'partial' | 'failed';
   validation_errors: Array<{ code: string; message: string; data?: any }>;
+  /**
+   * Offset the next page would be read from. A `partial` tier resumes here;
+   * an absent value means the tier ran to the end of the authoritative source.
+   */
+  next_offset?: number;
+  /** True only when every record advertised by the source was fetched and processed. */
+  complete?: boolean;
+  /** Independent reconciliation of ingested rows against the authoritative source total. */
+  count_verification?: {
+    source_total: number;
+    rows_in_database: number;
+    matched: boolean;
+    checked_at: string;
+  };
+  /**
+   * Completeness reconciliation for this tier (Phase K).
+   *
+   * States explicitly how `source_rows_observed` was obtained so a missing
+   * machine-readable total from the source is reported as such rather than
+   * back-filled from a published or reference expectation.
+   */
+  completeness?: {
+    tier: LgdSyncTierSummary['tier'];
+    unit_type: AdminUnitType;
+    source_rows_observed: number;
+    source_total_kind: 'advertised_by_source' | 'observed_rows' | 'not_provided';
+    source_total_note: string;
+    rows_in_database_total: number;
+    rows_in_database_from_source: number;
+    rows_missing_from_database: number;
+    rows_from_other_sources: number;
+    orphan_rows_rejected: number;
+    parent_integrity: 'verified' | 'failed' | 'not_checked';
+    complete: boolean;
+    checked_at: string;
+  };
 }
 
 export interface LgdSyncSummary {
@@ -1399,6 +1435,32 @@ export interface LgdSyncSummary {
   total_orphans: number;
   tiers: Record<string, LgdSyncTierSummary>;
   validation_errors: Array<{ code: string; message: string; data?: any }>;
+  /**
+   * Which registered geography source produced this run (Phase C). Present so
+   * a run against the temporary reference mirror can never be mistaken for an
+   * authoritative LGD synchronisation after the fact.
+   */
+  source_id?: string;
+  source_label?: string;
+  source_authority?: 'authoritative' | 'temporary_reference';
+  /**
+   * Overall completeness reconciliation across every tier that ran (Phase K).
+   * The run is only `complete` when every tier reconciled and no parent-child
+   * violation was observed.
+   */
+  reconciliation?: {
+    complete: boolean;
+    tiers_checked: number;
+    tiers_complete: number;
+    source_rows_observed: number;
+    rows_missing_from_database: number;
+    rows_from_other_sources: number;
+    orphan_rows_rejected: number;
+    parent_integrity: 'verified' | 'failed' | 'not_checked';
+    source_total_kind: 'advertised_by_source' | 'observed_rows' | 'not_provided';
+    note: string;
+    checked_at: string;
+  };
 }
 
 export interface LgdSyncStatus {
@@ -1413,6 +1475,26 @@ export interface LgdSyncStatus {
     sub_districts: number;
     villages: number;
     total: number;
+  };
+  /**
+   * Per-tier offset a `partial` sync can be resumed from. Keys are absent for
+   * tiers that completed; `0` means that tier has not started.
+   */
+  resume_offsets?: Partial<Record<'states' | 'districts' | 'subDistricts' | 'villages', number>>;
+  /**
+   * The registered source currently feeding administrative geography, so the
+   * console can show whether reads are authoritative LGD or a temporary
+   * reference extract without inferring it from row counts.
+   */
+  active_source?: {
+    id: string;
+    label: string;
+    authority: 'authoritative' | 'temporary_reference';
+    availability: string;
+    requires: string | null;
+    source_url: string;
+    lineage: string;
+    license: string;
   };
   sync_history: LgdSyncSummary[];
 }

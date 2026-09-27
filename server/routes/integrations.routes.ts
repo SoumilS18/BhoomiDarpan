@@ -15,8 +15,12 @@ import {
   getStates,
   getDistricts,
   getSubDistricts,
+  getVillages,
   getLocalities,
+  getGeographyProvenance,
+  createSubDistrict,
 } from '../services/administrativeGeographyService';
+import { CreateSubDistrictSchema } from '../utils/validators';
 import { executeImportPipeline } from '../services/dataImportPipeline';
 import { syncSource } from '../services/synchronizationService';
 import { listDiscrepancies, resolveDiscrepancy } from '../services/discrepancyDetector';
@@ -200,59 +204,145 @@ router.get('/geocoding/reverse', async (req: Request, res: Response) => {
 
 // ============================================================================
 // 4. ADMINISTRATIVE GEOGRAPHY
+// ----------------------------------------------------------------------------
+// Every response carries `provenance`. When the authoritative LGD source has
+// not been ingested, `provenance.authoritative` is false and the collections
+// are EMPTY — the API never substitutes a bundled reference subset so that a
+// partial hierarchy can pass for production data.
 // ============================================================================
+
+async function geographyEnvelope() {
+  return { provenance: await getGeographyProvenance() };
+}
+
+// GET /api/geography/status — honest availability of the authoritative source
+router.get('/geography/status', async (_req: Request, res: Response) => {
+  try {
+    res.json(await geographyEnvelope());
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // GET /api/geography/states
 router.get('/geography/states', async (_req: Request, res: Response) => {
   try {
     const states = await getStates();
-    res.json({ states, count: states.length });
+    res.json({ states, count: states.length, ...(await geographyEnvelope()) });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/geography/districts?state=...
+// GET /api/geography/districts?state=... or state_code=...
 router.get('/geography/districts', async (req: Request, res: Response) => {
   try {
-    const stateCode = req.query.state as string;
+    const stateCode = (req.query.state || req.query.state_code) as string;
     if (!stateCode) {
-      return res.status(400).json({ error: 'state query parameter is required' });
+      return res.status(400).json({ error: 'state or state_code query parameter is required' });
     }
     const districts = await getDistricts(stateCode);
-    res.json({ districts, count: districts.length });
+    res.json({ districts, count: districts.length, ...(await geographyEnvelope()) });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/geography/subdistricts?district=...
-router.get('/geography/subdistricts', async (req: Request, res: Response) => {
+// GET /api/geography/subdistricts?district=... or district_code=...
+router.get(['/geography/subdistricts', '/geography/sub-districts'], async (req: Request, res: Response) => {
   try {
-    const districtCode = req.query.district as string;
+    const districtCode = (req.query.district || req.query.district_code) as string;
     if (!districtCode) {
-      return res.status(400).json({ error: 'district query parameter is required' });
+      return res.status(400).json({ error: 'district or district_code query parameter is required' });
     }
     const subdistricts = await getSubDistricts(districtCode);
-    res.json({ subdistricts, count: subdistricts.length });
+    res.json({ subdistricts, count: subdistricts.length, ...(await geographyEnvelope()) });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// GET /api/geography/localities?subdistrict=...
-router.get('/geography/localities', async (req: Request, res: Response) => {
+// POST /api/geography/subdistricts — Add missing Sub-District / Tehsil (Authorized Officers only)
+router.post(
+  ['/geography/subdistricts', '/geography/sub-districts'],
+  requireAuth,
+  requireRole(['admin', 'lao', 'project_officer', 'revenue_inspector']),
+  async (req: Request, res: Response) => {
+    try {
+      const parseResult = CreateSubDistrictSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: parseResult.error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('; '),
+        });
+      }
+
+      const { name, code, state_code, district_code, local_name } = parseResult.data;
+      const user = (req as any).user;
+
+      // Enforce territorial jurisdiction scoping for jurisdiction-bound roles
+      if (user) {
+        if (user.jurisdiction_state_lgd_code && user.jurisdiction_state_lgd_code !== state_code) {
+          return res.status(403).json({
+            error: `Territorial jurisdiction mismatch: User is restricted to state "${user.jurisdiction_state_lgd_code}".`,
+          });
+        }
+        if (user.jurisdiction_district_lgd_code && user.jurisdiction_district_lgd_code !== district_code) {
+          return res.status(403).json({
+            error: `Territorial jurisdiction mismatch: User is restricted to district "${user.jurisdiction_district_lgd_code}".`,
+          });
+        }
+      }
+
+      const createdUnit = await createSubDistrict({
+        name,
+        code,
+        state_code,
+        district_code,
+        local_name,
+        created_by: user?.full_name || 'Authorized Officer',
+      });
+
+      res.status(201).json({
+        success: true,
+        subdistrict: createdUnit,
+        ...(await geographyEnvelope()),
+      });
+    } catch (err: any) {
+      const isConflict =
+        err.message?.includes('already exists') ||
+        err.message?.includes('duplicate key') ||
+        err.message?.includes('uq_admin_unit_type_code');
+      const status = isConflict ? 409 : 400;
+      res.status(status).json({ error: err.message });
+    }
+  }
+);
+
+// GET /api/geography/localities?subdistrict=...&search=...
+// Server-side search + pagination: the browser never loads the full village
+// tier (720k+ rows), and the search runs against ingested LGD codes only.
+router.get(['/geography/localities', '/geography/villages'], async (req: Request, res: Response) => {
   try {
-    const subDistrictCode = req.query.subdistrict as string;
+    const subDistrictCode = (req.query.subdistrict || req.query.sub_district || req.query.code) as string;
     if (!subDistrictCode) {
       return res.status(400).json({ error: 'subdistrict query parameter is required' });
     }
-    const localities = await getLocalities(subDistrictCode);
-    res.json({ localities, count: localities.length });
+    const page = req.query.page ? parseInt(String(req.query.page), 10) : 1;
+    const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 100;
+    const search = (req.query.search || req.query.q) ? String(req.query.search || req.query.q) : undefined;
+    const result = await getVillages(subDistrictCode, { page, limit, search });
+    res.json({
+      sub_district_code: subDistrictCode,
+      localities: result.villages,
+      ...result,
+      ...(await geographyEnvelope()),
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // ============================================================================
 // 5. DATA IMPORT PIPELINE

@@ -220,7 +220,7 @@ export const RecommendationsList: React.FC<RecommendationsListProps> = ({
                       Observed Post-Action Outcome
                     </span>
                     <span className="font-mono text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded uppercase">
-                      Evidence: {rec.observed_impact.evidence_type || 'Observed'}
+                      Evidence: {rec.observed_impact.evidence_type || '—'}
                     </span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">

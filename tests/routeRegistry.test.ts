@@ -173,9 +173,66 @@ describe('Route Registry - unknown routes', () => {
     }
   });
 
-  it('maps canonical entry paths to the dashboard', () => {
-    expect(resolveRedirect('/')).toBe('/dashboard');
-    expect(resolveRedirect('')).toBe('/dashboard');
+  it('maps the empty entry path to the public landing page', () => {
+    expect(resolveRedirect('')).toBe('/');
+    expect(resolveRedirect('/')).toBeNull();
     expect(resolveRedirect('/cases')).toBeNull();
+  });
+
+  it('resolves the public landing page at the root path', () => {
+    expect(resolveRouteFrom(ROUTES, '/')?.route.id).toBe('public.landing');
+  });
+});
+
+describe('Route Registry - public and authentication areas', () => {
+  it('registers every public and auth route outside the application sidebar', () => {
+    const expectedPublic = [
+      'public.landing',
+      'public.about',
+      'public.features',
+      'public.howItWorks',
+      'public.gisIntelligence',
+      'public.security',
+      'public.decisionSupport',
+      'public.contact',
+      'public.privacy',
+      'public.terms',
+      'public.accessibility',
+    ];
+    const expectedAuth = [
+      'auth.login',
+      'auth.forgotPassword',
+      'auth.resetPassword',
+      'auth.activateAccount',
+      'auth.requestAccess',
+    ];
+
+    for (const id of [...expectedPublic, ...expectedAuth]) {
+      const route = getRouteById(id);
+      expect(route.nav).toBe(false);
+      expect(route.module).toBeNull();
+      expect(route.keepAlive).toBe(false);
+    }
+
+    for (const id of expectedPublic) {
+      expect(getRouteById(id).area).toBe('public');
+    }
+    for (const id of expectedAuth) {
+      expect(getRouteById(id).area).toBe('auth');
+    }
+  });
+
+  it('aliases the spec-mandated sign-in and activation paths', () => {
+    expect(resolveRedirect('/sign-in')).toBe('/login');
+    expect(resolveRedirect('/account-activation')).toBe('/activate-account');
+    expect(resolveRouteFrom(ROUTES, '/login')?.route.id).toBe('auth.login');
+    expect(resolveRouteFrom(ROUTES, '/request-access')?.route.id).toBe('auth.requestAccess');
+  });
+
+  it('keeps public and application paths distinct', () => {
+    // The public GIS page must not shadow the application GIS module, and vice versa.
+    expect(resolveRouteFrom(ROUTES, '/gis-intelligence')?.route.id).toBe('public.gisIntelligence');
+    expect(resolveRouteFrom(ROUTES, '/gis')?.route.id).toBe('module.gis');
+    expect(resolveRouteFrom(ROUTES, '/how-it-works')?.route.id).toBe('public.howItWorks');
   });
 });

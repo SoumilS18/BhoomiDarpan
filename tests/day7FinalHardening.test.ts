@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
+import { startLiveApi, LiveApi } from './helpers/liveApi';
 import '../server/index';
 import { advanceStageInstance } from '../server/services/workflowEngine';
 import { analyzePortfolioOutcomes, authorizeUserForCase } from '../server/services/portfolioAnalyzer';
@@ -13,7 +14,17 @@ import {
 } from '../shared/types';
 import { AuthenticatedUser } from '../server/middleware/auth.middleware';
 
-const API_BASE = 'http://localhost:3001/api';
+let liveApi: LiveApi | null = null;
+let API_BASE = '';
+
+beforeAll(async () => {
+  liveApi = await startLiveApi();
+  API_BASE = `${liveApi.url}/api`;
+}, 30000);
+
+afterAll(async () => {
+  await liveApi?.close();
+});
 
 const mockCasePune: AcquisitionCase = {
   id: 'case-harden-pune-001',

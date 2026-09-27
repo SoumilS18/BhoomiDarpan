@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { fetchPortfolioOperations } from '../lib/api';
-import { PortfolioOperationsData } from '../../shared/types';
+import { PortfolioOperationsData, PortfolioFilterParams } from '../../shared/types';
 import { Button } from '../components/common/Button';
 import { EmptyState } from '../components/common/EmptyState';
+import { PageHeader, PageEyebrow } from '../components/common/PageHeader';
+import { PortfolioFilterBar } from '../components/dashboard/PortfolioFilterBar';
 import { PortfolioVisualizations } from '../components/dashboard/PortfolioVisualizations';
 import { PortfolioTrendsView } from '../components/dashboard/PortfolioTrendsView';
 import { GeographicDrilldownView } from '../components/dashboard/GeographicDrilldownView';
@@ -15,7 +17,6 @@ import {
   CheckCircle2,
   Clock,
   RefreshCw,
-  FolderKanban,
   PieChart,
 } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -38,6 +39,9 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
   onViewChange,
 }) => {
   const [portfolioData, setPortfolioData] = useState<PortfolioOperationsData | null>(null);
+  // Server-side filters: every change here is sent to `GET /api/analytics/portfolio`
+  // and applied by the API before any aggregation runs.
+  const [filters, setFilters] = useState<PortfolioFilterParams>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,11 +53,11 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
     : 'portfolio';
   const setActiveTab = (next: AnalyticsView) => onViewChange(next);
 
-  const loadData = async () => {
+  const loadData = async (activeFilters: PortfolioFilterParams) => {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetchPortfolioOperations({});
+      const res = await fetchPortfolioOperations(activeFilters);
       setPortfolioData(res.portfolio);
     } catch (err: any) {
       setError(err.message || 'Failed to aggregate analytics data');
@@ -63,12 +67,20 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(filters);
+  }, [filters]);
+
+  const handleFilterChange = (key: keyof PortfolioFilterParams, value: string | undefined) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleResetFilters = () => {
+    setFilters({});
+  };
 
   if (isLoading && !portfolioData) {
     return (
-      <div className="flex flex-col items-center justify-center p-20 space-y-3 bg-white rounded-xl border border-slate-200">
+      <div className="flex flex-col items-center justify-center p-20 space-y-3 bg-white rounded-xl border border-slate-200 shadow-gov">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gov-navy" />
         <p className="text-xs text-slate-500 font-medium">
           Aggregating national analytics, empirical trend series &amp; verified intervention outcomes...
@@ -83,7 +95,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
         title="Analytics Service Error"
         description={error}
         actionLabel="Retry"
-        onAction={loadData}
+        onAction={() => loadData(filters)}
       />
     );
   }
@@ -94,51 +106,56 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-gov-navy bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+      {/* Page header */}
+      <PageHeader
+        eyebrow={
+          <>
+            <PageEyebrow>
+              <BarChart3 className="h-3 w-3" />
               National Analytics Engine
-            </span>
-            <span className="text-xs text-slate-300">•</span>
-            <span className="text-[11px] text-slate-500">
-              Decision Support Telemetry
-            </span>
-          </div>
-          <h1 className="text-xl font-bold text-gov-slate tracking-tight">
-            National Land Acquisition Analytics
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Empirical distributions, temporal trends, administrative comparative performance, and verified intervention outcomes.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
+            </PageEyebrow>
+            <span className="text-[11px] text-slate-500">Decision Support Telemetry</span>
+          </>
+        }
+        title="National Land Acquisition Analytics"
+        subtitle="Empirical distributions, temporal trends, administrative comparative performance, and verified intervention outcomes."
+        actions={
           <Button
             variant="outline"
             size="sm"
-            onClick={loadData}
+            onClick={() => loadData(filters)}
             leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
           >
             Refresh
           </Button>
-        </div>
-      </div>
+        }
+      />
+
+      {/* Server-side filters — every selection refetches the portfolio API */}
+      {portfolioData && (
+        <PortfolioFilterBar
+          filters={filters}
+          availableFilters={portfolioData.available_filters}
+          onFilterChange={handleFilterChange}
+          onResetFilters={handleResetFilters}
+        />
+      )}
 
       {/* Analytics Sub-Navigation (Section 20 Structure) */}
-      <div className="flex border-b border-slate-200 bg-white rounded-t-xl px-4 gap-6 text-xs font-medium overflow-x-auto shadow-xs">
+      <div className="flex gap-6 overflow-x-auto rounded-t-xl border-b border-slate-200 bg-white px-4 text-xs font-medium shadow-gov">
         <button
           type="button"
           onClick={() => setActiveTab('portfolio')}
           className={clsx(
-            'py-3.5 flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer',
+            'flex cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 py-3.5 transition-all',
             activeTab === 'portfolio'
-              ? 'border-gov-navy text-gov-navy font-bold'
+              ? 'border-gov-navy font-bold text-gov-navy'
               : 'border-transparent text-slate-500 hover:text-gov-slate'
           )}
         >
-          <PieChart className="h-4 w-4 text-gov-navy" />
+          <PieChart
+            className={clsx('h-4 w-4', activeTab === 'portfolio' ? 'text-gov-navy' : 'text-slate-400')}
+          />
           <span>1. Portfolio Overview</span>
         </button>
 
@@ -146,13 +163,15 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
           type="button"
           onClick={() => setActiveTab('trends')}
           className={clsx(
-            'py-3.5 flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer',
+            'flex cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 py-3.5 transition-all',
             activeTab === 'trends'
-              ? 'border-gov-navy text-gov-navy font-bold'
+              ? 'border-gov-navy font-bold text-gov-navy'
               : 'border-transparent text-slate-500 hover:text-gov-slate'
           )}
         >
-          <TrendingUp className="h-4 w-4 text-blue-600" />
+          <TrendingUp
+            className={clsx('h-4 w-4', activeTab === 'trends' ? 'text-gov-navy' : 'text-slate-400')}
+          />
           <span>2. Trends &amp; Velocity</span>
         </button>
 
@@ -160,13 +179,15 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
           type="button"
           onClick={() => setActiveTab('geography')}
           className={clsx(
-            'py-3.5 flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer',
+            'flex cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 py-3.5 transition-all',
             activeTab === 'geography'
-              ? 'border-gov-navy text-gov-navy font-bold'
+              ? 'border-gov-navy font-bold text-gov-navy'
               : 'border-transparent text-slate-500 hover:text-gov-slate'
           )}
         >
-          <Compass className="h-4 w-4 text-emerald-600" />
+          <Compass
+            className={clsx('h-4 w-4', activeTab === 'geography' ? 'text-gov-navy' : 'text-slate-400')}
+          />
           <span>3. Geography</span>
         </button>
 
@@ -174,13 +195,15 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
           type="button"
           onClick={() => setActiveTab('outcomes')}
           className={clsx(
-            'py-3.5 flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer',
+            'flex cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 py-3.5 transition-all',
             activeTab === 'outcomes'
-              ? 'border-gov-navy text-gov-navy font-bold'
+              ? 'border-gov-navy font-bold text-gov-navy'
               : 'border-transparent text-slate-500 hover:text-gov-slate'
           )}
         >
-          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+          <CheckCircle2
+            className={clsx('h-4 w-4', activeTab === 'outcomes' ? 'text-gov-navy' : 'text-slate-400')}
+          />
           <span>4. Verified Outcomes</span>
         </button>
 
@@ -188,13 +211,15 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({
           type="button"
           onClick={() => setActiveTab('slas')}
           className={clsx(
-            'py-3.5 flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer',
+            'flex cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 py-3.5 transition-all',
             activeTab === 'slas'
-              ? 'border-gov-navy text-gov-navy font-bold'
+              ? 'border-gov-navy font-bold text-gov-navy'
               : 'border-transparent text-slate-500 hover:text-gov-slate'
           )}
         >
-          <Clock className="h-4 w-4 text-teal-600" />
+          <Clock
+            className={clsx('h-4 w-4', activeTab === 'slas' ? 'text-gov-navy' : 'text-slate-400')}
+          />
           <span>5. SLA Durations</span>
         </button>
       </div>

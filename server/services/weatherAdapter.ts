@@ -1,4 +1,5 @@
 import { getSupabase, isSupabaseConfigured } from '../config/supabase';
+import { isTestEnvironment } from '../config/runtimeEnv';
 import {
   ExternalObservation,
   NormalizedWeatherValues,
@@ -336,7 +337,7 @@ export async function persistObservation(obs: ExternalObservation): Promise<Exte
   const key = `${obs.entity_type}:${obs.entity_id}`;
   IN_MEMORY_OBSERVATIONS.set(key, obs);
 
-  if (isSupabaseConfigured) {
+  if (isSupabaseConfigured && !isTestEnvironment()) {
     try {
       const client = getSupabase();
       const { data, error } = await client

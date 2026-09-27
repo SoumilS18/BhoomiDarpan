@@ -4,6 +4,7 @@ import { AcquisitionCase, CaseStageInstance, CaseIntelligenceBundle } from '../.
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
 import { Card, CardHeader, CardContent } from '../components/common/Card';
+import { PageHeader, PageEyebrow } from '../components/common/PageHeader';
 import { CaseOverviewTab } from '../components/cases/CaseOverviewTab';
 import { TimelineGantt } from '../components/workflow/TimelineGantt';
 import { StageAdvanceModal } from '../components/workflow/StageAdvanceModal';
@@ -21,22 +22,15 @@ import { DisputesTab } from '../components/disputes/DisputesTab';
 import {
   ArrowLeft,
   Clock,
-  MapPin,
   FileText,
   AlertTriangle,
   History,
-  Building2,
-  CheckCircle2,
-  GitBranch,
   RefreshCw,
   Layers,
   Plus,
   Sparkles,
   Scale,
   Lightbulb,
-  ShieldCheck,
-  ChevronRight,
-  ExternalLink,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -177,93 +171,83 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
 
   return (
     <div className="space-y-5">
-      {/* Top Breadcrumb Navigation */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={onBack} leftIcon={<ArrowLeft className="h-4 w-4" />}>
-            Back to Registry
-          </Button>
-          <div className="text-xs text-slate-400 flex items-center gap-1.5 ml-2">
-            <span>{caseItem.state}</span>
-            <span>/</span>
-            <span>{caseItem.district}</span>
-            <span>/</span>
-            <strong className="text-gov-slate">{caseItem.village}</strong>
-            <span className="font-mono text-[10px] text-gov-navy bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 ml-1">
-              {caseItem.case_number}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadCaseDetails}
-            leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
-          >
-            Refresh
-          </Button>
-        </div>
-      </div>
-
-      {/* Case Header Banner */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-        <div className="p-6">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="font-mono text-xs font-bold text-gov-navy bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                  {caseItem.case_number}
+      {/* Case Header */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-gov overflow-hidden">
+        <div className="px-5 pt-5 md:px-6 md:pt-6">
+          <PageHeader
+            eyebrow={
+              <PageEyebrow>
+                <span className="font-mono normal-case tracking-normal">{caseItem.case_number}</span>
+              </PageEyebrow>
+            }
+            title={caseItem.title}
+            subtitle={
+              <span className="space-y-1.5">
+                <span className="flex flex-wrap items-center gap-2">
+                  <Badge
+                    variant={caseItem.priority === 'critical' ? 'red' : caseItem.priority === 'high' ? 'amber' : 'navy'}
+                  >
+                    {caseItem.priority.toUpperCase()} PRIORITY
+                  </Badge>
+                  <Badge variant={caseItem.status === 'completed' ? 'emerald' : isDelayed ? 'red' : 'navy'}>
+                    {caseItem.status.toUpperCase()}
+                  </Badge>
+                  {caseItem.project?.code && (
+                    <span className="text-[11px] font-mono text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                      {caseItem.project.code}
+                    </span>
+                  )}
                 </span>
-                <Badge variant={caseItem.priority === 'critical' ? 'red' : caseItem.priority === 'high' ? 'amber' : 'navy'}>
-                  {caseItem.priority.toUpperCase()} PRIORITY
-                </Badge>
-                <Badge variant={caseItem.status === 'completed' ? 'emerald' : isDelayed ? 'red' : 'navy'}>
-                  {caseItem.status.toUpperCase()}
-                </Badge>
-                {caseItem.project?.code && (
-                  <span className="text-[11px] font-mono text-slate-500 bg-slate-50 px-2 py-0.5 rounded border">
-                    {caseItem.project.code}
-                  </span>
-                )}
+                <span className="block">{caseItem.description || 'No description recorded.'}</span>
+                <span className="block text-slate-400">
+                  {caseItem.state} / {caseItem.district} /{' '}
+                  <strong className="text-gov-slate">{caseItem.village}</strong>
+                </span>
+              </span>
+            }
+            actions={
+              <>
+                <Button variant="outline" size="sm" onClick={onBack} leftIcon={<ArrowLeft className="h-4 w-4" />}>
+                  Back to Registry
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadCaseDetails}
+                  leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
+                >
+                  Refresh
+                </Button>
+              </>
+            }
+          />
+
+          {isDelayed && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-red-50 border border-red-200 px-4 py-3">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-gov-red">
+                <AlertTriangle className="h-4 w-4" />
+                <span>+{delayDays} Days SLA Delay</span>
               </div>
-
-              <h1 className="text-xl font-bold text-gov-slate tracking-tight">
-                {caseItem.title}
-              </h1>
-
-              <p className="text-xs text-slate-500 mt-1 max-w-3xl">
-                {caseItem.description || 'Statutory land acquisition proceedings under digital workflow monitoring.'}
-              </p>
+              <div className="text-[11px] text-slate-600">
+                Projected Completion:{' '}
+                <strong className="text-gov-slate">{metrics?.projected_completion_date}</strong>
+              </div>
             </div>
-
-            {isDelayed && (
-              <div className="rounded-xl bg-red-50 border border-red-200 p-3.5 text-right shrink-0">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-gov-red justify-end">
-                  <AlertTriangle className="h-4 w-4" />
-                  <span>+{delayDays} Days SLA Delay</span>
-                </div>
-                <div className="text-[11px] text-slate-600 mt-1">
-                  Projected Completion: <strong className="text-gov-slate">{metrics?.projected_completion_date}</strong>
-                </div>
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Dynamic Vitals Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-6 pt-5 border-t border-slate-100 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-5 pt-4 pb-5 border-t border-slate-100 text-xs">
             <div>
               <span className="text-[10px] text-slate-400 uppercase font-semibold block">Workflow Engine</span>
               <strong className="text-gov-slate font-semibold truncate block mt-0.5">
-                {caseItem.workflow?.name || 'Standard Acquisition'}
+                {caseItem.workflow?.name || '—'}
               </strong>
             </div>
 
             <div>
               <span className="text-[10px] text-slate-400 uppercase font-semibold block">Current Milestone</span>
               <strong className="text-gov-slate font-semibold block mt-0.5 truncate">
-                {metrics?.current_stage_title || 'Initiation'}
+                {metrics?.current_stage_title || '—'}
               </strong>
             </div>
 
@@ -357,7 +341,7 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
             )}
           >
             <Layers className="h-4 w-4 text-gov-navy" />
-            <span>4. GIS &amp; Cadastre ({parcelsCount})</span>
+            <span>4. GIS & Cadastre ({parcelsCount})</span>
           </button>
 
           {/* Tab 5: Documents */}
@@ -387,7 +371,7 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
             )}
           >
             <Scale className="h-4 w-4 text-purple-600" />
-            <span>6. Objections &amp; Disputes</span>
+            <span>6. Objections & Disputes</span>
           </button>
 
           {/* Tab 7: Recommendations */}
@@ -417,7 +401,7 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
             )}
           >
             <History className="h-4 w-4" />
-            <span>8. History &amp; Audit ({auditCount})</span>
+            <span>8. History & Audit ({auditCount})</span>
           </button>
         </div>
       </div>
@@ -461,11 +445,11 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
       {activeTab === 'intelligence' && intelligenceBundle && (
         <div className="space-y-6">
           {/* Header Note */}
-          <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+          <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-wrap items-center justify-between gap-3 shadow-gov">
             <div>
               <h3 className="font-bold text-gov-slate text-sm flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-amber-500" />
-                <span>Decision Intelligence &amp; Causal Diagnostics</span>
+                <span>Decision Intelligence & Causal Diagnostics</span>
               </h3>
               <p className="text-[11px] text-slate-500">
                 Rigorous deterministic risk scoring, active bottlenecks, root cause attribution, and downstream DAG propagation.
@@ -501,7 +485,7 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
         <div className="space-y-5">
           <Card className="border-slate-200">
             <CardHeader
-              title="Cadastral GIS &amp; Spatial Representation"
+              title="Cadastral GIS & Spatial Representation"
               subtitle="Interactive georeferenced boundary, cadastral parcels, and Bhuvan thematic satellite overlays"
               action={
                 <div className="flex items-center gap-2">
@@ -575,10 +559,10 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
                             {p.khata_number || 'N/A'}
                           </td>
                           <td className="py-2.5 px-3 font-medium text-gov-slate">
-                            {p.landowner_names?.join(', ') || 'Unregistered'}
+                            {p.landowner_names?.join(', ') || 'Not recorded'}
                           </td>
                           <td className="py-2.5 px-3 capitalize text-slate-600">
-                            {p.land_type || 'Agricultural'}
+                            {p.land_type || 'Not recorded'}
                           </td>
                           <td className="py-2.5 px-3 tabular-nums font-medium text-gov-slate">
                             {p.area_acres}
@@ -628,7 +612,7 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
       {activeTab === 'documents' && (
         <Card className="border-slate-200">
           <CardHeader
-            title="Statutory Documents &amp; Legal Order Vault"
+            title="Statutory Documents & Legal Order Vault"
             subtitle="Original file repository, Gemini structured entity extraction, and human validation ledger"
           />
           <CardContent>
@@ -644,7 +628,7 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
       {activeTab === 'disputes' && (
         <Card className="border-slate-200">
           <CardHeader
-            title="Objections, Grievance Conciliation &amp; Judicial Injunctions"
+            title="Objections, Grievance Conciliation & Judicial Injunctions"
             subtitle="Section 15 statutory objections, hearing records, conciliation awards, and High Court stay tracking"
           />
           <CardContent>
@@ -686,7 +670,7 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
       {activeTab === 'audit' && (
         <Card className="border-slate-200">
           <CardHeader
-            title="Statutory Chronological Audit &amp; Event Ledger"
+            title="Statutory Chronological Audit & Event Ledger"
             subtitle="Immutable record of administrative decisions, stage updates, document verifications, and disputes"
           />
           <CardContent>
@@ -704,7 +688,7 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
                         </span>
                       </div>
                       <p className="text-[11px] text-slate-500">
-                        Actor: <strong>{log.actor_name || 'System Engine'}</strong>
+                        Actor: <strong>{log.actor_name || '—'}</strong>
                       </p>
                     </div>
                     <div className="text-[10px] font-mono text-slate-400 whitespace-nowrap text-right">

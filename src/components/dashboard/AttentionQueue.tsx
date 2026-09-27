@@ -16,6 +16,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { formatDate } from '../../lib/utils';
+import { ROLE_LABELS } from '../../lib/domainLabels';
+import type { UserRole } from '../../../shared/types';
 
 interface AttentionQueueProps {
   queue: AttentionQueueItem[];
@@ -36,7 +38,8 @@ export const AttentionQueue: React.FC<AttentionQueueProps> = ({ queue, onSelectC
         <CheckCircle2 className="h-9 w-9 text-emerald-500 mx-auto mb-2" />
         <h4 className="font-bold text-gov-slate text-sm">Attention Queue Clear</h4>
         <p className="text-slate-500 mt-1 max-w-md mx-auto">
-          No active cases meet critical friction thresholds. All milestones, prerequisite dependencies, document validations, and cadastral holdings are progressing within statutory SLA buffers.
+          No cases currently meet the attention thresholds configured for this deployment. This
+          reflects the live case population — it is not a statement that all work is on schedule.
         </p>
       </div>
     );
@@ -55,10 +58,16 @@ export const AttentionQueue: React.FC<AttentionQueueProps> = ({ queue, onSelectC
     }
   };
 
+  /**
+   * Which backend role the recommended action belongs to.
+   *
+   * The key is a real `UserRole`; the label is rendered from `ROLE_LABELS`, so
+   * the column can never print a role name the API does not recognise.
+   */
   const getActionRecommendation = (item: AttentionQueueItem) => {
     if (item.unverified_docs_count > 0) {
       return {
-        role: 'Revenue Inspector / LAO',
+        roleKey: 'revenue_inspector' as UserRole,
         actionLabel: 'Verify Docs',
         tab: 'documents',
         issue: `${item.unverified_docs_count} Unverified Statutory Document${item.unverified_docs_count > 1 ? 's' : ''}`,
@@ -66,7 +75,7 @@ export const AttentionQueue: React.FC<AttentionQueueProps> = ({ queue, onSelectC
     }
     if (item.disputed_parcels_count > 0) {
       return {
-        role: 'Land Acquisition Officer (LAO)',
+        roleKey: 'lao' as UserRole,
         actionLabel: 'Review Dispute',
         tab: 'disputes',
         issue: `${item.disputed_parcels_count} Active Parcel Dispute${item.disputed_parcels_count > 1 ? 's' : ''}`,
@@ -74,14 +83,14 @@ export const AttentionQueue: React.FC<AttentionQueueProps> = ({ queue, onSelectC
     }
     if (item.has_active_bottleneck) {
       return {
-        role: 'Project Nodal Officer / LAO',
+        roleKey: 'project_officer' as UserRole,
         actionLabel: 'De-bottleneck',
         tab: 'intelligence',
         issue: 'Active Stage Bottleneck',
       };
     }
     return {
-      role: 'Competent Authority',
+      roleKey: 'approver' as UserRole,
       actionLabel: 'Inspect Workflow',
       tab: 'workflow',
       issue: 'SLA Milestone Trajectory',
@@ -243,7 +252,7 @@ export const AttentionQueue: React.FC<AttentionQueueProps> = ({ queue, onSelectC
                   <td className="py-3 px-3 whitespace-nowrap">
                     <div className="flex items-center gap-1 text-[11px] font-medium text-slate-700">
                       <UserCheck className="h-3 w-3 text-slate-400 shrink-0" />
-                      <span>{recommendation.role}</span>
+                      <span>{ROLE_LABELS[recommendation.roleKey]}</span>
                     </div>
                     <div className="text-[10px] text-slate-400 mt-0.5">
                       Stage: {item.current_stage_title}

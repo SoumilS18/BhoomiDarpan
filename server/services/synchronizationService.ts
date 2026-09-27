@@ -1,4 +1,5 @@
 import { getSupabase, isSupabaseConfigured } from '../config/supabase';
+import { isTestEnvironment } from '../config/runtimeEnv';
 import { getDataSource, updateDataSource } from './dataSourceRegistry';
 import { getLiveWeatherObservation } from './weatherAdapter';
 
@@ -223,7 +224,9 @@ async function updateSourceSyncState(
     updates.error_details = params.error;
   }
 
-  if (isSupabaseConfigured) {
+  // Sync bookkeeping on the live `data_sources` rows must only be written by a
+  // real server process, not by a fixture exercising the retry logic.
+  if (isSupabaseConfigured && !isTestEnvironment()) {
     try {
       const client = getSupabase();
       await client

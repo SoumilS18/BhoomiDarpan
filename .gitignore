@@ -11,6 +11,17 @@ package-lock.json
 .env.production
 .env.development
 
+# Local-only demonstration credentials (never commit real account passwords)
+scripts/demo-accounts.local.json
+demo-accounts.local.json
+
+# Local Data & Reference Geography Engines
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
 # Production builds
 dist
 dist-ssr

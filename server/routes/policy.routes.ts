@@ -9,7 +9,7 @@ import { requireAuth, requireRole } from '../middleware/auth.middleware';
 const router = Router();
 
 // GET /api/policies - List all configurable policies
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', requireAuth, async (_req: Request, res: Response) => {
   try {
     const policies = await getAllPolicies();
     res.json({ policies });
@@ -19,7 +19,7 @@ router.get('/', async (_req: Request, res: Response) => {
 });
 
 // GET /api/policies/:key - Retrieve single policy
-router.get('/:key', async (req: Request, res: Response) => {
+router.get('/:key', requireAuth, async (req: Request, res: Response) => {
   try {
     const key = typeof req.params.key === 'string' ? req.params.key : req.params.key[0];
     const policy = await getPolicy(key);

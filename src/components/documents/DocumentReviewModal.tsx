@@ -3,6 +3,7 @@ import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { processDocument, validateDocument } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
 import { CaseDocument, StructuredExtractionData } from '../../../shared/types';
 import {
   CheckCircle2,
@@ -49,7 +50,10 @@ export const DocumentReviewModal: React.FC<DocumentReviewModalProps> = ({
     humanData || rawStructured || {}
   );
   const [validationNotes, setValidationNotes] = useState(latestExtraction?.validation_notes || '');
-  const [actorName, setActorName] = useState('Land Acquisition Officer');
+  // Verification is attested by the signed-in officer only — see the note
+  // under the field.
+  const { activePersona } = useAuth();
+  const [actorName] = useState(activePersona.name);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -462,14 +466,19 @@ export const DocumentReviewModal: React.FC<DocumentReviewModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-semibold text-gov-slate mb-1">
-                    Verifying Officer Name *
+                    Verifying Officer *
                   </label>
                   <input
                     type="text"
                     value={actorName}
-                    onChange={(e) => setActorName(e.target.value)}
-                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-300"
+                    readOnly
+                    aria-readonly="true"
+                    title="Taken from the signed-in profile; cannot be edited"
+                    className="w-full text-xs px-3 py-1.5 rounded-lg border border-slate-300 bg-slate-50 text-slate-600"
                   />
+                  <p className="mt-1 text-[10px] text-slate-400">
+                    Recorded in the verification audit entry as your signed-in identity.
+                  </p>
                 </div>
 
                 <div>

@@ -6,6 +6,11 @@
 // the display title / breadcrumb label, the lazy-loading boundary, and the
 // frontend role visibility metadata.
 //
+// The registry covers three experience areas (RouteDef.area):
+//   'public' - the public marketing / informational website (world-readable)
+//   'auth'   - sign-in and account-access surfaces (no fabricated sessions)
+//   'app'    - the authenticated BhoomiSetu application (default)
+//
 // AUTHORISATION NOTE (deliberate):
 //   `roles` below governs NAVIGATION VISIBILITY ONLY. It is not, and must
 //   never be treated as, a security control. The Express API is the single
@@ -45,6 +50,14 @@ export type IconKey =
   | 'admin';
 
 export type BadgeSource = 'caseCount' | 'unreadNotifications';
+export type WorkspaceEntityType = 'case' | 'project';
+
+/**
+ * Experience area a route belongs to: the public website, the authentication /
+ * account area, or the authenticated application shell. Omitted means 'app'
+ * so the pre-existing operational routes stay untouched.
+ */
+export type RouteArea = 'public' | 'auth' | 'app';
 
 export type LazyPage = React.LazyExoticComponent<React.ComponentType<any>>;
 
@@ -53,6 +66,8 @@ export interface RouteDef {
   id: string;
   /** URL pattern. Supports `:param`, optional `:param?` and a trailing `*`. */
   path: string;
+  /** Experience area; omitted means the authenticated application ('app'). */
+  area?: RouteArea;
   /** Sidebar grouping. `null` for routes reached from within a module. */
   module: ModuleId | null;
   /** Human label used by navigation. */
@@ -68,8 +83,16 @@ export interface RouteDef {
   roles: UserRole[];
   /** Whether this route appears as a sidebar destination. */
   nav: boolean;
+  /** Whether this route appears in the public website header navigation. */
+  publicNav?: boolean;
   /** Optional runtime badge binding, resolved by the shell. */
   badgeSource?: BadgeSource;
+  /** Workspace identity metadata; URL remains the source of truth. */
+  workspace?: {
+    entityType?: WorkspaceEntityType;
+    param?: string;
+    label?: string;
+  };
   /**
    * Phase 3 metadata only. Nothing in Phase 0 keeps these views mounted; the
    * flag records which surfaces are worth preserving once the workspace tab
@@ -149,11 +172,309 @@ const NotFoundPage = React.lazy(() =>
   import('../pages/NotFoundPage').then((m) => ({ default: m.NotFoundPage }))
 );
 
+// Public website pages
+const LandingPage = React.lazy(() =>
+  import('../pages/public/LandingPage').then((m) => ({ default: m.LandingPage }))
+);
+const AboutPage = React.lazy(() =>
+  import('../pages/public/AboutPage').then((m) => ({ default: m.AboutPage }))
+);
+const FeaturesPage = React.lazy(() =>
+  import('../pages/public/FeaturesPage').then((m) => ({ default: m.FeaturesPage }))
+);
+const HowItWorksPage = React.lazy(() =>
+  import('../pages/public/HowItWorksPage').then((m) => ({ default: m.HowItWorksPage }))
+);
+const GisIntelligencePage = React.lazy(() =>
+  import('../pages/public/GisIntelligencePage').then((m) => ({ default: m.GisIntelligencePage }))
+);
+const DecisionSupportPage = React.lazy(() =>
+  import('../pages/public/DecisionSupportPage').then((m) => ({ default: m.DecisionSupportPage }))
+);
+const SecurityPage = React.lazy(() =>
+  import('../pages/public/SecurityPage').then((m) => ({ default: m.SecurityPage }))
+);
+const ContactPage = React.lazy(() =>
+  import('../pages/public/ContactPage').then((m) => ({ default: m.ContactPage }))
+);
+const PrivacyPage = React.lazy(() =>
+  import('../pages/public/PrivacyPage').then((m) => ({ default: m.PrivacyPage }))
+);
+const TermsPage = React.lazy(() =>
+  import('../pages/public/TermsPage').then((m) => ({ default: m.TermsPage }))
+);
+const AccessibilityPage = React.lazy(() =>
+  import('../pages/public/AccessibilityPage').then((m) => ({ default: m.AccessibilityPage }))
+);
+
+// Authentication / account-access pages
+const LoginPage = React.lazy(() =>
+  import('../pages/auth/LoginPage').then((m) => ({ default: m.LoginPage }))
+);
+const ForgotPasswordPage = React.lazy(() =>
+  import('../pages/auth/ForgotPasswordPage').then((m) => ({ default: m.ForgotPasswordPage }))
+);
+const ResetPasswordPage = React.lazy(() =>
+  import('../pages/auth/ResetPasswordPage').then((m) => ({ default: m.ResetPasswordPage }))
+);
+const ActivateAccountPage = React.lazy(() =>
+  import('../pages/auth/ActivateAccountPage').then((m) => ({ default: m.ActivateAccountPage }))
+);
+const RequestAccessPage = React.lazy(() =>
+  import('../pages/auth/RequestAccessPage').then((m) => ({ default: m.RequestAccessPage }))
+);
+
 // ---------------------------------------------------------------------------
 // Canonical route table
 // ---------------------------------------------------------------------------
 
 export const ROUTES: RouteDef[] = [
+  // -------------------------------------------------------------------------
+  // Public website area. These pages are world-readable: `roles` carries the
+  // full set only because the registry contract requires a non-empty role
+  // list — it grants no application capability. `module: null` + `nav: false`
+  // keeps every public route out of the application sidebar.
+  // -------------------------------------------------------------------------
+  {
+    id: 'public.landing',
+    path: '/',
+    area: 'public',
+    module: null,
+    title: 'Home',
+    breadcrumb: 'Home',
+    description: 'BhoomiSetu — National Land Acquisition Intelligence & Decision-Support',
+    iconKey: 'dashboard',
+    roles: ALL_ROLES,
+    nav: false,
+    publicNav: true,
+    keepAlive: false,
+    element: LandingPage,
+  },
+  {
+    id: 'public.about',
+    path: '/about',
+    area: 'public',
+    module: null,
+    title: 'About',
+    breadcrumb: 'About',
+    description: 'What BhoomiSetu is and the problem it addresses',
+    iconKey: 'governance',
+    roles: ALL_ROLES,
+    nav: false,
+    publicNav: true,
+    keepAlive: false,
+    element: AboutPage,
+  },
+  {
+    id: 'public.features',
+    path: '/features',
+    area: 'public',
+    module: null,
+    title: 'Features',
+    breadcrumb: 'Features',
+    description: 'Platform capabilities by module',
+    iconKey: 'cases',
+    roles: ALL_ROLES,
+    nav: false,
+    publicNav: true,
+    keepAlive: false,
+    element: FeaturesPage,
+  },
+  {
+    id: 'public.howItWorks',
+    path: '/how-it-works',
+    area: 'public',
+    module: null,
+    title: 'How It Works',
+    breadcrumb: 'How It Works',
+    description: 'The land acquisition workflow, end to end',
+    iconKey: 'projects',
+    roles: ALL_ROLES,
+    nav: false,
+    publicNav: true,
+    keepAlive: false,
+    element: HowItWorksPage,
+  },
+  {
+    id: 'public.gisIntelligence',
+    path: '/gis-intelligence',
+    area: 'public',
+    module: null,
+    title: 'GIS Intelligence',
+    breadcrumb: 'GIS Intelligence',
+    description: 'Spatial intelligence and map-based workflows',
+    iconKey: 'gis',
+    roles: ALL_ROLES,
+    nav: false,
+    publicNav: true,
+    keepAlive: false,
+    element: GisIntelligencePage,
+  },
+  {
+    id: 'public.security',
+    path: '/security',
+    area: 'public',
+    module: null,
+    title: 'Security',
+    breadcrumb: 'Security',
+    description: 'How access, data and audit trails are protected',
+    iconKey: 'admin',
+    roles: ALL_ROLES,
+    nav: false,
+    publicNav: true,
+    keepAlive: false,
+    element: SecurityPage,
+  },
+  {
+    id: 'public.decisionSupport',
+    path: '/decision-support',
+    area: 'public',
+    module: null,
+    title: 'Decision Support',
+    breadcrumb: 'Decision Support',
+    description: 'How intelligence supports — never replaces — official decisions',
+    iconKey: 'intelligence',
+    roles: ALL_ROLES,
+    nav: false,
+    keepAlive: false,
+    element: DecisionSupportPage,
+  },
+  {
+    id: 'public.contact',
+    path: '/contact',
+    area: 'public',
+    module: null,
+    title: 'Contact',
+    breadcrumb: 'Contact',
+    description: 'Contact and support channels',
+    iconKey: 'notifications',
+    roles: ALL_ROLES,
+    nav: false,
+    keepAlive: false,
+    element: ContactPage,
+  },
+  {
+    id: 'public.privacy',
+    path: '/privacy',
+    area: 'public',
+    module: null,
+    title: 'Privacy Policy',
+    breadcrumb: 'Privacy',
+    description: 'How BhoomiSetu handles personal data',
+    iconKey: 'governance',
+    roles: ALL_ROLES,
+    nav: false,
+    keepAlive: false,
+    element: PrivacyPage,
+  },
+  {
+    id: 'public.terms',
+    path: '/terms',
+    area: 'public',
+    module: null,
+    title: 'Terms of Use',
+    breadcrumb: 'Terms',
+    description: 'Conditions for using BhoomiSetu',
+    iconKey: 'governance',
+    roles: ALL_ROLES,
+    nav: false,
+    keepAlive: false,
+    element: TermsPage,
+  },
+  {
+    id: 'public.accessibility',
+    path: '/accessibility',
+    area: 'public',
+    module: null,
+    title: 'Accessibility',
+    breadcrumb: 'Accessibility',
+    description: 'Accessibility statement for this website',
+    iconKey: 'dashboard',
+    roles: ALL_ROLES,
+    nav: false,
+    keepAlive: false,
+    element: AccessibilityPage,
+  },
+
+  // -------------------------------------------------------------------------
+  // Authentication / account-access area. No fabricated sessions: these
+  // surfaces render the real capability state (Supabase auth when configured,
+  // evaluation mode otherwise) and never fake success.
+  // -------------------------------------------------------------------------
+  {
+    id: 'auth.login',
+    path: '/login',
+    area: 'auth',
+    module: null,
+    title: 'Sign In',
+    breadcrumb: 'Sign In',
+    description: 'Sign in to the BhoomiSetu application',
+    iconKey: 'admin',
+    roles: ALL_ROLES,
+    nav: false,
+    keepAlive: false,
+    element: LoginPage,
+  },
+  {
+    id: 'auth.forgotPassword',
+    path: '/forgot-password',
+    area: 'auth',
+    module: null,
+    title: 'Forgot Password',
+    breadcrumb: 'Forgot Password',
+    description: 'Request a password reset',
+    iconKey: 'admin',
+    roles: ALL_ROLES,
+    nav: false,
+    keepAlive: false,
+    element: ForgotPasswordPage,
+  },
+  {
+    id: 'auth.resetPassword',
+    path: '/reset-password',
+    area: 'auth',
+    module: null,
+    title: 'Reset Password',
+    breadcrumb: 'Reset Password',
+    description: 'Set a new password using a reset token',
+    iconKey: 'admin',
+    roles: ALL_ROLES,
+    nav: false,
+    keepAlive: false,
+    element: ResetPasswordPage,
+  },
+  {
+    id: 'auth.activateAccount',
+    path: '/activate-account',
+    area: 'auth',
+    module: null,
+    title: 'Activate Account',
+    breadcrumb: 'Activate Account',
+    description: 'Activate a provisioned BhoomiSetu account',
+    iconKey: 'admin',
+    roles: ALL_ROLES,
+    nav: false,
+    keepAlive: false,
+    element: ActivateAccountPage,
+  },
+  {
+    id: 'auth.requestAccess',
+    path: '/request-access',
+    area: 'auth',
+    module: null,
+    title: 'Request Access',
+    breadcrumb: 'Request Access',
+    description: 'Request a BhoomiSetu account for your department',
+    iconKey: 'admin',
+    roles: ALL_ROLES,
+    nav: false,
+    keepAlive: false,
+    element: RequestAccessPage,
+  },
+
+  // -------------------------------------------------------------------------
+  // Authenticated application area (unchanged operational surfaces)
+  // -------------------------------------------------------------------------
   {
     id: 'module.dashboard',
     path: '/dashboard',
@@ -194,6 +515,7 @@ export const ROUTES: RouteDef[] = [
     iconKey: 'cases',
     roles: ALL_ROLES,
     nav: false,
+    workspace: { entityType: 'case', param: 'caseId', label: 'Case' },
     keepAlive: true,
     element: CaseDetailPage,
   },
@@ -208,6 +530,20 @@ export const ROUTES: RouteDef[] = [
     iconKey: 'projects',
     roles: ALL_ROLES_EXCEPT_REVENUE_INSPECTOR,
     nav: true,
+    keepAlive: false,
+    element: ProjectsPage,
+  },
+  {
+    id: 'project.detail',
+    path: '/projects/:projectId/:view?',
+    module: 'projects',
+    title: 'Project Workspace',
+    breadcrumb: 'Project Workspace',
+    description: 'Project-specific cases, geography, timeline and outcomes',
+    iconKey: 'projects',
+    roles: ALL_ROLES_EXCEPT_REVENUE_INSPECTOR,
+    nav: false,
+    workspace: { entityType: 'project', param: 'projectId', label: 'Project' },
     keepAlive: false,
     element: ProjectsPage,
   },
@@ -323,8 +659,11 @@ export const ROUTES: RouteDef[] = [
 
 /** Paths that immediately resolve to another path. */
 export const ROUTE_REDIRECTS: Record<string, string> = {
-  '': '/dashboard',
-  '/': '/dashboard',
+  // The empty entry path resolves to the public landing page (front door).
+  '': '/',
+  // Spec'd aliases for the authentication surfaces.
+  '/sign-in': '/login',
+  '/account-activation': '/activate-account',
 };
 
 /** Returns the canonical target for a redirect path, or `null` when none applies. */
@@ -352,9 +691,38 @@ export function getRouteById(id: string): RouteDef {
   return route;
 }
 
+/**
+ * Concrete navigation path for a route pattern: strips parameter segments
+ * (e.g. `/intelligence/:view?` -> `/intelligence`) so sidebar hrefs never
+ * contain raw pattern syntax.
+ */
+export function navPathForPattern(pattern: string): string {
+  const paramIdx = pattern.indexOf('/:');
+  const base = paramIdx >= 0 ? pattern.slice(0, paramIdx) : pattern.replace(/\/\*$/, '');
+  return base || '/';
+}
+
 /** Sidebar destinations available to a role, in registry order. */
 export function navRoutesForRole(role: UserRole): RouteDef[] {
-  return ROUTES.filter((route) => route.nav && route.roles.includes(role));
+  return ROUTES.filter((route) => route.nav && route.roles.includes(role)).map((route) => ({
+    ...route,
+    path: navPathForPattern(route.path),
+  }));
+}
+
+/** Header destinations for the public website, in registry order. */
+export function publicNavRoutes(): RouteDef[] {
+  return ROUTES.filter((route) => route.area === 'public' && route.publicNav === true).map(
+    (route) => ({
+      ...route,
+      path: navPathForPattern(route.path),
+    })
+  );
+}
+
+/** Experience area a route belongs to; routes without an explicit area are application routes. */
+export function routeArea(route: RouteDef): RouteArea {
+  return route.area ?? 'app';
 }
 
 /**

@@ -62,7 +62,14 @@ export const WorkflowConfigPage: React.FC = () => {
 
       {/* Workflows List */}
       <div className="space-y-6">
-        {workflows.map((wf) => (
+        {workflows.length === 0 ? (
+          <EmptyState
+            icon={<GitBranch className="h-7 w-7 text-slate-400" />}
+            title="No Configured Workflows"
+            description="No statutory workflow templates have been registered yet. Configure a workflow to define statutory stages, SLA durations, and prerequisites before initiating acquisition cases."
+          />
+        ) : (
+        workflows.map((wf) => (
           <Card key={wf.id} className="border-slate-200">
             <CardHeader
               title={
@@ -74,7 +81,10 @@ export const WorkflowConfigPage: React.FC = () => {
                   </span>
                 </div>
               }
-              subtitle={wf.description || `Legal Framework: ${wf.legal_framework || 'Statutory'}`}
+              subtitle={
+                wf.description ||
+                (wf.legal_framework ? `Legal Framework: ${wf.legal_framework}` : 'No description recorded.')
+              }
             />
             <CardContent>
               <div className="space-y-3">
@@ -106,7 +116,7 @@ export const WorkflowConfigPage: React.FC = () => {
                           <span>{stage.default_duration_days} Days SLA</span>
                         </div>
                         <div className="capitalize text-slate-500">
-                          Role: <strong>{stage.required_role || 'LAO'}</strong>
+                          Role: <strong>{stage.required_role || '—'}</strong>
                         </div>
                       </div>
                     </div>
@@ -115,7 +125,8 @@ export const WorkflowConfigPage: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-        ))}
+        ))
+        )}
       </div>
     </div>
   );

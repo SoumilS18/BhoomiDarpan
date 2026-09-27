@@ -1,4 +1,5 @@
-import { describe, expect, it, beforeEach } from 'bun:test';
+import { describe, expect, it, beforeEach, beforeAll, afterAll } from 'bun:test';
+import { startLiveApi, LiveApi } from './helpers/liveApi';
 import '../server/index';
 import {
   calculateHaversineDistance,
@@ -32,7 +33,17 @@ import {
 } from '../shared/types';
 import { AuthenticatedUser } from '../server/middleware/auth.middleware';
 
-const SERVER_URL = 'http://127.0.0.1:3001';
+let liveApi: LiveApi | null = null;
+let SERVER_URL = '';
+
+beforeAll(async () => {
+  liveApi = await startLiveApi();
+  SERVER_URL = liveApi.url;
+}, 30000);
+
+afterAll(async () => {
+  await liveApi?.close();
+});
 
 describe('Day 6: GIS & Spatial Intelligence Layer Test Suite', () => {
   beforeEach(() => {

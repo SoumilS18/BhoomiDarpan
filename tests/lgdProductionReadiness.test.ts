@@ -27,6 +27,7 @@ import {
   executeLgdQuery,
   CANONICAL_LGD_RESOURCES,
 } from '../server/config/lgdConfig';
+import { getActiveGeographySource } from '../server/config/geographySourceRegistry';
 import {
   getAuthorizedScopeFilter,
   applyScopeFilter,
@@ -365,6 +366,7 @@ describe('LGD Controlled Full-Scale Ingestion & Production-Readiness Suite', () 
         tier: 'states',
         maxRecordsPerTier: 2,
         actor: 'Primary Officer',
+        recordsOverride: MOCK_LGD_FULL_DATA.states,
       });
 
       // Attempt immediate second concurrent sync
@@ -374,6 +376,7 @@ describe('LGD Controlled Full-Scale Ingestion & Production-Readiness Suite', () 
           tier: 'states',
           maxRecordsPerTier: 2,
           actor: 'Secondary Officer',
+          recordsOverride: MOCK_LGD_FULL_DATA.states,
         });
       } catch (err: any) {
         secondRejected = true;
@@ -507,7 +510,9 @@ describe('LGD Controlled Full-Scale Ingestion & Production-Readiness Suite', () 
       expect(enrichment.district?.name).toBe('Pune');
       expect(enrichment.sub_district?.name).toBe('Haveli');
       expect(enrichment.village?.name).toBe('Hadapsar');
-      expect(enrichment.provenance.source).toBe('lgd_india');
+      // Provenance must reflect the source the rows were actually ingested
+      // from (the configured active source), never a hardcoded source id.
+      expect(enrichment.provenance.source).toBe(getActiveGeographySource().id);
     });
 
     it('preserves honest geometry state: administrative identity available but boundary unavailable', async () => {
@@ -659,7 +664,9 @@ describe('LGD Controlled Full-Scale Ingestion & Production-Readiness Suite', () 
 
       const maharashtra = await getAdministrativeUnitByCode('27', 'state');
       expect(maharashtra).not.toBeNull();
-      expect(maharashtra?.source_id).toBe('lgd_india');
+      // Rows are stamped with whatever source is active in this environment —
+      // asserting a constant here would hide a provenance-stamping bug.
+      expect(maharashtra?.source_id).toBe(getActiveGeographySource().id);
       expect(maharashtra?.source_resource_id).toBe(CANONICAL_LGD_RESOURCES.states.resourceId);
       expect(maharashtra?.last_synced_at).toBeDefined();
     });

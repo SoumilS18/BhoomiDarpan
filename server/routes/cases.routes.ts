@@ -21,7 +21,10 @@ export function getDisputesForCaseSync(caseId: string): CaseDispute[] {
 const router = Router();
 
 // GET /api/cases - List cases with dynamic calculated metrics and filtering
-router.get('/', async (req: Request, res: Response) => {
+// Case records are operational data: they carry jurisdiction, LGD codes,
+// landowner names and stage history. Reading them requires a session — the
+// list endpoint used to answer anonymous callers.
+router.get('/', requireAuth, async (req: Request, res: Response) => {
   try {
     if (!isSupabaseConfigured) {
       return res.status(503).json({
@@ -33,9 +36,12 @@ router.get('/', async (req: Request, res: Response) => {
     const {
       state,
       district,
+      subdistrict,
+      village,
       status,
       priority,
       search,
+      project_id,
       state_lgd_code,
       district_lgd_code,
       subdistrict_lgd_code,
@@ -58,6 +64,9 @@ router.get('/', async (req: Request, res: Response) => {
 
     if (state) query = query.eq('state', String(state));
     if (district) query = query.eq('district', String(district));
+    if (subdistrict) query = query.ilike('tehsil', String(subdistrict));
+    if (village) query = query.ilike('village', String(village));
+    if (project_id) query = query.eq('project_id', String(project_id));
     if (state_lgd_code) query = query.eq('state_lgd_code', String(state_lgd_code));
     if (district_lgd_code) query = query.eq('district_lgd_code', String(district_lgd_code));
     if (subdistrict_lgd_code) query = query.eq('subdistrict_lgd_code', String(subdistrict_lgd_code));
@@ -97,14 +106,23 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // GET /api/cases/:id - Retrieve complete case details
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', requireAuth, async (req: Request, res: Response) => {
   try {
     if (!isSupabaseConfigured) {
       return res.status(503).json({ error: 'Supabase not configured' });
     }
 
     const supabase = getSupabase();
-    const { id } = req.params;
+    // Express types allow a repeated path segment, so normalise to a string
+    // before it is used as a uuid candidate.
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : String(req.params.id ?? '');
+
+    // `acquisition_cases.id` is a uuid column. Reject anything that is not one
+    // before it reaches the database, so a crafted id cannot surface a driver
+    // error (and the schema detail it carries) to the client.
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+      return res.status(404).json({ error: 'Case not found' });
+    }
 
     const { data: caseItem, error } = await supabase
       .from('acquisition_cases')
@@ -127,7 +145,9 @@ router.get('/:id', async (req: Request, res: Response) => {
       .single();
 
     if (error || !caseItem) {
-      return res.status(404).json({ error: error?.message || 'Case not found' });
+      // Do not echo the driver's message: for a bad id it names the column
+      // type, and for a missing row it is PostgREST's internals.
+      return res.status(404).json({ error: 'Case not found' });
     }
 
     // Fetch audit events sorted chronologically descending
@@ -372,7 +392,7 @@ router.patch('/:id/stages/:stageId', requireAuth, requireRole(['admin', 'project
 });
 
 // GET /api/cases/:id/timeline - Return calculated timeline coordinates for Gantt
-router.get('/:id/timeline', async (req: Request, res: Response) => {
+router.get('/:id/timeline', requireAuth, async (req: Request, res: Response) => {
   try {
     if (!isSupabaseConfigured) {
       return res.status(503).json({ error: 'Supabase not configured' });
@@ -399,7 +419,7 @@ router.get('/:id/timeline', async (req: Request, res: Response) => {
 });
 
 // GET /api/cases/:id/external-context - Retrieve live multi-source external context for a case
-router.get('/:id/external-context', async (req: Request, res: Response) => {
+router.get('/:id/external-context', requireAuth, async (req: Request, res: Response) => {
   try {
     const id = typeof req.params.id === 'string' ? req.params.id : req.params.id[0];
     const bypassCache = req.query.refresh === 'true';

@@ -9,18 +9,15 @@ import {
   Building2,
   CheckCircle2,
   RefreshCw,
-  ExternalLink,
   Info,
   Sliders,
-  Maximize2,
   Eye,
   EyeOff,
-  ShieldAlert,
-  ChevronRight,
-  CloudSun,
   X,
   FileCheck,
 } from 'lucide-react';
+import { clsx } from 'clsx';
+import { GeographySourceNote } from '../components/common/GeographySourceNote';
 import {
   fetchGISOverview,
   fetchGISCases,
@@ -30,14 +27,21 @@ import {
   fetchGISNearby,
   fetchIntegrationPolicy,
   resolveBhuvanLayers,
+  fetchStates,
+  fetchDistricts,
+  fetchSubDistricts,
+  fetchVillages,
+  forwardGeocode,
+  getGeographySource,
+  subscribeGeographySource,
+  GeographySource,
 } from '../lib/api';
 import {
   GISOverview,
   CaseSpatialContext,
   SpatialCluster,
-  SpatialLayerInfo,
-  NearbySpatialEntity,
   IntegrationPolicy,
+  AdministrativeUnit,
 } from '../../shared/types';
 import {
   createBasemapTileLayer,
@@ -45,10 +49,12 @@ import {
   getMapTilerClientKey,
   BasemapConfig,
 } from '../lib/mapProvider';
-import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
 import { Button } from '../components/common/Button';
-import { PARCEL_STATUS_COLORS, getBoundsFromGeoJSON } from '../../shared/utils/geojson';
+import { PageHeader, PageEyebrow } from '../components/common/PageHeader';
+import { SectionHeading } from '../components/common/SectionHeading';
+import { StatCard } from '../components/common/StatCard';
+import { PARCEL_STATUS_COLORS } from '../../shared/utils/geojson';
 
 interface GISSpatialIntelligencePageProps {
   onSelectCase: (caseId: string) => void;
@@ -64,6 +70,49 @@ export type TileBaseMap =
   | 'maptiler_dataviz_dark'
   | 'positron'
   | 'dark';
+
+/**
+ * Accessible layer toggle list item: icon + label + subtle visibility
+ * indicator. Remains a native keyboard-operable button with aria-pressed.
+ */
+const LayerToggleRow: React.FC<{
+  icon: React.ReactNode;
+  label: React.ReactNode;
+  checked: boolean;
+  onToggle: () => void;
+  title?: string;
+  dotClassName: string;
+  trailing?: React.ReactNode;
+}> = ({ icon, label, checked, onToggle, title, dotClassName, trailing }) => (
+  <button
+    type="button"
+    onClick={onToggle}
+    aria-pressed={checked}
+    title={title}
+    className={clsx(
+      'flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left text-xs transition-colors',
+      checked
+        ? 'border-blue-200 bg-gov-blue-soft font-semibold text-gov-slate'
+        : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-gov-slate'
+    )}
+  >
+    <span className={clsx('h-2 w-2 shrink-0 rounded-full', dotClassName)} />
+    <span className="shrink-0 text-slate-400">{icon}</span>
+    <span className="truncate">{label}</span>
+    {trailing}
+    <span
+      aria-hidden="true"
+      className={clsx(
+        'ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors',
+        checked
+          ? 'border-blue-200 bg-white text-gov-navy'
+          : 'border-slate-200 bg-slate-50 text-slate-300'
+      )}
+    >
+      {checked ? <Eye className="h-3 w-3" /> : <EyeOff className="h-3 w-3" />}
+    </span>
+  </button>
+);
 
 export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProps> = ({
   onSelectCase,
@@ -89,6 +138,8 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
   // Filters
   const [stateFilter, setStateFilter] = useState<string>('all');
   const [districtFilter, setDistrictFilter] = useState<string>('all');
+  const [subDistrictFilter, setSubDistrictFilter] = useState<string>('all');
+  const [villageFilter, setVillageFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [riskFilter, setRiskFilter] = useState<string>('all');
   const [mappingFilter, setMappingFilter] = useState<string>('all');
@@ -113,23 +164,151 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
   const [fallbackInfo, setFallbackInfo] = useState<BasemapConfig | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
-  // Derived filter options from real data
-  const availableStates = Array.from(
+  // Authoritative LGD administrative units (cascading), merged with feature-derived
+  // values so filters reflect real geography even before cases are loaded.
+  const [adminStates, setAdminStates] = useState<AdministrativeUnit[]>([]);
+  const [adminDistricts, setAdminDistricts] = useState<AdministrativeUnit[]>([]);
+  const [adminSubDistricts, setAdminSubDistricts] = useState<AdministrativeUnit[]>([]);
+  const [adminVillages, setAdminVillages] = useState<AdministrativeUnit[]>([]);
+  const [geoSource, setGeoSource] = useState<GeographySource>(getGeographySource());
+
+  useEffect(() => subscribeGeographySource(setGeoSource), []);
+
+  useEffect(() => {
+    let mounted = true;
+    fetchStates()
+      .then((res) => {
+        if (mounted) setAdminStates(res.states || []);
+      })
+      .catch(() => {
+        if (mounted) setAdminStates([]);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (stateFilter === 'all') {
+      setAdminDistricts([]);
+      setAdminSubDistricts([]);
+      setAdminVillages([]);
+      return;
+    }
+    const matchingState = adminStates.find(
+      (s) => s.name.toLowerCase() === stateFilter.toLowerCase() || s.code === stateFilter
+    );
+    const codeToFetch = matchingState?.code || stateFilter;
+    let mounted = true;
+    fetchDistricts(codeToFetch)
+      .then((res) => {
+        if (mounted) setAdminDistricts(res.districts || []);
+      })
+      .catch(() => {
+        if (mounted) setAdminDistricts([]);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [stateFilter, adminStates]);
+
+  useEffect(() => {
+    if (districtFilter === 'all') {
+      setAdminSubDistricts([]);
+      setAdminVillages([]);
+      return;
+    }
+    const matchingDist = adminDistricts.find(
+      (d) => d.name.toLowerCase() === districtFilter.toLowerCase() || d.code === districtFilter
+    );
+    const codeToFetch = matchingDist?.code || districtFilter;
+    let mounted = true;
+    fetchSubDistricts(codeToFetch)
+      .then((res) => {
+        if (mounted) setAdminSubDistricts(res.subdistricts || []);
+      })
+      .catch(() => {
+        if (mounted) setAdminSubDistricts([]);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [districtFilter, adminDistricts]);
+
+  useEffect(() => {
+    if (subDistrictFilter === 'all') {
+      setAdminVillages([]);
+      return;
+    }
+    const matchingSub = adminSubDistricts.find(
+      (sd) => sd.name.toLowerCase() === subDistrictFilter.toLowerCase() || sd.code === subDistrictFilter
+    );
+    const codeToFetch = matchingSub?.code || subDistrictFilter;
+    let mounted = true;
+    fetchVillages(codeToFetch, { limit: 200 })
+      .then((res) => {
+        if (mounted) setAdminVillages(res.villages || []);
+      })
+      .catch(() => {
+        if (mounted) setAdminVillages([]);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [subDistrictFilter, adminSubDistricts]);
+
+  // Derived filter options: union of real case-feature geography and the
+  // authoritative LGD hierarchy (so options never depend on hardcoded lists).
+  const featureStates = Array.from(
     new Set(
       (casesData?.features || [])
         .map((f: any) => f.properties.state)
         .filter(Boolean)
     )
-  ).sort() as string[];
+  ) as string[];
+
+  const availableStates = Array.from(
+    new Set([...featureStates, ...adminStates.map((s) => s.name)])
+  ).sort();
 
   const availableDistricts = Array.from(
-    new Set(
-      (casesData?.features || [])
+    new Set([
+      ...((casesData?.features || [])
         .filter((f: any) => stateFilter === 'all' || f.properties.state?.toLowerCase() === stateFilter.toLowerCase())
         .map((f: any) => f.properties.district)
-        .filter(Boolean)
-    )
-  ).sort() as string[];
+        .filter(Boolean) as string[]),
+      ...adminDistricts.map((d) => d.name),
+    ])
+  ).sort();
+
+  const availableSubDistricts = Array.from(
+    new Set([
+      ...((casesData?.features || [])
+        .filter((f: any) => {
+          const matchState = stateFilter === 'all' || f.properties.state?.toLowerCase() === stateFilter.toLowerCase();
+          const matchDist = districtFilter === 'all' || f.properties.district?.toLowerCase() === districtFilter.toLowerCase();
+          return matchState && matchDist;
+        })
+        .map((f: any) => f.properties.tehsil)
+        .filter(Boolean) as string[]),
+      ...adminSubDistricts.map((sd) => sd.name),
+    ])
+  ).sort();
+
+  const availableVillages = Array.from(
+    new Set([
+      ...((casesData?.features || [])
+        .filter((f: any) => {
+          const matchState = stateFilter === 'all' || f.properties.state?.toLowerCase() === stateFilter.toLowerCase();
+          const matchDist = districtFilter === 'all' || f.properties.district?.toLowerCase() === districtFilter.toLowerCase();
+          const matchSub = subDistrictFilter === 'all' || f.properties.tehsil?.toLowerCase() === subDistrictFilter.toLowerCase();
+          return matchState && matchDist && matchSub;
+        })
+        .map((f: any) => f.properties.village)
+        .filter(Boolean) as string[]),
+      ...adminVillages.map((v) => v.name),
+    ])
+  ).sort();
 
   // 1. Initial Data Load
   const loadData = async () => {
@@ -141,9 +320,12 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
         fetchGISCases({
           state: stateFilter !== 'all' ? stateFilter : undefined,
           district: districtFilter !== 'all' ? districtFilter : undefined,
+          subdistrict: subDistrictFilter !== 'all' ? subDistrictFilter : undefined,
+          village: villageFilter !== 'all' ? villageFilter : undefined,
           status: statusFilter !== 'all' ? statusFilter : undefined,
           risk_level: riskFilter !== 'all' ? riskFilter : undefined,
-          has_geometry: mappingFilter === 'mapped' ? 'true' : undefined,
+          has_geometry:
+            mappingFilter === 'mapped' ? 'true' : mappingFilter === 'unmapped' ? 'false' : undefined,
         }),
         fetchGISProjects(),
         fetchIntegrationPolicy().catch(() => ({ policy: null as any })),
@@ -164,7 +346,7 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
 
   useEffect(() => {
     loadData();
-  }, [stateFilter, districtFilter, statusFilter, riskFilter, mappingFilter]);
+  }, [stateFilter, districtFilter, subDistrictFilter, villageFilter, statusFilter, riskFilter, mappingFilter]);
 
   // 2. Initialize Leaflet Map
   useEffect(() => {
@@ -365,6 +547,63 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
     }
   }, [casesData, projectsData, overview, showCases, showProjects, showClusters, selectedCaseId]);
 
+  // 4b. Location-Aware Spatial Map Navigation on Geography Filter Change
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || selectedCaseId) return;
+
+    // Check if any specific geographic filter is active
+    if (stateFilter === 'all' && districtFilter === 'all' && subDistrictFilter === 'all' && villageFilter === 'all') {
+      return;
+    }
+
+    const queryParts: string[] = [];
+    let unitType: 'state' | 'district' | 'sub_district' | 'village' = 'state';
+
+    if (villageFilter && villageFilter !== 'all') {
+      queryParts.push(villageFilter);
+      unitType = 'village';
+    }
+    if (subDistrictFilter && subDistrictFilter !== 'all') {
+      queryParts.push(subDistrictFilter);
+      if (!villageFilter || villageFilter === 'all') unitType = 'sub_district';
+    }
+    if (districtFilter && districtFilter !== 'all') {
+      queryParts.push(districtFilter);
+      if ((!villageFilter || villageFilter === 'all') && (!subDistrictFilter || subDistrictFilter === 'all')) {
+        unitType = 'district';
+      }
+    }
+    if (stateFilter && stateFilter !== 'all') {
+      queryParts.push(stateFilter);
+    }
+
+    if (queryParts.length === 0) return;
+
+    const query = [...queryParts, 'India'].join(', ');
+    const zoomLevelMap = { state: 6, district: 9, sub_district: 11, village: 14 };
+
+    forwardGeocode(query, 1)
+      .then((res) => {
+        if (!mapInstanceRef.current) return;
+        if (res.results && res.results.length > 0) {
+          const item = res.results[0];
+          if (item.boundingbox && item.boundingbox.length === 4) {
+            const [south, north, west, east] = item.boundingbox;
+            const bounds = L.latLngBounds([south, west], [north, east]);
+            if (bounds.isValid()) {
+              mapInstanceRef.current.fitBounds(bounds, { padding: [30, 30], maxZoom: 14 });
+              return;
+            }
+          }
+          if (item.latitude && item.longitude) {
+            mapInstanceRef.current.setView([item.latitude, item.longitude], zoomLevelMap[unitType]);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [stateFilter, districtFilter, subDistrictFilter, villageFilter, selectedCaseId]);
+
   // 5. Load Case Spatial Context & Parcels when selectedCaseId changes
   useEffect(() => {
     if (!selectedCaseId) {
@@ -500,132 +739,134 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
   }, [showBhuvanLulc, showBhuvanDisaster, stateFilter, selectedCaseId, casesData]);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5.5rem)] space-y-4">
-      {/* 1. Header & Quick Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm shrink-0">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold text-gov-slate tracking-tight">
-              GIS & Spatial Decision Intelligence
-            </h1>
-            <Badge variant="navy" size="sm">
-              Day 6 Architecture
-            </Badge>
+    <div className="space-y-6">
+      {/* 1. Page Header & Quick Controls */}
+      <PageHeader
+        eyebrow={
+          <>
+            <PageEyebrow>
+              <Compass className="h-3 w-3" />
+              Spatial Intelligence
+            </PageEyebrow>
             {overview?.lgd_status === 'administrative_enrichment_unavailable' && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+              <span className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700">
                 <AlertTriangle className="h-3 w-3" />
                 LGD Enrichment Unavailable
               </span>
             )}
-          </div>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Real-time geodetic corridor mapping, infrastructure alignment, proximity friction clusters & cadastral verification.
-          </p>
-        </div>
-
-        {/* Base Map & Quick Toggles */}
-        <div className="flex items-center gap-2">
-          {/* Base Map Switcher */}
-          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200 text-xs">
-            <button
-              onClick={() => setBaseMap('positron')}
-              className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                baseMap === 'positron' ? 'bg-white text-gov-navy shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Positron
-            </button>
-            <button
-              onClick={() => setBaseMap('dark')}
-              className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                baseMap === 'dark' ? 'bg-gov-slate text-white shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Dark
-            </button>
-            <button
-              onClick={() => setBaseMap('osm')}
-              className={`px-2.5 py-1 rounded-md font-medium transition-all ${
-                baseMap === 'osm' ? 'bg-white text-emerald-800 shadow-sm font-bold' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              OSM
-            </button>
-          </div>
-
-          <Button variant="outline" size="sm" onClick={loadData} disabled={isLoading}>
-            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
+          </>
+        }
+        title="GIS & Spatial Decision Intelligence"
+        subtitle="Real-time geodetic corridor mapping, infrastructure alignment, proximity friction clusters & cadastral verification."
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadData}
+            disabled={isLoading}
+            leftIcon={<RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />}
+          >
             Refresh
           </Button>
-        </div>
-      </div>
+        }
+      />
 
-      {/* 2. KPI Metrics Ribbon */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 shrink-0">
-        <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Cases</div>
-          <div className="text-lg font-bold text-gov-slate mt-0.5">{overview?.total_cases || 0}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">National portfolio</div>
+      {/* Data load error (non-blocking) */}
+      {error && (
+        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
         </div>
+      )}
 
-        <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Mapped Corridors</div>
-          <div className="text-lg font-bold text-blue-600 mt-0.5">
-            {overview?.mapped_cases || 0}{' '}
-            <span className="text-xs font-normal text-slate-500">
-              ({overview?.total_cases ? Math.round((overview.mapped_cases / overview.total_cases) * 100) : 0}%)
-            </span>
-          </div>
-          <div className="text-[10px] text-emerald-600 mt-0.5">WGS-84 demarcated</div>
-        </div>
-
-        <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Awaiting GIS Survey</div>
-          <div className="text-lg font-bold text-amber-600 mt-0.5">{overview?.unmapped_cases || 0}</div>
-          <div className="text-[10px] text-amber-600 mt-0.5">Coordinates unmapped</div>
-        </div>
-
-        <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Infrastructure Projects</div>
-          <div className="text-lg font-bold text-indigo-600 mt-0.5">
-            {overview?.projects_with_geometry || 0} / {overview?.total_projects || 0}
-          </div>
-          <div className="text-[10px] text-indigo-600 mt-0.5">Corridors mapped</div>
-        </div>
-
-        <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Proximity Clusters</div>
-          <div className="text-lg font-bold text-purple-600 mt-0.5">{overview?.spatial_clusters_count || 0}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">Density grouping</div>
-        </div>
-
-        <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-          <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Administrative LGD</div>
-          <div className="text-sm font-bold text-gov-slate mt-1.5 flex items-center gap-1.5">
-            {overview?.lgd_status === 'operational' ? (
+      {/* 2. Spatial KPI Metrics */}
+      <section>
+        <SectionHeading title="Spatial Portfolio Metrics" hint="Real-time statutory telemetry" />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+          <StatCard
+            label="Total Cases"
+            value={overview?.total_cases || 0}
+            hint="National portfolio"
+            icon={<FolderKanban className="h-4 w-4" />}
+            tone="navy"
+          />
+          <StatCard
+            label="Mapped Corridors"
+            value={
               <>
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                <span className="text-emerald-700 text-xs">Operational</span>
+                {overview?.mapped_cases || 0}{' '}
+                <span className="text-sm font-normal text-slate-400">
+                  (
+                  {overview?.total_cases
+                    ? Math.round((overview.mapped_cases / overview.total_cases) * 100)
+                    : 0}
+                  %)
+                </span>
               </>
-            ) : (
-              <>
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                <span className="text-amber-700 text-xs font-semibold">Unavailable</span>
-              </>
-            )}
-          </div>
-          <div className="text-[10px] text-slate-400 mt-0.5">National master</div>
+            }
+            hint="WGS-84 demarcated"
+            icon={<MapPin className="h-4 w-4" />}
+            tone="emerald"
+          />
+          <StatCard
+            label="Awaiting GIS Survey"
+            value={overview?.unmapped_cases || 0}
+            hint="Coordinates unmapped"
+            icon={<AlertTriangle className="h-4 w-4" />}
+            tone="amber"
+          />
+          <StatCard
+            label="Infrastructure Projects"
+            value={`${overview?.projects_with_geometry || 0} / ${overview?.total_projects || 0}`}
+            hint="Corridors mapped"
+            icon={<Building2 className="h-4 w-4" />}
+            tone="slate"
+          />
+          <StatCard
+            label="Proximity Clusters"
+            value={overview?.spatial_clusters_count || 0}
+            hint="Density grouping"
+            icon={<Compass className="h-4 w-4" />}
+            tone="orange"
+          />
+          <StatCard
+            label="Administrative LGD"
+            value={
+              geoSource === 'authoritative' && overview?.lgd_status === 'operational'
+                ? 'Operational'
+                : 'Unavailable'
+            }
+            hint={
+              geoSource === 'authoritative'
+                ? 'National master'
+                : 'Authoritative LGD source not ingested'
+            }
+            icon={
+              geoSource === 'authoritative' && overview?.lgd_status === 'operational' ? (
+                <CheckCircle2 className="h-4 w-4" />
+              ) : (
+                <AlertTriangle className="h-4 w-4" />
+              )
+            }
+            tone={
+              geoSource === 'authoritative' && overview?.lgd_status === 'operational'
+                ? 'emerald'
+                : 'amber'
+            }
+          />
         </div>
-      </div>
+      </section>
 
-      {/* 3. Multi-Dimensional Filter Bar & Layer Ribbon */}
-      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3 shrink-0">
+      {/* 3. Multi-Dimensional Filter Bar */}
+      <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-gov">
         {/* Geographic & Workflow Filters */}
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <div className="flex items-center gap-1.5 font-semibold text-slate-600 mr-1">
-            <Sliders className="h-3.5 w-3.5 text-blue-600" />
-            Filters:
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="mr-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <Sliders className="h-3.5 w-3.5 text-gov-navy" />
+            Geographic Scope
           </div>
+
+          <GeographySourceNote variant="badge" />
 
           {/* State Filter */}
           <select
@@ -633,8 +874,10 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
             onChange={(e) => {
               setStateFilter(e.target.value);
               setDistrictFilter('all');
+              setSubDistrictFilter('all');
+              setVillageFilter('all');
             }}
-            className="border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50 text-gov-slate focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="input input-xs w-auto"
           >
             <option value="all">All States</option>
             {availableStates.map((s) => (
@@ -647,9 +890,13 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
           {/* District Filter */}
           <select
             value={districtFilter}
-            onChange={(e) => setDistrictFilter(e.target.value)}
-            disabled={availableDistricts.length === 0}
-            className="border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50 text-gov-slate focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+            onChange={(e) => {
+              setDistrictFilter(e.target.value);
+              setSubDistrictFilter('all');
+              setVillageFilter('all');
+            }}
+            disabled={stateFilter !== 'all' && availableDistricts.length === 0}
+            className="input input-xs w-auto disabled:cursor-not-allowed"
           >
             <option value="all">All Districts</option>
             {availableDistricts.map((d) => (
@@ -659,14 +906,55 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
             ))}
           </select>
 
+          {/* Sub-District / Tehsil Filter */}
+          <select
+            value={subDistrictFilter}
+            onChange={(e) => {
+              setSubDistrictFilter(e.target.value);
+              setVillageFilter('all');
+            }}
+            disabled={availableSubDistricts.length === 0}
+            className="input input-xs w-auto disabled:cursor-not-allowed"
+          >
+            <option value="all">All Tehsils</option>
+            {availableSubDistricts.map((sd) => (
+              <option key={sd} value={sd}>
+                {sd}
+              </option>
+            ))}
+          </select>
+
+          {/* Village Filter */}
+          <select
+            value={villageFilter}
+            onChange={(e) => setVillageFilter(e.target.value)}
+            disabled={availableVillages.length === 0}
+            className="input input-xs w-auto disabled:cursor-not-allowed"
+          >
+            <option value="all">All Villages</option>
+            {availableVillages.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+          <span className="mr-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            Workflow
+          </span>
+
           {/* Status Filter */}
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50 text-gov-slate focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="input input-xs w-auto"
           >
             <option value="all">All Case Statuses</option>
+            <option value="draft">Draft</option>
             <option value="active">Active</option>
+            <option value="under_review">Under Review</option>
             <option value="delayed">Delayed</option>
             <option value="litigation">Litigation</option>
             <option value="completed">Completed</option>
@@ -676,7 +964,7 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
           <select
             value={riskFilter}
             onChange={(e) => setRiskFilter(e.target.value)}
-            className="border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50 text-gov-slate focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="input input-xs w-auto"
           >
             <option value="all">All Risk Bands</option>
             <option value="critical">Critical Risk</option>
@@ -689,7 +977,7 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
           <select
             value={mappingFilter}
             onChange={(e) => setMappingFilter(e.target.value)}
-            className="border border-slate-200 rounded-lg px-2.5 py-1.5 bg-slate-50 text-gov-slate focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="input input-xs w-auto"
           >
             <option value="all">All Mapping States</option>
             <option value="mapped">Mapped Only</option>
@@ -698,469 +986,588 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
 
           {(stateFilter !== 'all' ||
             districtFilter !== 'all' ||
+            subDistrictFilter !== 'all' ||
+            villageFilter !== 'all' ||
             statusFilter !== 'all' ||
             riskFilter !== 'all' ||
             mappingFilter !== 'all') && (
             <button
+              type="button"
               onClick={() => {
                 setStateFilter('all');
                 setDistrictFilter('all');
+                setSubDistrictFilter('all');
+                setVillageFilter('all');
                 setStatusFilter('all');
                 setRiskFilter('all');
                 setMappingFilter('all');
               }}
-              className="text-xs text-blue-600 hover:text-blue-800 underline ml-1"
+              className="ml-auto text-xs font-semibold text-gov-navy underline-offset-2 hover:underline"
             >
-              Reset
+              Reset Filters
             </button>
           )}
         </div>
+      </section>
 
-        {/* Layer Toggles */}
-        <div className="flex items-center gap-1.5 text-xs font-medium">
-          <div className="flex items-center gap-1 text-slate-500 mr-1">
-            <Layers className="h-3.5 w-3.5" />
-            Layers:
-          </div>
+      {/* 4. Map Viewport, Layers Panel & Context Inspector */}
+      <section>
+        <div className="flex flex-col gap-4 lg:flex-row">
+          {/* Leaflet Map Workspace */}
+          <div className="relative min-h-[560px] flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-gov">
+            <div ref={mapContainerRef} className="z-0 h-full w-full" />
 
-          <button
-            onClick={() => setShowCases(!showCases)}
-            className={`px-2 py-1 rounded-md border text-[11px] flex items-center gap-1 transition-all ${
-              showCases ? 'bg-blue-50 text-blue-800 border-blue-200 font-semibold' : 'bg-slate-50 text-slate-500 border-slate-200'
-            }`}
-          >
-            <span className="h-2 w-2 rounded-full bg-blue-600" />
-            Cases
-          </button>
-
-          <button
-            onClick={() => setShowProjects(!showProjects)}
-            className={`px-2 py-1 rounded-md border text-[11px] flex items-center gap-1 transition-all ${
-              showProjects ? 'bg-slate-100 text-slate-800 border-slate-300 font-semibold' : 'bg-slate-50 text-slate-400 border-slate-200'
-            }`}
-          >
-            <span className="h-2 w-2 rounded-full bg-slate-500" />
-            Projects
-          </button>
-
-          <button
-            onClick={() => setShowClusters(!showClusters)}
-            className={`px-2 py-1 rounded-md border text-[11px] flex items-center gap-1 transition-all ${
-              showClusters ? 'bg-amber-50 text-amber-800 border-amber-200 font-semibold' : 'bg-slate-50 text-slate-400 border-slate-200'
-            }`}
-          >
-            <span className="h-2 w-2 rounded-full bg-amber-500" />
-            Clusters
-          </button>
-
-          <button
-            onClick={() => setShowParcels(!showParcels)}
-            className={`px-2 py-1 rounded-md border text-[11px] flex items-center gap-1 transition-all ${
-              showParcels ? 'bg-purple-50 text-purple-800 border-purple-200 font-semibold' : 'bg-slate-50 text-slate-400 border-slate-200'
-            }`}
-          >
-            <span className="h-2 w-2 rounded-full bg-purple-600" />
-            Parcels
-          </button>
-
-          {/* Bhuvan Sovereign Thematic Overlays */}
-          <div className="h-4 w-px bg-slate-200 mx-1" />
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setShowBhuvanLulc(!showBhuvanLulc)}
-              className={`px-2 py-1 rounded-md border text-[11px] flex items-center gap-1 transition-all ${
-                showBhuvanLulc
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold shadow-xs'
-                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'
-              }`}
-              title="Toggle ISRO Bhuvan Land Use / Land Cover (1:50,000 reference cartography)"
-            >
-              <span className={`h-2 w-2 rounded-full ${showBhuvanLulc ? 'bg-emerald-600' : 'bg-slate-400'}`} />
-              Bhuvan LULC
-              <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-mono ml-0.5">
-                2015–16
-              </span>
-              {bhuvanLoading && <RefreshCw className="h-2.5 w-2.5 animate-spin ml-0.5 text-emerald-600" />}
-            </button>
-
-            <button
-              onClick={() => setShowBhuvanDisaster(!showBhuvanDisaster)}
-              className={`px-2 py-1 rounded-md border text-[11px] flex items-center gap-1 transition-all ${
-                showBhuvanDisaster
-                  ? 'bg-orange-50 text-orange-800 border-orange-300 font-semibold shadow-xs'
-                  : 'bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'
-              }`}
-              title="Toggle ISRO Bhuvan Disaster Hazard Susceptibility"
-            >
-              <span className={`h-2 w-2 rounded-full ${showBhuvanDisaster ? 'bg-orange-600' : 'bg-slate-400'}`} />
-              Bhuvan Hazard
-              <span className="text-[9px] bg-orange-100 text-orange-800 px-1 py-0.2 rounded font-mono ml-0.5">
-                2023
-              </span>
-            </button>
-
-            {/* Bhuvan Disclaimer / Info Popover */}
-            <div className="relative">
-              <button
-                onClick={() => setShowBhuvanInfo(!showBhuvanInfo)}
-                className="p-1 text-slate-400 hover:text-slate-700 rounded-md hover:bg-slate-100 transition-colors"
-                title="Bhuvan Geospatial Information & Statutory Disclaimer"
-              >
-                <Info className="h-3.5 w-3.5" />
-              </button>
-
-              {showBhuvanInfo && (
-                <div className="absolute right-0 top-7 w-80 bg-white border border-slate-200 rounded-xl shadow-lg p-3 z-50 text-xs text-slate-700 animate-in fade-in">
-                  <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
-                    <span className="font-bold text-gov-slate flex items-center gap-1">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                      ISRO / NRSC Bhuvan Overlays
-                    </span>
-                    <button
-                      onClick={() => setShowBhuvanInfo(false)}
-                      className="text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  <div className="mt-2 space-y-1.5 text-[11px]">
-                    <p>
-                      <strong>Provider:</strong> National Remote Sensing Centre (NRSC), ISRO.
-                    </p>
-                    <p>
-                      <strong>Coverage:</strong> State-scoped 1:50,000 multi-spectral thematic cartography.
-                    </p>
-                    <div className="bg-amber-50 border border-amber-200 rounded p-2 text-amber-800 text-[10px] leading-relaxed">
-                      <strong>Statutory Disclaimer:</strong> Bhuvan layers provide thematic and reference spatial context. They do <em>not</em> constitute cadastral ground truth, legal boundaries, or land records for compensation determination.
-                    </div>
-                    {bhuvanUnsupported.length > 0 && (
-                      <div className="bg-slate-50 border border-slate-200 rounded p-1.5 text-slate-600 text-[10px]">
-                        <strong>Unavailable in:</strong> {bhuvanUnsupported.join(', ')}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Basemap Style Selector */}
-          <div className="h-4 w-px bg-slate-200 mx-1" />
-          <div className="flex items-center gap-1.5">
-            <select
-              value={baseMap}
-              onChange={(e) => setBaseMap(e.target.value as TileBaseMap)}
-              className="border border-slate-200 rounded-md px-2 py-1 bg-slate-50 text-slate-700 text-[11px] font-medium focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-              title="Select Basemap Cartography"
-            >
-              <option value="osm">OpenStreetMap Standard</option>
-              <option value="maptiler_streets">MapTiler Streets v2</option>
-              <option value="maptiler_satellite">MapTiler Satellite</option>
-              <option value="maptiler_topo">MapTiler Topo v2</option>
-              <option value="maptiler_outdoor">MapTiler Outdoor v2</option>
-              <option value="maptiler_dataviz_light">MapTiler Dataviz Light</option>
-              <option value="maptiler_dataviz_dark">MapTiler Dataviz Dark</option>
-            </select>
-            {fallbackInfo?.isFallback && (
-              <span
-                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-800 border border-amber-200"
-                title={fallbackInfo.fallbackReason || 'OpenStreetMap fallback active'}
-              >
-                <AlertTriangle className="h-3 w-3 text-amber-600 shrink-0" />
-                OSM Fallback
-              </span>
+            {/* Non-blocking data refresh indicator */}
+            {isLoading && (
+              <div className="absolute left-1/2 top-3 z-[450] flex -translate-x-1/2 items-center gap-2 rounded-lg border border-slate-200 bg-white/95 px-3 py-1.5 text-[11px] font-medium text-slate-600 shadow-gov-md">
+                <RefreshCw className="h-3 w-3 animate-spin text-gov-navy" />
+                Refreshing spatial datasets...
+              </div>
             )}
-          </div>
-        </div>
-      </div>
 
-      {/* 4. Map Viewport & Context Inspector Drawer */}
-      <div className="flex-1 flex gap-4 min-h-0 relative">
-        {/* Leaflet Map Workspace */}
-        <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden relative">
-          <div ref={mapContainerRef} className="w-full h-full z-0" />
-
-          {/* Map Legend (Bottom-Left) */}
-          <div className="absolute bottom-4 left-4 z-[400] bg-white/95 backdrop-blur-sm p-3 rounded-lg border border-slate-200 shadow-md text-xs space-y-2 pointer-events-auto max-w-xs">
-            <div className="font-bold text-gov-slate flex items-center justify-between text-[11px] uppercase tracking-wider">
-              <span>Risk Color Scheme</span>
-            </div>
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-slate-600">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-red-600" />
-                <span>Critical Risk</span>
+            {/* Map Legend (Bottom-Left) */}
+            <div className="pointer-events-auto absolute bottom-4 left-4 z-[400] max-w-xs space-y-2 rounded-xl border border-slate-200 bg-white/95 p-3 text-xs shadow-gov-md">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-gov-slate">
+                Risk Color Scheme
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-                <span>High Risk</span>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-slate-600">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-red-600" />
+                  <span>Critical Risk</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                  <span>High Risk</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />
+                  <span>Medium Risk</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-600" />
+                  <span>Low Risk</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />
-                <span>Medium Risk</span>
+              <div className="border-t border-slate-100 pt-1.5 text-[10px] text-slate-500">
+                Click any corridor or marker to inspect statutory spatial context.
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-600" />
-                <span>Low Risk</span>
-              </div>
-            </div>
-            <div className="pt-1.5 border-t border-slate-200 text-[10px] text-slate-500">
-              Click any corridor or marker to inspect statutory spatial context.
             </div>
           </div>
-        </div>
 
-        {/* Right: Spatial Context Inspector Drawer */}
-        <div className="w-96 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden shrink-0">
-          {selectedCaseId ? (
-            // Feature Detail View
-            <div className="flex flex-col h-full overflow-y-auto p-4 space-y-4">
-              {/* Header */}
-              <div className="flex items-start justify-between pb-3 border-b border-slate-200">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                      {spatialContext?.case_number || 'Loading...'}
-                    </span>
-                    {spatialContext?.geometry_status === 'mapped' ? (
-                      <Badge variant="emerald" size="sm">
-                        Mapped
-                      </Badge>
-                    ) : spatialContext?.geometry_status === 'partially_mapped' ? (
-                      <Badge variant="amber" size="sm">
-                        Partially Mapped
-                      </Badge>
-                    ) : (
-                      <Badge variant="slate" size="sm">
-                        Unmapped
-                      </Badge>
-                    )}
-                  </div>
-                  <h3 className="text-sm font-bold text-gov-slate mt-1.5 leading-snug">
-                    {spatialContext?.title || 'Case Spatial Context'}
-                  </h3>
-                  {spatialContext?.project_name && (
-                    <div className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                      <Building2 className="h-3 w-3 text-slate-400" />
-                      <span>{spatialContext.project_name}</span>
+          {/* Layers Panel & Spatial Context Inspector */}
+          <div className="flex w-full shrink-0 flex-col gap-4 lg:w-[22rem]">
+            {/* Map Layers Panel */}
+            <div className="relative rounded-xl border border-slate-200 bg-white shadow-gov">
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Map Layers
+                </h2>
+                <div className="flex items-center gap-1">
+                  <Layers className="h-3.5 w-3.5 text-slate-400" />
+                  {/* Bhuvan Disclaimer / Info Popover */}
+                  <button
+                    type="button"
+                    onClick={() => setShowBhuvanInfo(!showBhuvanInfo)}
+                    aria-label="Bhuvan Geospatial Information & Statutory Disclaimer"
+                    aria-pressed={showBhuvanInfo}
+                    className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                    title="Bhuvan Geospatial Information & Statutory Disclaimer"
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+
+                {showBhuvanInfo && (
+                  <div className="absolute right-3 top-11 z-50 w-80 animate-in fade-in rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-700 shadow-gov-lg">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                      <span className="flex items-center gap-1.5 font-bold text-gov-slate">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                        ISRO / NRSC Bhuvan Overlays
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowBhuvanInfo(false)}
+                        aria-label="Close Bhuvan disclaimer"
+                        className="text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
                     </div>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => setSelectedCaseId(null)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                    <div className="mt-2 space-y-1.5 text-[11px]">
+                      <p>
+                        <strong>Provider:</strong> National Remote Sensing Centre (NRSC), ISRO.
+                      </p>
+                      <p>
+                        <strong>Coverage:</strong> State-scoped 1:50,000 multi-spectral thematic cartography.
+                      </p>
+                      <div className="rounded border border-amber-200 bg-amber-50 p-2 text-[10px] leading-relaxed text-amber-800">
+                        <strong>Statutory Disclaimer:</strong> Bhuvan layers provide thematic and reference
+                        spatial context. They do <em>not</em> constitute cadastral ground truth, legal
+                        boundaries, or land records for compensation determination.
+                      </div>
+                      {bhuvanUnsupported.length > 0 && (
+                        <div className="rounded border border-slate-200 bg-slate-50 p-1.5 text-[10px] text-slate-600">
+                          <strong>Unavailable in:</strong> {bhuvanUnsupported.join(', ')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Administrative Hierarchy Block */}
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs space-y-2">
-                <div className="font-bold text-slate-700 uppercase tracking-wider text-[10px] flex items-center justify-between">
-                  <span>Administrative Hierarchy</span>
-                  {spatialContext?.administrative_hierarchy.lgd_status === 'mapped' ? (
-                    <span className="text-emerald-700 font-bold">LGD Verified</span>
-                  ) : (
-                    <span className="text-amber-700 font-bold">Enrichment Unavailable</span>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-slate-600">
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">State:</span>
-                    <span className="font-semibold text-slate-800">{spatialContext?.state || 'N/A'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">District:</span>
-                    <span className="font-semibold text-slate-800">{spatialContext?.district || 'N/A'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">Tehsil / Taluk:</span>
-                    <span className="font-semibold text-slate-800">{spatialContext?.tehsil || 'N/A'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px]">Revenue Village:</span>
-                    <span className="font-semibold text-slate-800">{spatialContext?.village || 'N/A'}</span>
-                  </div>
-                </div>
+              {/* Layer Toggle List */}
+              <div className="space-y-0.5 p-2">
+                <LayerToggleRow
+                  icon={<FolderKanban className="h-3.5 w-3.5" />}
+                  label="Acquisition Cases"
+                  checked={showCases}
+                  onToggle={() => setShowCases(!showCases)}
+                  dotClassName="bg-blue-600"
+                />
+                <LayerToggleRow
+                  icon={<Building2 className="h-3.5 w-3.5" />}
+                  label="Project Corridors"
+                  checked={showProjects}
+                  onToggle={() => setShowProjects(!showProjects)}
+                  dotClassName="bg-slate-500"
+                />
+                <LayerToggleRow
+                  icon={<Compass className="h-3.5 w-3.5" />}
+                  label="Proximity Clusters"
+                  checked={showClusters}
+                  onToggle={() => setShowClusters(!showClusters)}
+                  dotClassName="bg-amber-500"
+                />
+                <LayerToggleRow
+                  icon={<MapPin className="h-3.5 w-3.5" />}
+                  label="Cadastral Parcels"
+                  checked={showParcels}
+                  onToggle={() => setShowParcels(!showParcels)}
+                  dotClassName="bg-purple-600"
+                />
+
+                <div className="mx-2 my-1.5 border-t border-slate-100" />
+
+                {/* Bhuvan Sovereign Thematic Overlays */}
+                <LayerToggleRow
+                  icon={<Layers className="h-3.5 w-3.5" />}
+                  label={
+                    <span className="flex items-center gap-1">
+                      Bhuvan LULC
+                      <span className="rounded bg-emerald-100 px-1 py-0.5 font-mono text-[9px] font-semibold text-emerald-800">
+                        2015–16
+                      </span>
+                    </span>
+                  }
+                  checked={showBhuvanLulc}
+                  onToggle={() => setShowBhuvanLulc(!showBhuvanLulc)}
+                  title="Toggle ISRO Bhuvan Land Use / Land Cover (1:50,000 reference cartography)"
+                  dotClassName="bg-emerald-600"
+                  trailing={
+                    bhuvanLoading ? (
+                      <RefreshCw className="h-3 w-3 shrink-0 animate-spin text-emerald-600" />
+                    ) : undefined
+                  }
+                />
+                <LayerToggleRow
+                  icon={<AlertTriangle className="h-3.5 w-3.5" />}
+                  label={
+                    <span className="flex items-center gap-1">
+                      Bhuvan Hazard
+                      <span className="rounded bg-orange-100 px-1 py-0.5 font-mono text-[9px] font-semibold text-orange-800">
+                        2023
+                      </span>
+                    </span>
+                  }
+                  checked={showBhuvanDisaster}
+                  onToggle={() => setShowBhuvanDisaster(!showBhuvanDisaster)}
+                  title="Toggle ISRO Bhuvan Disaster Hazard Susceptibility"
+                  dotClassName="bg-orange-600"
+                />
               </div>
 
-              {/* Spatial Geometry & Cadastral Metrics */}
-              <div className="bg-blue-50/60 p-3 rounded-lg border border-blue-200 text-xs space-y-2">
-                <div className="font-bold text-blue-900 uppercase tracking-wider text-[10px] flex items-center justify-between">
-                  <span>Spatial Metrics & Geometry</span>
-                  <span className="font-bold text-blue-700">
-                    Quality: {spatialContext?.geometry_quality_score ?? 0}/100
+              {/* Basemap Style Selector */}
+              <div className="space-y-2 border-t border-slate-100 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    Basemap Cartography
                   </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-slate-700">
-                  <div>
-                    <span className="text-slate-500 block text-[10px]">Demarcated Area:</span>
-                    <span className="font-bold text-slate-900">
-                      {spatialContext?.total_area_hectares} Hectares
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px]">Geometry Type:</span>
-                    <span className="font-bold text-slate-900">{spatialContext?.geometry_type || 'Polygon'}</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px]">Total Cadastral Parcels:</span>
-                    <span className="font-bold text-slate-900">{spatialContext?.parcels_summary.total} plots</span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block text-[10px]">Parcels with GIS:</span>
-                    <span className="font-bold text-emerald-700">
-                      {spatialContext?.parcels_summary.mapped} plots
-                    </span>
-                  </div>
-                </div>
-
-                {spatialContext?.parcels_summary.disputed ? (
-                  <div className="bg-red-50 p-2 rounded border border-red-200 text-red-800 text-[11px] flex items-center gap-1.5 mt-2">
-                    <AlertTriangle className="h-3.5 w-3.5 text-red-600 shrink-0" />
-                    <span>
-                      <strong>{spatialContext.parcels_summary.disputed} Disputed Parcels</strong> under active title litigation.
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-
-              {/* Nearby Infrastructure Proximity Block */}
-              <div className="text-xs space-y-2">
-                <div className="font-bold text-slate-700 uppercase tracking-wider text-[10px] flex items-center justify-between">
-                  <span>Nearby Infrastructure ({spatialContext?.nearby_cases.length || 0})</span>
-                  <span className="text-slate-400 font-normal text-[10px]">Within 25km radius</span>
-                </div>
-
-                {spatialContext?.nearby_cases && spatialContext.nearby_cases.length > 0 ? (
-                  <div className="space-y-1.5">
-                    {spatialContext.nearby_cases.map((nb) => (
-                      <div
-                        key={nb.id}
-                        onClick={() => setSelectedCaseId(nb.id)}
-                        className="p-2 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer flex items-center justify-between transition-all"
-                      >
-                        <div>
-                          <div className="font-semibold text-gov-slate flex items-center gap-1.5">
-                            <span>{nb.case_number}</span>
-                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
-                              {nb.status}
-                            </span>
-                          </div>
-                          <div className="text-[10px] text-slate-500 truncate max-w-[200px]">{nb.title}</div>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-mono text-xs font-bold text-blue-700">
-                            {nb.distance_km} km
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-slate-400 text-xs italic py-2 text-center bg-slate-50 rounded-lg border">
-                    No neighboring acquisition cases detected within statutory search radius.
-                  </div>
-                )}
-              </div>
-
-              {/* Statutory Data Provenance */}
-              <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-[11px] text-slate-500 space-y-1 mt-auto">
-                <div className="font-bold text-slate-700 text-[10px] uppercase">Data Provenance</div>
-                <div>Source: <span className="font-mono text-slate-800">{spatialContext?.provenance.source_id}</span></div>
-                <div>Type: <span className="font-semibold text-slate-800">{spatialContext?.provenance.provenance_type}</span></div>
-                <div>Recorded: <span className="text-slate-600">{spatialContext?.provenance.retrieved_at ? new Date(spatialContext.provenance.retrieved_at).toLocaleDateString() : 'N/A'}</span></div>
-              </div>
-
-              {/* Action Button */}
-              <Button
-                variant="primary"
-                size="sm"
-                className="w-full mt-2"
-                onClick={() => onSelectCase(selectedCaseId)}
-              >
-                <FileCheck className="h-4 w-4 mr-1.5" />
-                Open Statutory Case File
-              </Button>
-            </div>
-          ) : (
-            // Default Spatial Summary View
-            <div className="flex flex-col h-full p-4 overflow-y-auto space-y-4">
-              <div>
-                <h3 className="text-sm font-bold text-gov-slate">Spatial Portfolio Summary</h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Select an acquisition corridor or marker on the map to inspect its spatial and cadastral details.
-                </p>
-              </div>
-
-              {/* Spatial Clusters List */}
-              <div className="space-y-2">
-                <div className="font-bold text-slate-700 uppercase tracking-wider text-[10px] flex items-center justify-between">
-                  <span>Detected Friction Clusters ({overview?.clusters.length || 0})</span>
-                  <span className="text-slate-400 font-normal text-[10px]">15km radius</span>
-                </div>
-
-                {overview?.clusters && overview.clusters.length > 0 ? (
-                  <div className="space-y-2">
-                    {overview.clusters.map((cl) => (
-                      <div
-                        key={cl.cluster_id}
-                        className="p-3 rounded-lg border border-amber-200 bg-amber-50/50 space-y-1.5"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-amber-900 text-xs uppercase">
-                            {cl.cluster_id}
-                          </span>
-                          <span className="font-mono text-xs font-bold text-amber-800">
-                            {cl.case_count} Cases
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-slate-600">
-                          Radius: <strong>{cl.radius_km} km</strong> | Aggregate Area:{' '}
-                          <strong>{cl.aggregate_area_hectares} Ha</strong>
-                        </div>
-                        <div className="text-[10px] text-amber-800 italic bg-amber-100/50 p-1.5 rounded">
-                          {cl.sample_size_note}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-slate-400 text-xs italic py-4 text-center bg-slate-50 rounded-lg border">
-                    No spatial density clusters detected under current filter criteria.
-                  </div>
-                )}
-              </div>
-
-              {/* Layer Health Manifest */}
-              <div className="space-y-2">
-                <div className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">
-                  Spatial Layer Manifest
-                </div>
-                <div className="space-y-1.5 text-xs">
-                  {overview?.layer_manifest.map((lyr) => (
-                    <div
-                      key={lyr.id}
-                      className="p-2 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between"
+                  {fallbackInfo?.isFallback && (
+                    <span
+                      className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+                      title={fallbackInfo.fallbackReason || 'OpenStreetMap fallback active'}
                     >
-                      <div>
-                        <div className="font-semibold text-slate-800 text-xs">{lyr.name}</div>
-                        <div className="text-[10px] text-slate-500">{lyr.description}</div>
+                      <AlertTriangle className="h-3 w-3 shrink-0 text-amber-600" />
+                      OSM Fallback
+                    </span>
+                  )}
+                </div>
+
+                {/* Quick Base Map Presets */}
+                <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setBaseMap('positron')}
+                    className={`flex-1 rounded-md px-2.5 py-1 font-medium transition-all ${
+                      baseMap === 'positron'
+                        ? 'bg-white font-bold text-gov-navy shadow-gov'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Positron
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBaseMap('dark')}
+                    className={`flex-1 rounded-md px-2.5 py-1 font-medium transition-all ${
+                      baseMap === 'dark'
+                        ? 'bg-gov-slate font-bold text-white shadow-gov'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Dark
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBaseMap('osm')}
+                    className={`flex-1 rounded-md px-2.5 py-1 font-medium transition-all ${
+                      baseMap === 'osm'
+                        ? 'bg-white font-bold text-emerald-800 shadow-gov'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    OSM
+                  </button>
+                </div>
+
+                <select
+                  value={baseMap}
+                  onChange={(e) => setBaseMap(e.target.value as TileBaseMap)}
+                  className="input input-xs"
+                  title="Select Basemap Cartography"
+                >
+                  <option value="osm">OpenStreetMap Standard</option>
+                  <option value="maptiler_streets">MapTiler Streets v2</option>
+                  <option value="maptiler_satellite">MapTiler Satellite</option>
+                  <option value="maptiler_topo">MapTiler Topo v2</option>
+                  <option value="maptiler_outdoor">MapTiler Outdoor v2</option>
+                  <option value="maptiler_dataviz_light">MapTiler Dataviz Light</option>
+                  <option value="maptiler_dataviz_dark">MapTiler Dataviz Dark</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Spatial Context Inspector */}
+            <div className="flex flex-1 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-gov">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+                <div>
+                  <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Spatial Context Inspector
+                  </h2>
+                  <p className="text-[10px] text-slate-400">
+                    {selectedCaseId
+                      ? 'Statutory case spatial context'
+                      : 'Portfolio summary & friction clusters'}
+                  </p>
+                </div>
+                {contextLoading && (
+                  <RefreshCw className="h-3.5 w-3.5 shrink-0 animate-spin text-gov-navy" />
+                )}
+                {selectedCaseId && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCaseId(null)}
+                    aria-label="Close spatial context inspector"
+                    className="rounded-lg p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex-1 space-y-4 overflow-y-auto p-4">
+                {selectedCaseId ? (
+                  // Feature Detail View
+                  <>
+                    {/* Header */}
+                    <div className="border-b border-slate-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded border border-blue-200 bg-blue-50 px-2 py-0.5 font-mono text-xs font-bold text-blue-700">
+                          {spatialContext?.case_number || 'Loading...'}
+                        </span>
+                        {spatialContext?.geometry_status === 'mapped' ? (
+                          <Badge variant="emerald" size="sm">
+                            Mapped
+                          </Badge>
+                        ) : spatialContext?.geometry_status === 'partially_mapped' ? (
+                          <Badge variant="amber" size="sm">
+                            Partially Mapped
+                          </Badge>
+                        ) : (
+                          <Badge variant="slate" size="sm">
+                            Unmapped
+                          </Badge>
+                        )}
                       </div>
-                      <div className="text-right shrink-0">
-                        <span className="font-mono font-bold text-gov-navy text-xs">
-                          {lyr.feature_count}
+                      <h3 className="mt-1.5 text-sm font-bold leading-snug text-gov-slate">
+                        {spatialContext?.title || 'Case Spatial Context'}
+                      </h3>
+                      {spatialContext?.project_name && (
+                        <div className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-500">
+                          <Building2 className="h-3 w-3 text-slate-400" />
+                          <span>{spatialContext.project_name}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Administrative Hierarchy Block */}
+                    <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
+                      <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                        <span>Administrative Hierarchy</span>
+                        {spatialContext?.administrative_hierarchy.lgd_status === 'mapped' ? (
+                          <span className="font-bold text-emerald-700">LGD Verified</span>
+                        ) : (
+                          <span className="font-bold text-amber-700">Enrichment Unavailable</span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-slate-600">
+                        <div>
+                          <span className="block text-[10px] text-slate-400">State:</span>
+                          <span className="font-semibold text-slate-800">
+                            {spatialContext?.state || 'N/A'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] text-slate-400">District:</span>
+                          <span className="font-semibold text-slate-800">
+                            {spatialContext?.district || 'N/A'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] text-slate-400">Tehsil / Taluk:</span>
+                          <span className="font-semibold text-slate-800">
+                            {spatialContext?.tehsil || 'N/A'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] text-slate-400">Revenue Village:</span>
+                          <span className="font-semibold text-slate-800">
+                            {spatialContext?.village || 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Spatial Geometry & Cadastral Metrics */}
+                    <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/60 p-3 text-xs">
+                      <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-blue-900">
+                        <span>Spatial Metrics &amp; Geometry</span>
+                        <span className="font-bold text-blue-700">
+                          Quality: {spatialContext?.geometry_quality_score ?? 0}/100
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-slate-700">
+                        <div>
+                          <span className="block text-[10px] text-slate-500">Demarcated Area:</span>
+                          <span className="font-bold text-slate-900">
+                            {spatialContext?.total_area_hectares} Hectares
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] text-slate-500">Geometry Type:</span>
+                          <span className="font-bold text-slate-900">
+                            {spatialContext?.geometry_type || '—'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] text-slate-500">Total Cadastral Parcels:</span>
+                          <span className="font-bold text-slate-900">
+                            {spatialContext?.parcels_summary.total} plots
+                          </span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] text-slate-500">Parcels with GIS:</span>
+                          <span className="font-bold text-emerald-700">
+                            {spatialContext?.parcels_summary.mapped} plots
+                          </span>
+                        </div>
+                      </div>
+
+                      {spatialContext?.parcels_summary.disputed ? (
+                        <div className="mt-2 flex items-center gap-1.5 rounded border border-red-200 bg-red-50 p-2 text-[11px] text-red-800">
+                          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-600" />
+                          <span>
+                            <strong>{spatialContext.parcels_summary.disputed} Disputed Parcels</strong>{' '}
+                            under active title litigation.
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {/* Nearby Infrastructure Proximity Block */}
+                    <div className="space-y-2 text-xs">
+                      <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                        <span>Nearby Infrastructure ({spatialContext?.nearby_cases.length || 0})</span>
+                        <span className="text-[10px] font-normal text-slate-400">
+                          Within 25km radius
+                        </span>
+                      </div>
+
+                      {spatialContext?.nearby_cases && spatialContext.nearby_cases.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {spatialContext.nearby_cases.map((nb) => (
+                            <button
+                              key={nb.id}
+                              type="button"
+                              onClick={() => setSelectedCaseId(nb.id)}
+                              className="flex w-full items-center justify-between rounded-lg border border-slate-200 p-2 text-left transition-colors hover:bg-slate-50"
+                            >
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 font-semibold text-gov-slate">
+                                  <span>{nb.case_number}</span>
+                                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">
+                                    {nb.status}
+                                  </span>
+                                </div>
+                                <div className="max-w-[200px] truncate text-[10px] text-slate-500">
+                                  {nb.title}
+                                </div>
+                              </div>
+                              <div className="shrink-0 text-right">
+                                <span className="font-mono text-xs font-bold text-blue-700">
+                                  {nb.distance_km} km
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 py-2 text-center text-xs italic text-slate-400">
+                          No neighboring acquisition cases detected within statutory search radius.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Statutory Data Provenance */}
+                    <div className="mt-auto space-y-1 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-[11px] text-slate-500">
+                      <div className="text-[10px] font-bold uppercase text-slate-700">
+                        Data Provenance
+                      </div>
+                      <div>
+                        Source:{' '}
+                        <span className="font-mono text-slate-800">
+                          {spatialContext?.provenance.source_id}
+                        </span>
+                      </div>
+                      <div>
+                        Type:{' '}
+                        <span className="font-semibold text-slate-800">
+                          {spatialContext?.provenance.provenance_type}
+                        </span>
+                      </div>
+                      <div>
+                        Recorded:{' '}
+                        <span className="text-slate-600">
+                          {spatialContext?.provenance.retrieved_at
+                            ? new Date(spatialContext.provenance.retrieved_at).toLocaleDateString()
+                            : 'N/A'}
                         </span>
                       </div>
                     </div>
-                  ))}
-                </div>
+
+                    {/* Action Button */}
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => onSelectCase(selectedCaseId)}
+                    >
+                      <FileCheck className="mr-1.5 h-4 w-4" />
+                      Open Statutory Case File
+                    </Button>
+                  </>
+                ) : (
+                  // Default Spatial Summary View
+                  <>
+                    <div>
+                      <h3 className="text-sm font-bold text-gov-slate">Spatial Portfolio Summary</h3>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        Select an acquisition corridor or marker on the map to inspect its spatial and
+                        cadastral details.
+                      </p>
+                    </div>
+
+                    {/* Spatial Clusters List */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                        <span>Detected Friction Clusters ({overview?.clusters.length || 0})</span>
+                        <span className="text-[10px] font-normal text-slate-400">15km radius</span>
+                      </div>
+
+                      {overview?.clusters && overview.clusters.length > 0 ? (
+                        <div className="space-y-2">
+                          {overview.clusters.map((cl) => (
+                            <div
+                              key={cl.cluster_id}
+                              className="space-y-1.5 rounded-lg border border-amber-200 bg-amber-50/50 p-3"
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold uppercase text-amber-900">
+                                  {cl.cluster_id}
+                                </span>
+                                <span className="font-mono text-xs font-bold text-amber-800">
+                                  {cl.case_count} Cases
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-slate-600">
+                                Radius: <strong>{cl.radius_km} km</strong> | Aggregate Area:{' '}
+                                <strong>{cl.aggregate_area_hectares} Ha</strong>
+                              </div>
+                              <div className="rounded bg-amber-100/50 p-1.5 text-[10px] italic text-amber-800">
+                                {cl.sample_size_note}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 py-4 text-center text-xs italic text-slate-400">
+                          No spatial density clusters detected under current filter criteria.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Layer Health Manifest */}
+                    <div className="space-y-2">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                        Spatial Layer Manifest
+                      </div>
+                      <div className="space-y-1.5 text-xs">
+                        {overview?.layer_manifest.map((lyr) => (
+                          <div
+                            key={lyr.id}
+                            className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-2"
+                          >
+                            <div className="min-w-0">
+                              <div className="text-xs font-semibold text-slate-800">{lyr.name}</div>
+                              <div className="text-[10px] text-slate-500">{lyr.description}</div>
+                            </div>
+                            <div className="shrink-0 text-right">
+                              <span className="font-mono text-xs font-bold text-gov-navy">
+                                {lyr.feature_count}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      </section>
     </div>
   );
 };

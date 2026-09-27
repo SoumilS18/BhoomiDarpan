@@ -8,11 +8,15 @@ import {
   getAdministrativeUnitByCode,
   getLGDDataSourceStatus,
   resolveAdministrativeEnrichment,
+  createSubDistrict,
 } from '../services/administrativeGeographyService';
+import { CreateSubDistrictSchema } from '../utils/validators';
 import {
   executeAuthoritativeLgdSync,
   getLgdSyncStatus,
 } from '../services/lgdIngestionService';
+import { getSupabase, isSupabaseConfigured } from '../config/supabase';
+import { getRecentAuditLogs } from '../services/auditLogger';
 import { requireAuth, requireRole } from '../middleware/auth.middleware';
 import { LgdAdministrativeTier } from '../config/lgdConfig';
 import { AdminUnitType } from '../../shared/types';
@@ -71,6 +75,64 @@ administrationRouter.get('/districts/:districtCode/subdistricts', async (req: Re
 });
 
 /**
+ * POST /api/administration/subdistricts
+ * Creates a missing Sub-District / Tehsil with non-authoritative reference provenance.
+ */
+administrationRouter.post(
+  ['/subdistricts', '/sub-districts'],
+  requireAuth,
+  requireRole(['admin', 'lao', 'project_officer', 'revenue_inspector']),
+  async (req: Request, res: Response) => {
+    try {
+      const parseResult = CreateSubDistrictSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({
+          error: 'Validation failed',
+          details: parseResult.error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('; '),
+        });
+      }
+
+      const { name, code, state_code, district_code, local_name } = parseResult.data;
+      const user = (req as any).user;
+
+      if (user) {
+        if (user.jurisdiction_state_lgd_code && user.jurisdiction_state_lgd_code !== state_code) {
+          return res.status(403).json({
+            error: `Territorial jurisdiction mismatch: User is restricted to state "${user.jurisdiction_state_lgd_code}".`,
+          });
+        }
+        if (user.jurisdiction_district_lgd_code && user.jurisdiction_district_lgd_code !== district_code) {
+          return res.status(403).json({
+            error: `Territorial jurisdiction mismatch: User is restricted to district "${user.jurisdiction_district_lgd_code}".`,
+          });
+        }
+      }
+
+      const createdUnit = await createSubDistrict({
+        name,
+        code,
+        state_code,
+        district_code,
+        local_name,
+        created_by: user?.full_name || 'Authorized Officer',
+      });
+
+      res.status(201).json({
+        success: true,
+        subdistrict: createdUnit,
+      });
+    } catch (err: any) {
+      const isConflict =
+        err.message?.includes('already exists') ||
+        err.message?.includes('duplicate key') ||
+        err.message?.includes('uq_admin_unit_type_code');
+      const status = isConflict ? 409 : 400;
+      res.status(status).json({ error: err.message });
+    }
+  }
+);
+
+/**
  * GET /api/administration/subdistricts/:code/villages
  * Retrieves Revenue Villages under a Sub-District code with server-side pagination & search.
  */
@@ -101,12 +163,12 @@ administrationRouter.get('/subdistricts/:code/villages', async (req: Request, re
  */
 administrationRouter.get('/search', async (req: Request, res: Response) => {
   try {
-    const queryText = req.query.q ? String(req.query.q) : '';
+    const queryText = (req.query.q || req.query.query) ? String(req.query.q || req.query.query) : '';
     if (!queryText || queryText.trim().length === 0) {
-      return res.status(400).json({ error: 'Query parameter "q" is required for search' });
+      return res.status(400).json({ error: 'Query parameter "q" or "query" is required for search' });
     }
 
-    const unitType = req.query.unit_type as AdminUnitType | undefined;
+    const unitType = (req.query.unit_type || req.query.type) as AdminUnitType | undefined;
     const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 20;
 
     const results = await searchAdministrativeUnits(queryText, { unit_type: unitType, limit });
@@ -143,7 +205,7 @@ administrationRouter.get('/units/:code', async (req: Request, res: Response) => 
  * GET /api/administration/enrichment
  * Resolves authoritative administrative hierarchy for provided LGD codes.
  */
-administrationRouter.get('/enrichment', async (req: Request, res: Response) => {
+administrationRouter.get('/enrichment', requireAuth, async (req: Request, res: Response) => {
   try {
     const stateLgdCode = req.query.state_lgd_code as string | undefined;
     const districtLgdCode = req.query.district_lgd_code as string | undefined;
@@ -171,7 +233,7 @@ administrationRouter.get('/enrichment', async (req: Request, res: Response) => {
  * GET /api/administration/sync/status
  * Retrieves operational status, records per tier, and recent sync history.
  */
-administrationRouter.get('/sync/status', async (_req: Request, res: Response) => {
+administrationRouter.get('/sync/status', requireAuth, async (_req: Request, res: Response) => {
   try {
     const status = await getLgdSyncStatus();
     res.json(status);
@@ -221,6 +283,68 @@ administrationRouter.post(
         error: err.message,
         is_locked: isLockError,
       });
+    }
+  }
+);
+
+// ============================================================================
+// 4. GLOBAL AUDIT LEDGER
+// ============================================================================
+
+/**
+ * GET /api/administration/audit
+ *
+ * Most recent audit events across every case, for the administration console.
+ *
+ * Reuses the existing `case_events` table written by `auditLogger.logCaseEvent`
+ * — no separate audit store is introduced. The response reports which store it
+ * came from so the interface can state honestly whether records are durable
+ * (`database`) or held only in this server process (`memory`, used when
+ * Supabase is unconfigured or the query fails).
+ *
+ * Restricted to administrators: a cross-case ledger is not case-scoped data.
+ */
+administrationRouter.get(
+  '/audit',
+  requireAuth,
+  requireRole(['admin']),
+  async (req: Request, res: Response) => {
+    try {
+      const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+      const eventType = req.query.event_type ? String(req.query.event_type) : undefined;
+      const caseId = req.query.case_id ? String(req.query.case_id) : undefined;
+
+      if (isSupabaseConfigured) {
+        try {
+          const supabase = getSupabase();
+          let query = supabase
+            .from('case_events')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(limit);
+          if (caseId) query = query.eq('case_id', caseId);
+          if (eventType) query = query.eq('event_type', eventType);
+
+          const { data, error } = await query;
+          if (!error && data) {
+            return res.json({ events: data, source: 'database', count: data.length });
+          }
+          if (error) {
+            console.warn('[Administration] case_events query failed:', error.message);
+          }
+        } catch (err: any) {
+          console.warn('[Administration] case_events query threw:', err.message);
+        }
+      }
+
+      // Durable store unavailable — report the in-process buffer explicitly
+      // rather than presenting it as a persisted ledger.
+      const events = getRecentAuditLogs({ case_id: caseId, event_type: eventType })
+        .slice(-limit)
+        .reverse();
+      res.json({ events, source: 'memory', count: events.length });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
     }
   }
 );

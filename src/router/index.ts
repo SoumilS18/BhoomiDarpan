@@ -25,6 +25,8 @@ export {
   getRouteById,
   isRouteVisibleToRole,
   navRoutesForRole,
+  publicNavRoutes,
+  routeArea,
   ROUTE_BY_ID,
   ROUTE_REDIRECTS,
   resolveRedirect,
@@ -32,6 +34,7 @@ export {
   type IconKey,
   type LazyPage,
   type ModuleId,
+  type RouteArea,
 } from './routes';
 export {
   comparePatternScore,
@@ -45,3 +48,12 @@ export {
   type RouteMatch,
   type RouteParamsInput,
 } from './matchPath';
+export {
+  EMPTY_WORKSPACE_STATE,
+  workspaceIdentity,
+  workspaceItemFromRoute,
+  workspaceReducer,
+  type WorkspaceAction,
+  type WorkspaceItem,
+  type WorkspaceState,
+} from '../workspace/workspace';

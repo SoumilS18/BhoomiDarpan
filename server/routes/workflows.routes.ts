@@ -6,7 +6,7 @@ import { logCaseEvent } from '../services/auditLogger';
 const router = Router();
 
 // GET /api/workflows - Get all active workflows with stages
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', requireAuth, async (_req: Request, res: Response) => {
   try {
     if (!isSupabaseConfigured) {
       return res.status(503).json({ error: 'Supabase not configured' });
@@ -19,9 +19,9 @@ router.get('/', async (_req: Request, res: Response) => {
         *,
         stages:workflow_stages(
           *,
-          dependencies:stage_dependencies(
+          dependencies:stage_dependencies!stage_id(
             *,
-            depends_on_stage:workflow_stages(*)
+            depends_on_stage:workflow_stages!depends_on_stage_id(*)
           )
         )
       `)
@@ -44,7 +44,7 @@ router.get('/', async (_req: Request, res: Response) => {
 });
 
 // GET /api/workflows/:id - Get single workflow with details
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', requireAuth, async (req: Request, res: Response) => {
   try {
     if (!isSupabaseConfigured) {
       return res.status(503).json({ error: 'Supabase not configured' });
@@ -59,9 +59,9 @@ router.get('/:id', async (req: Request, res: Response) => {
         *,
         stages:workflow_stages(
           *,
-          dependencies:stage_dependencies(
+          dependencies:stage_dependencies!stage_id(
             *,
-            depends_on_stage:workflow_stages(*)
+            depends_on_stage:workflow_stages!depends_on_stage_id(*)
           )
         )
       `)

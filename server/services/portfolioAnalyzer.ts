@@ -50,6 +50,42 @@ export interface CaseEnrichedForPortfolio extends AcquisitionCase {
 }
 
 /**
+ * Resolves a case's risk level for FILTERING and reporting purposes.
+ *
+ * WHY THIS HELPER EXISTS
+ *   The portfolio routes read `acquisition_cases` with `*`, so `latest_risk`
+ *   is normally absent and the level has to be derived with the same
+ *   deterministic assessment the analysis itself uses. Filtering against an
+ *   unset `latest_risk` would silently drop every case — a control that
+ *   appears active in the UI while returning nothing. This keeps one
+ *   authoritative resolution path for both the filter and the metric.
+ */
+export function resolveCaseRiskLevel(
+  c: CaseEnrichedForPortfolio,
+  currentDateStr: string,
+  dependencies?: StageDependency[]
+): 'critical' | 'high' | 'medium' | 'low' {
+  if (c.latest_risk?.risk_level) {
+    return c.latest_risk.risk_level;
+  }
+
+  const stageInstances = calculateStageDeviations(c.stage_instances || [], currentDateStr);
+  const stagesList = ((c.stage_instances || []).map((i) => i.stage).filter(
+    Boolean
+  ) as WorkflowStage[]);
+
+  return calculateDeterministicRiskAssessment({
+    caseItem: c,
+    stageInstances,
+    stages: stagesList,
+    dependencies: c.dependencies || dependencies || [],
+    documents: c.documents || [],
+    parcels: c.parcels || [],
+    currentDateStr,
+  }).risk_level;
+}
+
+/**
  * Extracts a mathematical centroid [lat, lng] from GeoJSON Polygon or MultiPolygon.
  * Returns undefined if geometry is absent or invalid (STRICT ZERO HARDCODING).
  */
@@ -157,6 +193,26 @@ export function analyzePortfolioOperations(params: {
   }
   if (filters.status) {
     filteredCases = filteredCases.filter((c) => c.status === filters.status);
+  }
+  if (filters.state_lgd_code) {
+    filteredCases = filteredCases.filter((c) => c.state_lgd_code === filters.state_lgd_code);
+  }
+  if (filters.district_lgd_code) {
+    filteredCases = filteredCases.filter((c) => c.district_lgd_code === filters.district_lgd_code);
+  }
+  if (filters.subdistrict_lgd_code) {
+    filteredCases = filteredCases.filter(
+      (c) => c.subdistrict_lgd_code === filters.subdistrict_lgd_code
+    );
+  }
+  if (filters.village_lgd_code) {
+    filteredCases = filteredCases.filter((c) => c.village_lgd_code === filters.village_lgd_code);
+  }
+  if (filters.risk_level) {
+    const wantedRisk = filters.risk_level;
+    filteredCases = filteredCases.filter(
+      (c) => resolveCaseRiskLevel(c, currentDate, params.dependencies) === wantedRisk
+    );
   }
   if (filters.search) {
     const q = filters.search.toLowerCase();
@@ -984,7 +1040,9 @@ export function applyScopeAndQueryParams(
     result = result.filter((c) => c.status === filters.status);
   }
   if (filters.risk_level) {
-    result = result.filter((c) => c.latest_risk?.risk_level === filters.risk_level);
+    const wantedRisk = filters.risk_level;
+    const today = new Date().toISOString().split('T')[0];
+    result = result.filter((c) => resolveCaseRiskLevel(c, today) === wantedRisk);
   }
   if (filters.search) {
     const q = filters.search.toLowerCase();

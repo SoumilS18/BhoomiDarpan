@@ -1,11 +1,25 @@
-import React, { useCallback, useEffect, useMemo, useState, Suspense } from 'react';
+import React, { useCallback, useEffect, useMemo, useReducer, useState, Suspense } from 'react';
 import { Header } from './components/layout/Header';
 import { Sidebar } from './components/layout/Sidebar';
+import { WorkspaceBar } from './components/layout/WorkspaceBar';
 import { CreateCaseModal } from './components/cases/CreateCaseModal';
 import { fetchProjects, fetchWorkflows, fetchHealth, fetchCases, HealthResponse } from './lib/api';
 import { Project, Workflow } from '../shared/types';
 import { AlertTriangle } from 'lucide-react';
-import { buildPath, getRouteById, navigate, usePendingRedirect, useRoute } from './router';
+import {
+  buildPath,
+  EMPTY_WORKSPACE_STATE,
+  getRouteById,
+  navigate,
+  routeArea,
+  usePendingRedirect,
+  useRoute,
+  workspaceItemFromRoute,
+  workspaceReducer,
+} from './router';
+import { useAuth } from './context/AuthContext';
+import { evaluateAppAccessFor } from './lib/appAccess';
+import type { WorkspaceItem } from './workspace/workspace';
 
 /**
  * Application shell.
@@ -15,31 +29,16 @@ import { buildPath, getRouteById, navigate, usePendingRedirect, useRoute } from 
  * been replaced by registry lookup, but every page component keeps its
  * original prop signature and the DOM structure is unchanged.
  *
- * ---------------------------------------------------------------------------
- * PHASE 3 INTEGRATION POINT (documented, NOT implemented)
- * ---------------------------------------------------------------------------
- * The workspace tab strip and keep-alive host will be introduced here, between
- * `<Header />` and the `<main>` element:
- *
- *   <Header ... />
- *   <WorkspaceTabStrip />          <-- Phase 1/3: one tab per open route
- *   <div className="flex-1 flex ...">
- *     <Sidebar ... />
- *     <KeepAliveHost>              <-- Phase 3: LRU-capped mounted views,
- *       {matchedPage}                  hidden with `visibility: hidden`
- *     </KeepAliveHost>                 (NEVER `display: none`, which yields a
- *   </div>                             0x0 Leaflet container + blank tiles)
- *
- * Realtime case channels will likewise be owned by a provider at this level,
- * keyed on the set of currently open case routes, so that N views of one case
- * share a single reference-counted `case:<id>` Supabase channel
- * (see src/lib/realtime.ts).
- * ---------------------------------------------------------------------------
  */
 export const App: React.FC = () => {
-  const { route, params, pathname } = useRoute();
+  const { route, params, pathname, search } = useRoute();
+  const { session, sessionStatus, isRealAuthConfigured } = useAuth();
 
-  // Canonical entry redirects (`/` -> `/dashboard`).
+  // Which of the three experience areas (public / auth / app) the current URL
+  // belongs to. The registry is the only place that knows this.
+  const area = route ? routeArea(route) : 'app';
+
+  // Canonical entry redirects (`/` -> public landing, per ROUTE_REDIRECTS).
   const pendingRedirect = usePendingRedirect();
   useEffect(() => {
     if (pendingRedirect) {
@@ -47,7 +46,68 @@ export const App: React.FC = () => {
     }
   }, [pendingRedirect]);
 
+  // -------------------------------------------------------------------------
+  // Application-area access boundary.
+  //
+  // Mirrors the rule the Express API already enforces (evaluation role context
+  // is refused in production builds) — see src/lib/appAccess.ts for the full
+  // rationale. Authorisation itself stays server-side on every request.
+  // -------------------------------------------------------------------------
+  const appAccess = evaluateAppAccessFor(session, sessionStatus, isRealAuthConfigured);
+
+  useEffect(() => {
+    if (area !== 'app' || appAccess !== 'deny' || pendingRedirect) {
+      return;
+    }
+    // Preserve the deep link so a successful sign-in returns here.
+    const next = `${pathname}${search}`;
+    navigate(
+      `${getRouteById('auth.login').path}?next=${encodeURIComponent(next)}`,
+      { replace: true }
+    );
+  }, [area, appAccess, pendingRedirect, pathname, search]);
+
+  const [workspace, dispatchWorkspace] = useReducer(
+    workspaceReducer,
+    EMPTY_WORKSPACE_STATE
+  );
+
+  const currentWorkspaceItem = useMemo(() => {
+    if (!route || pendingRedirect) {
+      return null;
+    }
+    return workspaceItemFromRoute(route, params, pathname, search);
+  }, [route, params, pathname, search, pendingRedirect]);
+
+  useEffect(() => {
+    if (currentWorkspaceItem) {
+      dispatchWorkspace({ type: 'OPEN_WORKSPACE', item: currentWorkspaceItem });
+    }
+  }, [currentWorkspaceItem]);
+
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  // The sidebar collapses into an overlay drawer below the `lg` breakpoint.
+  // Its open state lives in the shell so both the header toggle and the route
+  // change can drive it.
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setIsMobileNavOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!isMobileNavOpen) {
+      return undefined;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsMobileNavOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isMobileNavOpen]);
 
   // Pre-loaded projects & workflows for the Create Case modal (unchanged).
   const [projects, setProjects] = useState<Project[]>([]);
@@ -63,8 +123,13 @@ export const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    loadInitialData();
-  }, [loadInitialData]);
+    // Only the authenticated application needs the workspace bootstrap. The
+    // public website and the account pages must not fire operational API calls
+    // on first paint.
+    if (area === 'app' && appAccess === 'allow') {
+      loadInitialData();
+    }
+  }, [area, appAccess, loadInitialData]);
 
   const handleCaseCreated = useCallback(() => {
     loadInitialData();
@@ -102,6 +167,42 @@ export const App: React.FC = () => {
   const goToCasesRegistry = useCallback(() => {
     navigate(getRouteById('module.cases').path);
   }, []);
+
+  const goToProject = useCallback((projectId: string, view?: string) => {
+    navigate(buildPath(getRouteById('project.detail').path, { projectId, view }));
+  }, []);
+
+  const goToWorkspaceItem = useCallback((item: WorkspaceItem) => {
+    dispatchWorkspace({ type: 'ACTIVATE_WORKSPACE', id: item.id });
+    navigate(`${item.pathname}${item.search}`);
+  }, []);
+
+  const closeWorkspaceItem = useCallback(
+    (item: WorkspaceItem) => {
+      if (!item.closable) {
+        return;
+      }
+
+      const remaining = workspace.items.filter((candidate) => candidate.id !== item.id);
+      if (item.id !== workspace.activeId) {
+        dispatchWorkspace({ type: 'CLOSE_WORKSPACE', id: item.id });
+        return;
+      }
+
+      const next = remaining[Math.min(workspace.items.indexOf(item), remaining.length - 1)];
+      if (next) {
+        dispatchWorkspace({ type: 'CLOSE_WORKSPACE', id: item.id });
+        navigate(`${next.pathname}${next.search}`);
+        return;
+      }
+
+      const dashboard = getRouteById('module.dashboard');
+      const fallback = workspaceItemFromRoute(dashboard, {}, dashboard.path, '');
+      dispatchWorkspace({ type: 'CLOSE_ALL_WORKSPACES', fallback });
+      navigate(dashboard.path, { replace: true });
+    },
+    [workspace]
+  );
 
   // -------------------------------------------------------------------------
   // Route -> page props
@@ -149,7 +250,25 @@ export const App: React.FC = () => {
       }
 
       case 'module.projects':
-        return <Element onSelectCase={openCase} onOpenCreateCase={openCreateCaseModal} />;
+        return (
+          <Element
+            onSelectCase={openCase}
+            onOpenCreateCase={openCreateCaseModal}
+            onSelectProject={goToProject}
+          />
+        );
+
+      case 'project.detail':
+        return (
+          <Element
+            projectId={params.projectId}
+            initialView={params.view}
+            onSelectCase={openCase}
+            onOpenCreateCase={openCreateCaseModal}
+            onSelectProject={goToProject}
+            onBack={() => navigate(getRouteById('module.projects').path)}
+          />
+        );
 
       case 'module.gis':
         return <Element onSelectCase={openCase} />;
@@ -213,19 +332,60 @@ export const App: React.FC = () => {
     handleCaseTabChange,
     openCreateCaseModal,
     goToCasesRegistry,
+    goToProject,
   ]);
+
+  // -------------------------------------------------------------------------
+  // Area routing.
+  //
+  // Public website and account pages render WITHOUT the application shell —
+  // no operational header, no workspace bar, no module sidebar. Each of those
+  // pages owns its own layout (PublicPageLayout / AuthShell), so marketing and
+  // account content can never be mistaken for the officer dashboard.
+  // -------------------------------------------------------------------------
+  if (area !== 'app') {
+    return (
+      <div className="min-h-screen flex flex-col bg-gov-canvas text-gov-slate">
+        {pendingRedirect ? (
+          <RouteLoadingFallback />
+        ) : (
+          <Suspense fallback={<RouteLoadingFallback />}>{matchedPage}</Suspense>
+        )}
+      </div>
+    );
+  }
+
+  // A persisted session may still be restoring, or a production build without
+  // a session is already navigating to sign-in. Render the neutral surface
+  // rather than flashing the shell (or an empty dashboard) for one frame.
+  if (appAccess !== 'allow') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gov-canvas text-gov-slate">
+        <RouteLoadingFallback />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gov-canvas text-gov-slate">
       {/* Top Header */}
       <Header
         onOpenCreateCase={openCreateCaseModal}
+        isNavigationOpen={isMobileNavOpen}
+        onToggleNavigation={() => setIsMobileNavOpen((open) => !open)}
         onSearch={(term) => {
           // Global search now reaches the registry's own `q` filter instead of
           // merely switching surfaces (see Header + CasesListPage).
           const casesPath = getRouteById('module.cases').path;
           navigate(term ? `${casesPath}?q=${encodeURIComponent(term)}` : casesPath);
         }}
+      />
+
+      <WorkspaceBar
+        items={workspace.items}
+        activeId={workspace.activeId}
+        onActivate={goToWorkspaceItem}
+        onClose={closeWorkspaceItem}
       />
 
       {/* Supabase Pending Banner (if credentials pending) */}
@@ -248,12 +408,17 @@ export const App: React.FC = () => {
       )}
 
       {/* Main Workspace Layout */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto">
+      <div className="flex-1 flex max-w-[1600px] w-full mx-auto">
         {/* Left Navigation Sidebar */}
-        <Sidebar activeModule={route?.module ?? null} caseCount={caseCount} />
+        <Sidebar
+          activeModule={route?.module ?? null}
+          caseCount={caseCount}
+          mobileOpen={isMobileNavOpen}
+          onCloseMobile={() => setIsMobileNavOpen(false)}
+        />
 
         {/* Content Viewport */}
-        <main className="flex-1 p-6 overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 overflow-y-auto min-w-0">
           {pendingRedirect ? (
             <RouteLoadingFallback />
           ) : (

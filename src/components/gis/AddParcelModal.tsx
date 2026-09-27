@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { createParcel } from '../../lib/api';
+import { useAuth } from '../../context/AuthContext';
 import { Plus, AlertCircle, CheckCircle } from 'lucide-react';
 
 interface AddParcelModalProps {
@@ -20,12 +21,16 @@ export const AddParcelModal: React.FC<AddParcelModalProps> = ({
   const [surveyNumber, setSurveyNumber] = useState('');
   const [khataNumber, setKhataNumber] = useState('');
   const [landownerNames, setLandownerNames] = useState('');
-  const [landType, setLandType] = useState('Agricultural');
+  // Empty until entered: the column is NOT NULL but has no server-defined
+  // enum, so a pre-filled value would assert a land use nobody recorded.
+  const [landType, setLandType] = useState('');
   const [areaAcres, setAreaAcres] = useState('');
   const [compensationAmount, setCompensationAmount] = useState('');
   const [acquisitionStatus, setAcquisitionStatus] = useState('identified');
   const [geojsonText, setGeojsonText] = useState('');
-  const [actorName, setActorName] = useState('Revenue Officer');
+  // Audit actor follows the signed-in identity and is not user-editable.
+  const { activePersona } = useAuth();
+  const [actorName] = useState(activePersona.name);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +40,15 @@ export const AddParcelModal: React.FC<AddParcelModalProps> = ({
     e.preventDefault();
     if (!surveyNumber.trim() || !areaAcres.trim() || !landownerNames.trim()) {
       setError('Survey Number, Landowner(s), and Area in Acres are required.');
+      return;
+    }
+    if (!landType.trim()) {
+      setError('Land type is required.');
+      return;
+    }
+    const acres = parseFloat(areaAcres);
+    if (!Number.isFinite(acres) || acres < 0) {
+      setError('Area in Acres must be a valid number.');
       return;
     }
 
@@ -61,8 +75,8 @@ export const AddParcelModal: React.FC<AddParcelModalProps> = ({
           .split(',')
           .map((n) => n.trim())
           .filter(Boolean),
-        land_type: landType,
-        area_acres: parseFloat(areaAcres),
+        land_type: landType.trim(),
+        area_acres: acres,
         compensation_amount: compensationAmount ? parseFloat(compensationAmount) : 0,
         acquisition_status: acquisitionStatus,
         geojson_geometry: parsedGeom,
@@ -232,9 +246,11 @@ export const AddParcelModal: React.FC<AddParcelModalProps> = ({
             <input
               type="text"
               value={actorName}
-              onChange={(e) => setActorName(e.target.value)}
+              readOnly
+              aria-readonly="true"
               placeholder="Officer Name"
-              className="w-full text-xs px-2.5 py-1.5 rounded border border-slate-200"
+              title="Taken from the signed-in profile; cannot be edited"
+              className="w-full text-xs px-2.5 py-1.5 rounded border border-slate-200 bg-slate-50 text-slate-600"
             />
           </div>
           <div className="flex gap-2">

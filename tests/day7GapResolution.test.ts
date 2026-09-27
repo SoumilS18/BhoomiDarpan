@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
+import { startLiveApi, LiveApi } from './helpers/liveApi';
 import '../server/index';
 import { calculateDeterministicRiskAssessment } from '../server/services/riskAssessment';
 import { detectCaseBottlenecks } from '../server/services/bottleneckDetector';
@@ -16,7 +17,17 @@ import {
   Recommendation,
 } from '../shared/types';
 
-const API_BASE = 'http://localhost:3001/api';
+let liveApi: LiveApi | null = null;
+let API_BASE = '';
+
+beforeAll(async () => {
+  liveApi = await startLiveApi();
+  API_BASE = `${liveApi.url}/api`;
+}, 30000);
+
+afterAll(async () => {
+  await liveApi?.close();
+});
 
 const mockCase: AcquisitionCase = {
   id: 'case-day7-001',

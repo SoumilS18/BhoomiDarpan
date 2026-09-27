@@ -218,8 +218,8 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
                 Survey No: ${props.survey_number}
               </div>
               <div><strong>Khata:</strong> ${props.khata_number || 'N/A'}</div>
-              <div><strong>Landowners:</strong> ${(props.landowner_names || []).join(', ') || 'Unregistered'}</div>
-              <div><strong>Type:</strong> ${props.land_type || 'Agricultural'}</div>
+              <div><strong>Landowners:</strong> ${(props.landowner_names || []).join(', ') || 'Not recorded'}</div>
+              <div><strong>Type:</strong> ${props.land_type || 'Not recorded'}</div>
               <div><strong>Area:</strong> ${props.area_acres} Acres</div>
               <div><strong>Status:</strong> <span style="text-transform: capitalize; font-weight: 600; color: ${props.color};">${props.acquisition_status}</span></div>
             </div>
@@ -486,7 +486,7 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
                   <div>
                     <span className="text-slate-500">Khata / Record:</span>
                     <strong className="block font-mono text-gov-slate">
-                      {selectedFeatureProps.khata_number || 'Unregistered'}
+                      {selectedFeatureProps.khata_number || 'N/A'}
                     </strong>
                   </div>
                   <div>

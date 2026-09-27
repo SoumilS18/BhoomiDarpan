@@ -86,4 +86,8 @@ INSERT INTO data_sources (
     provider = EXCLUDED.provider,
     endpoint_ref = EXCLUDED.endpoint_ref,
     data_scope = EXCLUDED.data_scope,
-    metadata = administrative_units.metadata || EXCLUDED.metadata;
+    -- Must reference the target table (`data_sources`), not `administrative_units`:
+    -- an ON CONFLICT DO UPDATE SET clause has no FROM entry for other tables,
+    -- so naming it here raises "missing FROM-clause entry for table".
+    metadata = data_sources.metadata || EXCLUDED.metadata,
+    updated_at = NOW();

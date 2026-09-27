@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { RoleSwitcher } from './RoleSwitcher';
 import { NotificationBell } from './NotificationBell';
 import { Button } from '../common/Button';
-import { Plus, Search, Layers, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, Search, Layers, CheckCircle2, AlertCircle, Menu } from 'lucide-react';
 import { fetchHealth, HealthResponse } from '../../lib/api';
 import { useRoute } from '../../router';
 
@@ -14,9 +14,18 @@ interface HeaderProps {
    * instead of a local component value.
    */
   onSearch?: (term: string) => void;
+  /** Toggles the overlay navigation drawer below the `lg` breakpoint. */
+  onToggleNavigation?: () => void;
+  /** Current open state of that drawer, mirrored into `aria-expanded`. */
+  isNavigationOpen?: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenCreateCase, onSearch }) => {
+export const Header: React.FC<HeaderProps> = ({
+  onOpenCreateCase,
+  onSearch,
+  onToggleNavigation,
+  isNavigationOpen = false,
+}) => {
   const { route, query } = useRoute();
   const [health, setHealth] = useState<HealthResponse | null>(null);
 
@@ -56,15 +65,27 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCreateCase, onSearch }) =>
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-slate-200/90 shadow-sm">
-      {/* Institutional Top Accent Ribbon */}
-      <div className="h-1 bg-gradient-to-r from-gov-saffron via-white to-gov-emerald" />
+    <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-gov-header">
+      {/* Institutional top accent */}
+      <div className="h-0.5 bg-gov-navy-dark" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
           {/* Logo & Title */}
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gov-navy text-white shadow-sm ring-1 ring-gov-navy/20">
+            {/* Mobile navigation toggle (the sidebar is an overlay below `lg`) */}
+            <button
+              type="button"
+              onClick={onToggleNavigation}
+              aria-label={isNavigationOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={isNavigationOpen}
+              aria-controls="primary-application-navigation"
+              className="lg:hidden inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-gov-navy"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gov-navy-dark text-white shadow-sm">
               <Layers className="h-5 w-5 text-amber-400" />
             </div>
             <div>
@@ -72,15 +93,12 @@ export const Header: React.FC<HeaderProps> = ({ onOpenCreateCase, onSearch }) =>
                 <span className="text-lg font-bold tracking-tight text-gov-slate">
                   BhoomiSetu
                 </span>
-                <span className="text-xs font-semibold text-gov-navy bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                <span className="text-[10px] font-semibold text-gov-navy bg-gov-blue-soft px-2 py-0.5 rounded border border-gov-navy/20">
                   भूमिसेतु
-                </span>
-                <span className="hidden sm:inline-flex text-[11px] font-medium text-slate-500">
-                  SIH 2026
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 hidden md:block">
-                Intelligent Land Acquisition & Decision-Support System
+                Intelligent Land Acquisition &amp; Decision-Support System
               </p>
             </div>
           </div>

@@ -83,7 +83,7 @@ export const CaseCard: React.FC<CaseCardProps> = ({ caseItem, onClick }) => {
         <div className="mt-4 pt-3 border-t border-slate-100">
           <div className="flex justify-between items-center text-xs mb-1.5">
             <span className="text-[11px] text-slate-500">
-              Stage: <strong className="text-gov-slate font-semibold">{metrics?.current_stage_title || 'In Progress'}</strong>
+              Stage: <strong className="text-gov-slate font-semibold">{metrics?.current_stage_title || '—'}</strong>
             </span>
             <span className="font-mono font-bold text-gov-navy text-xs">{progress}%</span>
           </div>

@@ -406,9 +406,13 @@ export const DocumentsTab: React.FC<DocumentsTabProps> = ({ caseId, stageInstanc
               className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:outline-none"
             >
               <option value="all">All Statuses ({documents.length})</option>
-              <option value="verified">Verified</option>
-              <option value="validation_required">Pending Verification</option>
               <option value="uploaded">Uploaded</option>
+              <option value="processing">Processing</option>
+              <option value="processed">Processed</option>
+              <option value="extracted">Extracted</option>
+              <option value="validation_required">Pending Verification</option>
+              <option value="verified">Verified</option>
+              <option value="rejected">Rejected</option>
               <option value="failed">Failed</option>
             </select>
 

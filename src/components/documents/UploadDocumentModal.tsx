@@ -3,6 +3,8 @@ import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { uploadCaseDocument } from '../../lib/api';
 import { DocumentType, CaseStageInstance } from '../../../shared/types';
+import { DOCUMENT_TYPE_OPTIONS } from '../../lib/domainLabels';
+import { useAuth } from '../../context/AuthContext';
 import { Upload, FileText, AlertCircle, CheckCircle } from 'lucide-react';
 
 interface UploadDocumentModalProps {
@@ -14,19 +16,6 @@ interface UploadDocumentModalProps {
   onSuccess: (newDoc: any) => void;
 }
 
-const DOCUMENT_TYPES: Array<{ value: DocumentType; label: string }> = [
-  { value: 'preliminary_notice', label: 'Preliminary Gazette Notice' },
-  { value: 'sec_11_notification', label: 'Section 11 Preliminary Notification' },
-  { value: 'hearing_minutes', label: 'Section 15 Hearing Minutes & Objections' },
-  { value: 'survey_report', label: 'Cadastral Land Survey & Census Report' },
-  { value: 'valuation_record', label: 'Land & Asset Valuation Statement' },
-  { value: 'sec_19_declaration', label: 'Section 19 Declaration of Acquisition' },
-  { value: 'award_order', label: 'Section 23 / 31 Award & Compensation Order' },
-  { value: 'possession_memo', label: 'Section 38 Possession Certificate / Panchnama' },
-  { value: 'litigation_filing', label: 'Court Stay / Legal Objection Petition' },
-  { value: 'miscellaneous', label: 'Miscellaneous Statutory Record' },
-];
-
 export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   isOpen,
   onClose,
@@ -36,11 +25,16 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   onSuccess,
 }) => {
   const [title, setTitle] = useState('');
-  const [documentType, setDocumentType] = useState<DocumentType>('sec_11_notification');
+  // No default classification: choosing one on the officer's behalf would
+  // record a document type nobody selected. `''` forces an explicit choice.
+  const [documentType, setDocumentType] = useState<DocumentType | ''>('');
   const [stageInstanceId, setStageInstanceId] = useState(preselectedStageId || '');
   const [file, setFile] = useState<File | null>(null);
   const [textContent, setTextContent] = useState('');
-  const [actorName, setActorName] = useState('Land Acquisition Officer');
+  // The actor written to the audit log is the signed-in identity, read-only —
+  // see the note under the field.
+  const { activePersona } = useAuth();
+  const [actorName] = useState(activePersona.name);
 
   React.useEffect(() => {
     if (preselectedStageId) {
@@ -71,6 +65,10 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
     e.preventDefault();
     if (!title.trim()) {
       setError('Document title is required.');
+      return;
+    }
+    if (!documentType) {
+      setError('Please choose a document classification.');
       return;
     }
     if (!file && !textContent.trim()) {
@@ -153,10 +151,11 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
             </label>
             <select
               value={documentType}
-              onChange={(e) => setDocumentType(e.target.value as DocumentType)}
+              onChange={(e) => setDocumentType(e.target.value as DocumentType | '')}
               className="w-full text-xs px-3 py-2 rounded-lg border border-slate-300 bg-white focus:ring-1 focus:ring-gov-navy focus:outline-none"
             >
-              {DOCUMENT_TYPES.map((dt) => (
+              <option value="">Select classification…</option>
+              {DOCUMENT_TYPE_OPTIONS.map((dt) => (
                 <option key={dt.value} value={dt.value}>
                   {dt.label}
                 </option>
@@ -222,14 +221,19 @@ export const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
           <div>
             <label className="block text-xs font-semibold text-gov-slate mb-1">
-              Officer Name
+              Recorded As (Audit Actor)
             </label>
             <input
               type="text"
               value={actorName}
-              onChange={(e) => setActorName(e.target.value)}
-              className="w-full text-xs px-2.5 py-1.5 rounded border border-slate-200"
+              readOnly
+              aria-readonly="true"
+              title="Taken from the signed-in profile; cannot be edited"
+              className="w-full text-xs px-2.5 py-1.5 rounded border border-slate-200 bg-slate-50 text-slate-600"
             />
+            <p className="mt-1 text-[10px] text-slate-400">
+              Written to the audit log exactly as shown. It follows your signed-in profile.
+            </p>
           </div>
 
           <div className="flex items-end justify-end gap-2">

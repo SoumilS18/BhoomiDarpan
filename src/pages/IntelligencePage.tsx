@@ -1,23 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { fetchPortfolioOperations } from '../lib/api';
-import { PortfolioOperationsData } from '../../shared/types';
+import { PortfolioOperationsData, PortfolioFilterParams } from '../../shared/types';
 import { Button } from '../components/common/Button';
 import { EmptyState } from '../components/common/EmptyState';
+import { PageHeader, PageEyebrow } from '../components/common/PageHeader';
+import { SectionHeading } from '../components/common/SectionHeading';
+import { StatCard } from '../components/common/StatCard';
 import { PortfolioBottlenecks } from '../components/dashboard/PortfolioBottlenecks';
+import { PortfolioFilterBar } from '../components/dashboard/PortfolioFilterBar';
 import { GeographicDrilldownView } from '../components/dashboard/GeographicDrilldownView';
 import {
-  Sparkles,
+  BrainCircuit,
   GitPullRequest,
   Compass,
-  AlertTriangle,
   RefreshCw,
   Flame,
   ShieldAlert,
   ArrowRight,
   TrendingUp,
-  Layers,
-  FileWarning,
-  Scale,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -39,6 +39,9 @@ export const IntelligencePage: React.FC<IntelligencePageProps> = ({
   onViewChange,
 }) => {
   const [portfolioData, setPortfolioData] = useState<PortfolioOperationsData | null>(null);
+  // Server-side filters: every change is sent to `GET /api/analytics/portfolio`
+  // and applied by the API before any intelligence aggregation runs.
+  const [filters, setFilters] = useState<PortfolioFilterParams>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -49,11 +52,11 @@ export const IntelligencePage: React.FC<IntelligencePageProps> = ({
     : 'drilldown';
   const setSubTab = (next: IntelligenceView) => onViewChange(next);
 
-  const loadData = async () => {
+  const loadData = async (activeFilters: PortfolioFilterParams) => {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetchPortfolioOperations({});
+      const res = await fetchPortfolioOperations(activeFilters);
       setPortfolioData(res.portfolio);
     } catch (err: any) {
       setError(err.message || 'Failed to aggregate portfolio intelligence');
@@ -63,8 +66,16 @@ export const IntelligencePage: React.FC<IntelligencePageProps> = ({
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(filters);
+  }, [filters]);
+
+  const handleFilterChange = (key: keyof PortfolioFilterParams, value: string | undefined) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleResetFilters = () => {
+    setFilters({});
+  };
 
   if (isLoading && !portfolioData) {
     return (
@@ -83,7 +94,7 @@ export const IntelligencePage: React.FC<IntelligencePageProps> = ({
         title="Intelligence Service Error"
         description={error}
         actionLabel="Retry Analysis"
-        onAction={loadData}
+        onAction={() => loadData(filters)}
       />
     );
   }
@@ -95,98 +106,94 @@ export const IntelligencePage: React.FC<IntelligencePageProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-gov-navy bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+      {/* Page header */}
+      <PageHeader
+        eyebrow={
+          <>
+            <PageEyebrow>
+              <BrainCircuit className="h-3 w-3" />
               Cross-Case Intelligence Hub
-            </span>
-            <span className="text-xs text-slate-300">•</span>
-            <span className="text-[11px] text-slate-500">
-              National Hierarchy Telemetry
-            </span>
-          </div>
-          <h1 className="text-xl font-bold text-gov-slate tracking-tight">
-            Cross-Case Decision Intelligence &amp; Hierarchy Drilldown
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Systemic friction loci, delay patterns, risk concentration, and multi-tier administrative drilldown from National to Case level.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
+            </PageEyebrow>
+            <span className="text-[11px] text-slate-500">National Hierarchy Telemetry</span>
+          </>
+        }
+        title="Cross-Case Decision Intelligence & Hierarchy Drilldown"
+        subtitle="Systemic friction loci, delay patterns, risk concentration, and multi-tier administrative drilldown from National to Case level."
+        actions={
           <Button
             variant="outline"
             size="sm"
-            onClick={loadData}
+            onClick={() => loadData(filters)}
             leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
           >
             Refresh
           </Button>
-        </div>
-      </div>
+        }
+      />
+
+      {/* Server-side filters — every selection refetches the portfolio API */}
+      {portfolioData && (
+        <PortfolioFilterBar
+          filters={filters}
+          availableFilters={portfolioData.available_filters}
+          onFilterChange={handleFilterChange}
+          onResetFilters={handleResetFilters}
+        />
+      )}
 
       {/* Intelligence Vitals Ribbon */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold">
-            <span>Systemic Bottlenecks</span>
-            <GitPullRequest className="h-4 w-4 text-orange-600" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-gov-slate tabular-nums">
-            {bottlenecks.length}
-          </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">Stages causing portfolio delay</p>
+      <section>
+        <SectionHeading
+          title="Intelligence Vitals"
+          hint="Deterministic portfolio-wide signals"
+        />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard
+            label="Systemic Bottlenecks"
+            value={bottlenecks.length}
+            hint="Stages causing portfolio delay"
+            icon={<GitPullRequest className="h-4 w-4" />}
+            tone="orange"
+          />
+          <StatCard
+            label="Critical Attention Areas"
+            value={attentionQueue.length}
+            hint="Immediate operational triage"
+            icon={<Flame className="h-4 w-4" />}
+            tone="navy"
+          />
+          <StatCard
+            label="Critical / High Risk"
+            value={summary?.at_risk_cases || 0}
+            hint="Cases with risk score > 60"
+            icon={<ShieldAlert className="h-4 w-4" />}
+            tone="amber"
+          />
+          <StatCard
+            label="Total SLA Slippage"
+            value={`+${summary?.total_delay_days_accumulated || 0}d`}
+            hint="Cumulative portfolio delay"
+            icon={<TrendingUp className="h-4 w-4" />}
+            tone="red"
+          />
         </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold">
-            <span>Critical Attention Areas</span>
-            <Flame className="h-4 w-4 text-purple-600" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-purple-800 tabular-nums">
-            {attentionQueue.length}
-          </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">Immediate operational triage</p>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold">
-            <span>Critical / High Risk</span>
-            <ShieldAlert className="h-4 w-4 text-amber-600" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-amber-700 tabular-nums">
-            {summary?.at_risk_cases || 0}
-          </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">Cases with risk score &gt; 60</p>
-        </div>
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between text-[11px] text-slate-500 font-semibold">
-            <span>Total SLA Slippage</span>
-            <TrendingUp className="h-4 w-4 text-red-600" />
-          </div>
-          <div className="mt-2 text-2xl font-bold text-red-600 tabular-nums">
-            +{summary?.total_delay_days_accumulated || 0}d
-          </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">Cumulative portfolio delay</p>
-        </div>
-      </div>
+      </section>
 
       {/* Sub-Navigation Switcher */}
-      <div className="flex border-b border-slate-200 bg-white rounded-t-xl px-4 gap-6 text-xs font-medium overflow-x-auto shadow-xs">
+      <div className="flex gap-6 overflow-x-auto rounded-t-xl border-b border-slate-200 bg-white px-4 text-xs font-medium shadow-gov">
         <button
           type="button"
           onClick={() => setSubTab('drilldown')}
           className={clsx(
-            'py-3.5 flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer',
+            'flex cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 py-3.5 transition-all',
             subTab === 'drilldown'
-              ? 'border-gov-navy text-gov-navy font-bold'
+              ? 'border-gov-navy font-bold text-gov-navy'
               : 'border-transparent text-slate-500 hover:text-gov-slate'
           )}
         >
-          <Compass className="h-4 w-4 text-emerald-600" />
+          <Compass
+            className={clsx('h-4 w-4', subTab === 'drilldown' ? 'text-gov-navy' : 'text-slate-400')}
+          />
           <span>Administrative Hierarchy Drilldown (National → State → District → Case)</span>
         </button>
 
@@ -194,13 +201,15 @@ export const IntelligencePage: React.FC<IntelligencePageProps> = ({
           type="button"
           onClick={() => setSubTab('bottlenecks')}
           className={clsx(
-            'py-3.5 flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer',
+            'flex cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 py-3.5 transition-all',
             subTab === 'bottlenecks'
-              ? 'border-gov-navy text-gov-navy font-bold'
+              ? 'border-gov-navy font-bold text-gov-navy'
               : 'border-transparent text-slate-500 hover:text-gov-slate'
           )}
         >
-          <GitPullRequest className="h-4 w-4 text-orange-600" />
+          <GitPullRequest
+            className={clsx('h-4 w-4', subTab === 'bottlenecks' ? 'text-gov-navy' : 'text-slate-400')}
+          />
           <span>Systemic Bottlenecks ({bottlenecks.length})</span>
         </button>
 
@@ -208,13 +217,15 @@ export const IntelligencePage: React.FC<IntelligencePageProps> = ({
           type="button"
           onClick={() => setSubTab('risk_concentration')}
           className={clsx(
-            'py-3.5 flex items-center gap-2 border-b-2 transition-all whitespace-nowrap cursor-pointer',
+            'flex cursor-pointer items-center gap-2 whitespace-nowrap border-b-2 py-3.5 transition-all',
             subTab === 'risk_concentration'
-              ? 'border-gov-navy text-gov-navy font-bold'
+              ? 'border-gov-navy font-bold text-gov-navy'
               : 'border-transparent text-slate-500 hover:text-gov-slate'
           )}
         >
-          <ShieldAlert className="h-4 w-4 text-amber-600" />
+          <ShieldAlert
+            className={clsx('h-4 w-4', subTab === 'risk_concentration' ? 'text-gov-navy' : 'text-slate-400')}
+          />
           <span>Risk Concentration &amp; Delay Patterns</span>
         </button>
       </div>
@@ -236,63 +247,57 @@ export const IntelligencePage: React.FC<IntelligencePageProps> = ({
 
         {/* SUBTAB 3: RISK CONCENTRATION */}
         {subTab === 'risk_concentration' && (
-          <div className="bg-white rounded-xl border border-slate-200 p-5 space-y-4 shadow-xs">
-            <div>
-              <h3 className="font-bold text-gov-slate text-sm">
-                Multi-Dimensional Risk Concentration Analysis
-              </h3>
-              <p className="text-[11px] text-slate-500">
-                Cross-case risk distribution categorized by statutory stage and SLA deviation severity.
-              </p>
-            </div>
+          <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-gov">
+            <SectionHeading
+              title="Multi-Dimensional Risk Concentration Analysis"
+              hint="Cross-case risk distribution categorized by statutory stage and SLA deviation severity"
+            />
 
             {/* Distribution Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs pt-2">
-              <div className="p-4 rounded-xl border border-red-200 bg-red-50/30">
-                <span className="font-bold text-gov-red block">Critical Risk Concentration</span>
-                <div className="text-2xl font-bold text-gov-red mt-1">
+            <div className="grid grid-cols-1 gap-4 pt-1 text-xs md:grid-cols-3">
+              <div className="rounded-xl border border-red-200 bg-red-50/30 p-4">
+                <span className="block font-bold text-gov-red">Critical Risk Concentration</span>
+                <div className="mt-1 text-2xl font-bold text-gov-red">
                   {summary?.at_risk_cases || 0} Cases
                 </div>
-                <p className="text-[11px] text-slate-600 mt-1">
+                <p className="mt-1 text-[11px] text-slate-600">
                   Cases exceeding statutory SLA limits with unresolved disputes or missing Section 11/19 declarations.
                 </p>
               </div>
 
-              <div className="p-4 rounded-xl border border-amber-200 bg-amber-50/30">
-                <span className="font-bold text-amber-800 block">SLA Warning Buffer</span>
-                <div className="text-2xl font-bold text-amber-700 mt-1">
+              <div className="rounded-xl border border-amber-200 bg-amber-50/30 p-4">
+                <span className="block font-bold text-amber-800">SLA Warning Buffer</span>
+                <div className="mt-1 text-2xl font-bold text-amber-700">
                   {attentionQueue.length} Cases
                 </div>
-                <p className="text-[11px] text-slate-600 mt-1">
+                <p className="mt-1 text-[11px] text-slate-600">
                   Cases approaching statutory maximum stage durations requiring administrative intervention.
                 </p>
               </div>
 
-              <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/30">
-                <span className="font-bold text-emerald-800 block">Normal Trajectory</span>
-                <div className="text-2xl font-bold text-emerald-700 mt-1">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/30 p-4">
+                <span className="block font-bold text-emerald-800">Normal Trajectory</span>
+                <div className="mt-1 text-2xl font-bold text-emerald-700">
                   {Math.max(0, (summary?.total_cases || 0) - (summary?.delayed_cases || 0))} Cases
                 </div>
-                <p className="text-[11px] text-slate-600 mt-1">
+                <p className="mt-1 text-[11px] text-slate-600">
                   Proceedings on track within calculated RFCTLARR schedule buffers.
                 </p>
               </div>
             </div>
 
             {/* Top Attention Areas List */}
-            <div className="pt-4 border-t border-slate-100">
-              <h4 className="font-bold text-gov-slate text-xs uppercase tracking-wider mb-2">
-                Highest-Priority Operational Attention Areas
-              </h4>
+            <div className="border-t border-slate-100 pt-4">
+              <SectionHeading title="Highest-Priority Operational Attention Areas" />
               <div className="divide-y divide-slate-100">
                 {attentionQueue.slice(0, 5).map((item) => (
-                  <div key={item.case_id} className="py-2.5 flex items-center justify-between text-xs">
-                    <div>
-                      <span className="font-mono text-gov-navy font-bold mr-2">
+                  <div key={item.case_id} className="flex items-center justify-between py-2.5 text-xs">
+                    <div className="min-w-0">
+                      <span className="mr-2 font-mono font-bold text-gov-navy">
                         {item.case_number}
                       </span>
                       <strong className="text-gov-slate">{item.title}</strong>
-                      <span className="text-[11px] text-slate-400 ml-2">
+                      <span className="ml-2 text-[11px] text-slate-400">
                         {item.district}, {item.state}
                       </span>
                     </div>

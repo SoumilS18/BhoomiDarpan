@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isTestEnvironment } from '../config/runtimeEnv';
 import { ImportFormat, ImportSummary, DataImportBatch } from '../../shared/types';
 import { registerAdministrativeUnit } from './administrativeGeographyService';
 import { recordProvenance } from './provenanceService';
@@ -179,7 +180,8 @@ export async function executeImportPipeline(
       : 'failed';
 
   // 3. Persist import batch record to database if configured
-  if (isSupabaseConfigured) {
+  //    (never from the test harness — fixtures would log fake import batches)
+  if (isSupabaseConfigured && !isTestEnvironment()) {
     try {
       const client = getSupabase();
       await client.from('data_import_batches').insert({

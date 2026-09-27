@@ -7,7 +7,7 @@ import { logCaseEvent } from '../services/auditLogger';
 const router = Router();
 
 // GET /api/projects - List all projects with case statistics
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', requireAuth, async (_req: Request, res: Response) => {
   try {
     if (!isSupabaseConfigured) {
       return res.status(503).json({ error: 'Supabase not configured' });
@@ -50,7 +50,7 @@ router.get('/', async (_req: Request, res: Response) => {
 });
 
 // POST /api/projects - Create new project (Authorized officers only)
-router.post('/', requireAuth, requireRole(['admin', 'project_officer']), async (req: Request, res: Response) => {
+router.post('/', requireAuth, requireRole(['admin', 'project_officer', 'lao']), async (req: Request, res: Response) => {
   try {
     if (!isSupabaseConfigured) {
       return res.status(503).json({ error: 'Supabase not configured' });
@@ -80,6 +80,20 @@ router.post('/', requireAuth, requireRole(['admin', 'project_officer']), async (
       subdistrict_lgd_code,
     } = parseResult.data;
 
+    const user = (req as any).user;
+    if (user) {
+      if (user.jurisdiction_state_lgd_code && state_lgd_code && user.jurisdiction_state_lgd_code !== state_lgd_code) {
+        return res.status(403).json({
+          error: `Territorial jurisdiction mismatch: User is restricted to state "${user.jurisdiction_state_lgd_code}".`,
+        });
+      }
+      if (user.jurisdiction_district_lgd_code && district_lgd_code && user.jurisdiction_district_lgd_code !== district_lgd_code) {
+        return res.status(403).json({
+          error: `Territorial jurisdiction mismatch: User is restricted to district "${user.jurisdiction_district_lgd_code}".`,
+        });
+      }
+    }
+
     const { data: newProject, error } = await supabase
       .from('projects')
       .insert({
@@ -100,7 +114,10 @@ router.post('/', requireAuth, requireRole(['admin', 'project_officer']), async (
       .single();
 
     if (error) {
-      return res.status(500).json({ error: error.message });
+      const isConflict = error.code === '23505' || error.message.includes('unique') || error.message.includes('duplicate');
+      return res.status(isConflict ? 409 : 500).json({
+        error: isConflict ? `A project with code "${code}" already exists.` : error.message,
+      });
     }
 
     // Log immutable audit trail for project creation

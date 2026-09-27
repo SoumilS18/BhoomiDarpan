@@ -1,4 +1,5 @@
 import { getSupabase, isSupabaseConfigured } from '../config/supabase';
+import { isTestEnvironment } from '../config/runtimeEnv';
 import {
   SystemPolicy,
   RiskScoringPolicy,
@@ -195,7 +196,15 @@ export const DEFAULT_INTEGRATION_POLICY: IntegrationPolicy = {
   maptiler_style: 'streets-v2',
 };
 
-const DEFAULT_POLICIES_MAP: Record<string, SystemPolicy> = {
+/**
+ * Canonical default for every policy in the platform.
+ *
+ * This is the authority the system falls back to when no database row exists.
+ * It is exported so reconciliation tooling can restore a row that has been
+ * overwritten (the DB is meant to hold an *override* of these values, never an
+ * arbitrary substitute for them).
+ */
+export const DEFAULT_POLICIES_MAP: Record<string, SystemPolicy> = {
   risk_scoring_weights: {
     id: 'risk_scoring_weights',
     category: 'risk',
@@ -369,7 +378,11 @@ const CACHE_TTL_MS = 60_000; // 1 minute cache TTL
  * Synchronize policy cache from Supabase database if configured and reachable.
  */
 export async function syncPoliciesFromDatabase(): Promise<void> {
-  if (!isSupabaseConfigured) {
+  // The test harness must never load live production policy rows: fixtures
+  // mutate policies in memory and expect read-after-write to see their own
+  // change. Reading the real database here would both break that contract and
+  // make tests depend on data nobody put there.
+  if (!isSupabaseConfigured || isTestEnvironment()) {
     return;
   }
 
@@ -571,8 +584,10 @@ export async function updatePolicy<T = any>(params: {
     },
   });
 
-  // 3. Persist to Supabase if configured
-  if (isSupabaseConfigured) {
+  // 3. Persist to Supabase if configured.
+  //    The test harness shares `.env` credentials: a fixture updating a policy
+  //    in memory must not rewrite the live policy rows.
+  if (isSupabaseConfigured && !isTestEnvironment()) {
     try {
       const supabase = getSupabase();
       const { error } = await supabase

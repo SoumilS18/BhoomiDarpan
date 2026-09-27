@@ -46,6 +46,21 @@ export const RiskOverviewCard: React.FC<RiskOverviewCardProps> = ({
   const bd = assessment.factor_breakdown;
   const pred = bd.predictive_delay;
 
+  /**
+   * Live policy weight for a scoring category.
+   *
+   * The weights are configuration (`risk_scoring_weights` policy), not
+   * constants — they are reported back on each factor detail. When a category
+   * contributed no detail, no percentage is shown rather than a stale one.
+   */
+  const weightLabel = (category: string): string => {
+    const detail = (bd.details || []).find(
+      (d) => d.category === category && typeof d.weight === 'number'
+    );
+    if (!detail || typeof detail.weight !== 'number') return '';
+    return ` (${Math.round(detail.weight * 100)}%)`;
+  };
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-4">
       {/* Top Banner */}
@@ -74,7 +89,11 @@ export const RiskOverviewCard: React.FC<RiskOverviewCardProps> = ({
               </Badge>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Explainable multi-factor decision intelligence • Model: {assessment.model_version || 'v3.0-predictive'} • Confidence: {Math.round((assessment.confidence || 0.9) * 100)}%
+              Explainable multi-factor decision intelligence
+              {assessment.model_version ? ` • Model: ${assessment.model_version}` : ''}
+              {assessment.confidence !== undefined && assessment.confidence !== null
+                ? ` • Confidence: ${Math.round(assessment.confidence * 100)}%`
+                : ''}
             </p>
           </div>
         </div>
@@ -112,7 +131,7 @@ export const RiskOverviewCard: React.FC<RiskOverviewCardProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
         <div className="bg-slate-50/80 p-3 rounded-lg border border-slate-200 text-xs">
           <div className="flex justify-between items-center mb-1.5">
-            <span className="text-slate-600 font-medium">Schedule Delay (40%)</span>
+            <span className="text-slate-600 font-medium">Schedule Delay{weightLabel('workflow_deviation')}</span>
             <span className="font-mono font-bold text-gov-slate">{bd.schedule_delay_score}/100</span>
           </div>
           <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
@@ -125,7 +144,7 @@ export const RiskOverviewCard: React.FC<RiskOverviewCardProps> = ({
 
         <div className="bg-slate-50/80 p-3 rounded-lg border border-slate-200 text-xs">
           <div className="flex justify-between items-center mb-1.5">
-            <span className="text-slate-600 font-medium">Dependency Stalls (25%)</span>
+            <span className="text-slate-600 font-medium">Dependency Stalls{weightLabel('dependency_blockage')}</span>
             <span className="font-mono font-bold text-gov-slate">{bd.dependency_blockage_score}/100</span>
           </div>
           <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
@@ -138,7 +157,7 @@ export const RiskOverviewCard: React.FC<RiskOverviewCardProps> = ({
 
         <div className="bg-slate-50/80 p-3 rounded-lg border border-slate-200 text-xs">
           <div className="flex justify-between items-center mb-1.5">
-            <span className="text-slate-600 font-medium">Document Friction (20%)</span>
+            <span className="text-slate-600 font-medium">Document Friction{weightLabel('document_friction')}</span>
             <span className="font-mono font-bold text-gov-slate">{bd.missing_documents_score}/100</span>
           </div>
           <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
@@ -151,7 +170,7 @@ export const RiskOverviewCard: React.FC<RiskOverviewCardProps> = ({
 
         <div className="bg-slate-50/80 p-3 rounded-lg border border-slate-200 text-xs">
           <div className="flex justify-between items-center mb-1.5">
-            <span className="text-slate-600 font-medium">Cadastral Disputes (15%)</span>
+            <span className="text-slate-600 font-medium">Cadastral Disputes{weightLabel('cadastral_dispute')}</span>
             <span className="font-mono font-bold text-gov-slate">{bd.cadastral_dispute_score}/100</span>
           </div>
           <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">

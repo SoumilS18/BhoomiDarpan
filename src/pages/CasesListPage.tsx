@@ -1,35 +1,39 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { fetchCases, fetchProjects } from '../lib/api';
+import {
+  fetchCases,
+  fetchProjects,
+  fetchStates,
+  fetchDistricts,
+  fetchSubDistricts,
+  fetchVillages,
+} from '../lib/api';
 import { useQueryParams } from '../router';
-import { AcquisitionCase, Project } from '../../shared/types';
+import { AcquisitionCase, Project, AdministrativeUnit } from '../../shared/types';
 import { CaseCard } from '../components/cases/CaseCard';
 import { EmptyState } from '../components/common/EmptyState';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
+import { GeographySourceNote } from '../components/common/GeographySourceNote';
 import {
   FolderKanban,
   Plus,
   RefreshCw,
   Search,
-  SlidersHorizontal,
   ChevronDown,
   ChevronRight,
   ArrowUpDown,
   Clock,
   AlertTriangle,
   FileText,
-  MapPin,
   Layers,
   Sparkles,
   Scale,
-  GitBranch,
   Table as TableIcon,
   LayoutGrid,
   CheckCircle2,
   FileWarning,
-  ExternalLink,
-  ShieldAlert,
 } from 'lucide-react';
+import { PageHeader, PageEyebrow } from '../components/common/PageHeader';
 import { clsx } from 'clsx';
 import { formatDate } from '../lib/utils';
 
@@ -53,13 +57,14 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Administrative units loaded from authoritative hierarchy
+  const [adminStates, setAdminStates] = useState<AdministrativeUnit[]>([]);
+  const [adminDistricts, setAdminDistricts] = useState<AdministrativeUnit[]>([]);
+  const [adminSubDistricts, setAdminSubDistricts] = useState<AdministrativeUnit[]>([]);
+  const [adminVillages, setAdminVillages] = useState<AdministrativeUnit[]>([]);
+
   // -------------------------------------------------------------------------
   // Filter / sort / view state lives in the URL query string.
-  //
-  // Rationale: a filtered registry view is a legitimate shareable artefact
-  // ("Sonipat, delayed, sorted by SLA"), and the global header search delivers
-  // its term here as `?q=`. Writes use `replace` so adjusting a filter does not
-  // flood browser history.
   // -------------------------------------------------------------------------
   const { query, setQuery } = useQueryParams();
 
@@ -72,9 +77,17 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
   const searchQuery = query.q ?? '';
   const setSearchQuery = (next: string) => setQuery({ q: next });
   const selectedState = query.state ?? '';
-  const setSelectedState = (next: string) => setQuery({ state: next });
+  const setSelectedState = (next: string) =>
+    setQuery({ state: next || undefined, district: undefined, subdistrict: undefined, village: undefined });
   const selectedDistrict = query.district ?? '';
-  const setSelectedDistrict = (next: string) => setQuery({ district: next });
+  const setSelectedDistrict = (next: string) =>
+    setQuery({ district: next || undefined, subdistrict: undefined, village: undefined });
+  const selectedSubDistrict = query.subdistrict ?? query.tehsil ?? '';
+  const setSelectedSubDistrict = (next: string) =>
+    setQuery({ subdistrict: next || undefined, village: undefined });
+  const selectedVillage = query.village ?? '';
+  const setSelectedVillage = (next: string) => setQuery({ village: next || undefined });
+
   const selectedProjectId = query.project ?? '';
   const setSelectedProjectId = (next: string) => setQuery({ project: next });
   const selectedStatus = query.status ?? '';
@@ -113,7 +126,58 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
   useEffect(() => {
     loadProjects();
     loadCases();
+    fetchStates()
+      .then((res) => setAdminStates(res.states || []))
+      .catch(() => {});
   }, []);
+
+  // Fetch districts when state changes
+  useEffect(() => {
+    if (!selectedState) {
+      setAdminDistricts([]);
+      setAdminSubDistricts([]);
+      setAdminVillages([]);
+      return;
+    }
+    const matchingState = adminStates.find(
+      (s) => s.name.toLowerCase() === selectedState.toLowerCase() || s.code === selectedState
+    );
+    const codeToFetch = matchingState?.code || selectedState;
+    fetchDistricts(codeToFetch)
+      .then((res) => setAdminDistricts(res.districts || []))
+      .catch(() => setAdminDistricts([]));
+  }, [selectedState, adminStates]);
+
+  // Fetch sub-districts when district changes
+  useEffect(() => {
+    if (!selectedDistrict) {
+      setAdminSubDistricts([]);
+      setAdminVillages([]);
+      return;
+    }
+    const matchingDist = adminDistricts.find(
+      (d) => d.name.toLowerCase() === selectedDistrict.toLowerCase() || d.code === selectedDistrict
+    );
+    const codeToFetch = matchingDist?.code || selectedDistrict;
+    fetchSubDistricts(codeToFetch)
+      .then((res) => setAdminSubDistricts(res.subdistricts || []))
+      .catch(() => setAdminSubDistricts([]));
+  }, [selectedDistrict, adminDistricts]);
+
+  // Fetch villages when sub-district changes
+  useEffect(() => {
+    if (!selectedSubDistrict) {
+      setAdminVillages([]);
+      return;
+    }
+    const matchingSub = adminSubDistricts.find(
+      (sd) => sd.name.toLowerCase() === selectedSubDistrict.toLowerCase() || sd.code === selectedSubDistrict
+    );
+    const codeToFetch = matchingSub?.code || selectedSubDistrict;
+    fetchVillages(codeToFetch, { limit: 200 })
+      .then((res) => setAdminVillages(res.villages || []))
+      .catch(() => setAdminVillages([]));
+  }, [selectedSubDistrict, adminSubDistricts]);
 
   const loadProjects = async () => {
     try {
@@ -128,11 +192,32 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
     setIsLoading(true);
     setError(null);
     try {
+      // Prefer the authoritative LGD code when the selection resolves to one;
+      // otherwise fall back to the label the server compares directly.
+      const stateUnit = adminStates.find(
+        (s) => s.name.toLowerCase() === selectedState.toLowerCase() || s.code === selectedState
+      );
+      const districtUnit = adminDistricts.find(
+        (d) => d.name.toLowerCase() === selectedDistrict.toLowerCase() || d.code === selectedDistrict
+      );
+      const subUnit = adminSubDistricts.find(
+        (sd) => sd.name.toLowerCase() === selectedSubDistrict.toLowerCase() || sd.code === selectedSubDistrict
+      );
+      const villageUnit = adminVillages.find(
+        (v) => v.name.toLowerCase() === selectedVillage.toLowerCase() || v.code === selectedVillage
+      );
       const res = await fetchCases({
-        state: selectedState || undefined,
-        district: selectedDistrict || undefined,
+        state: selectedState && !stateUnit ? selectedState : undefined,
+        state_lgd_code: stateUnit?.code || undefined,
+        district: selectedDistrict && !districtUnit ? selectedDistrict : undefined,
+        district_lgd_code: districtUnit?.code || undefined,
+        subdistrict: selectedSubDistrict && !subUnit ? selectedSubDistrict : undefined,
+        subdistrict_lgd_code: subUnit?.code || undefined,
+        village: selectedVillage && !villageUnit ? selectedVillage : undefined,
+        village_lgd_code: villageUnit?.code || undefined,
         status: selectedStatus || undefined,
         priority: selectedPriority || undefined,
+        project_id: selectedProjectId || undefined,
         search: searchQuery || undefined,
       });
       setCases(res.cases || []);
@@ -143,15 +228,39 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
     }
   };
 
-  // Dynamic filter lists derived from data
+  // Dynamic filter lists derived from authoritative data and loaded cases
   const availableStates = useMemo(() => {
-    return Array.from(new Set(cases.map((c) => c.state).filter(Boolean))).sort();
-  }, [cases]);
+    const caseStates = cases.map((c) => c.state).filter(Boolean);
+    const adminStateNames = adminStates.map((s) => s.name);
+    return Array.from(new Set([...caseStates, ...adminStateNames])).sort();
+  }, [cases, adminStates]);
 
   const availableDistricts = useMemo(() => {
-    const pool = selectedState ? cases.filter((c) => c.state === selectedState) : cases;
-    return Array.from(new Set(pool.map((c) => c.district).filter(Boolean))).sort();
-  }, [cases, selectedState]);
+    const pool = selectedState
+      ? cases.filter((c) => c.state?.toLowerCase() === selectedState.toLowerCase() || c.state_lgd_code === selectedState)
+      : cases;
+    const caseDistricts = pool.map((c) => c.district).filter(Boolean);
+    const adminDistrictNames = adminDistricts.map((d) => d.name);
+    return Array.from(new Set([...caseDistricts, ...adminDistrictNames])).sort();
+  }, [cases, selectedState, adminDistricts]);
+
+  const availableSubDistricts = useMemo(() => {
+    const pool = selectedDistrict
+      ? cases.filter((c) => c.district?.toLowerCase() === selectedDistrict.toLowerCase() || c.district_lgd_code === selectedDistrict)
+      : cases;
+    const caseTehsils = pool.map((c) => c.tehsil).filter(Boolean);
+    const adminSubNames = adminSubDistricts.map((sd) => sd.name);
+    return Array.from(new Set([...caseTehsils, ...adminSubNames])).sort();
+  }, [cases, selectedDistrict, adminSubDistricts]);
+
+  const availableVillages = useMemo(() => {
+    const pool = selectedSubDistrict
+      ? cases.filter((c) => c.tehsil?.toLowerCase() === selectedSubDistrict.toLowerCase() || c.subdistrict_lgd_code === selectedSubDistrict)
+      : cases;
+    const caseVillages = pool.map((c) => c.village).filter(Boolean);
+    const adminVillageNames = adminVillages.map((v) => v.name);
+    return Array.from(new Set([...caseVillages, ...adminVillageNames])).sort();
+  }, [cases, selectedSubDistrict, adminVillages]);
 
   const availableStages = useMemo(() => {
     const set = new Set<string>();
@@ -173,18 +282,48 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
         (c) =>
           c.case_number.toLowerCase().includes(q) ||
           c.title.toLowerCase().includes(q) ||
-          c.village.toLowerCase().includes(q) ||
-          c.district.toLowerCase().includes(q) ||
+          (c.village && c.village.toLowerCase().includes(q)) ||
+          (c.tehsil && c.tehsil.toLowerCase().includes(q)) ||
+          (c.district && c.district.toLowerCase().includes(q)) ||
+          (c.state && c.state.toLowerCase().includes(q)) ||
           (c.project?.name && c.project.name.toLowerCase().includes(q))
       );
     }
 
     if (selectedState) {
-      result = result.filter((c) => c.state === selectedState);
+      const stateLower = selectedState.toLowerCase();
+      result = result.filter(
+        (c) =>
+          (c.state && c.state.toLowerCase() === stateLower) ||
+          c.state_lgd_code === selectedState
+      );
     }
 
     if (selectedDistrict) {
-      result = result.filter((c) => c.district === selectedDistrict);
+      const distLower = selectedDistrict.toLowerCase();
+      result = result.filter(
+        (c) =>
+          (c.district && c.district.toLowerCase() === distLower) ||
+          c.district_lgd_code === selectedDistrict
+      );
+    }
+
+    if (selectedSubDistrict) {
+      const subLower = selectedSubDistrict.toLowerCase();
+      result = result.filter(
+        (c) =>
+          (c.tehsil && c.tehsil.toLowerCase() === subLower) ||
+          c.subdistrict_lgd_code === selectedSubDistrict
+      );
+    }
+
+    if (selectedVillage) {
+      const vilLower = selectedVillage.toLowerCase();
+      result = result.filter(
+        (c) =>
+          (c.village && c.village.toLowerCase() === vilLower) ||
+          c.village_lgd_code === selectedVillage
+      );
     }
 
     if (selectedProjectId) {
@@ -242,6 +381,8 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
     searchQuery,
     selectedState,
     selectedDistrict,
+    selectedSubDistrict,
+    selectedVillage,
     selectedProjectId,
     selectedStatus,
     selectedPriority,
@@ -250,6 +391,7 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
     sortField,
     sortOrder,
   ]);
+
 
   const handleSortToggle = (field: SortField) => {
     if (sortField === field) {
@@ -270,6 +412,8 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
       q: undefined,
       state: undefined,
       district: undefined,
+      subdistrict: undefined,
+      village: undefined,
       project: undefined,
       status: undefined,
       priority: undefined,
@@ -293,75 +437,68 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Top Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-gov-navy bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
-              National Digital Registry
-            </span>
-            <span className="text-xs text-slate-300">•</span>
+      <PageHeader
+        eyebrow={
+          <>
+            <PageEyebrow>National Digital Registry</PageEyebrow>
             <span className="text-[11px] text-slate-500">
               RFCTLARR 2013 Statutory Workspace
             </span>
-          </div>
-          <h1 className="text-xl font-bold text-gov-slate tracking-tight">
-            Land Acquisition Case Registry
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Operational registry workspace with real-time milestone tracking, SLA delay telemetry, and progressive statutory disclosure.
-          </p>
-        </div>
+          </>
+        }
+        title="Land Acquisition Case Registry"
+        subtitle="Operational registry workspace with real-time milestone tracking, SLA delay telemetry, and progressive statutory disclosure."
+        actions={
+          <>
+            {/* View mode toggle */}
+            <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setViewMode('table')}
+                className={clsx(
+                  'flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition-all',
+                  viewMode === 'table'
+                    ? 'bg-white font-bold text-gov-navy shadow-gov'
+                    : 'text-slate-500 hover:text-gov-slate'
+                )}
+                title="Dense Operational Table"
+              >
+                <TableIcon className="h-3.5 w-3.5" />
+                <span>Table</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('cards')}
+                className={clsx(
+                  'flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 font-medium transition-all',
+                  viewMode === 'cards'
+                    ? 'bg-white font-bold text-gov-navy shadow-gov'
+                    : 'text-slate-500 hover:text-gov-slate'
+                )}
+                title="Card Grid View"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                <span>Cards</span>
+              </button>
+            </div>
 
-        <div className="flex items-center gap-2">
-          {/* View mode toggle */}
-          <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
-            <button
-              type="button"
-              onClick={() => setViewMode('table')}
-              className={clsx(
-                'flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all font-medium cursor-pointer',
-                viewMode === 'table'
-                  ? 'bg-white text-gov-navy font-bold shadow-xs'
-                  : 'text-slate-500 hover:text-gov-slate'
-              )}
-              title="Dense Operational Table"
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadCases}
+              leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
             >
-              <TableIcon className="h-3.5 w-3.5" />
-              <span>Table</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('cards')}
-              className={clsx(
-                'flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all font-medium cursor-pointer',
-                viewMode === 'cards'
-                  ? 'bg-white text-gov-navy font-bold shadow-xs'
-                  : 'text-slate-500 hover:text-gov-slate'
-              )}
-              title="Card Grid View"
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              <span>Cards</span>
-            </button>
-          </div>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadCases}
-            leftIcon={<RefreshCw className="h-3.5 w-3.5" />}
-          >
-            Refresh
-          </Button>
-          <Button size="sm" onClick={onOpenCreateCase} leftIcon={<Plus className="h-3.5 w-3.5" />}>
-            Initiate Case
-          </Button>
-        </div>
-      </div>
+              Refresh
+            </Button>
+            <Button size="sm" onClick={onOpenCreateCase} leftIcon={<Plus className="h-3.5 w-3.5" />}>
+              Initiate Case
+            </Button>
+          </>
+        }
+      />
 
       {/* Filter and Search Bar */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3 shadow-xs">
+      <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-gov">
         {/* Search Row */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[260px]">
@@ -371,7 +508,7 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by case number, title, village, district, corridor..."
-              className="w-full rounded-lg border border-slate-200 bg-slate-50/70 pl-9 pr-3 py-1.5 text-xs text-gov-slate placeholder:text-slate-400 focus:bg-white focus:border-gov-navy focus:outline-none focus:ring-1 focus:ring-gov-navy transition-all"
+              className="input pl-9 text-xs"
             />
           </div>
 
@@ -393,6 +530,8 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
           {(searchQuery ||
             selectedState ||
             selectedDistrict ||
+            selectedSubDistrict ||
+            selectedVillage ||
             selectedProjectId ||
             selectedStatus ||
             selectedPriority ||
@@ -409,15 +548,18 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
         </div>
 
         {/* Structured Dropdown Filters */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-xs">
+        <GeographySourceNote className="mb-1" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 text-xs">
           {/* State */}
           <select
             value={selectedState}
             onChange={(e) => {
               setSelectedState(e.target.value);
               setSelectedDistrict('');
+              setSelectedSubDistrict('');
+              setSelectedVillage('');
             }}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-gov-slate focus:bg-white focus:outline-none focus:ring-1 focus:ring-gov-navy"
+            className="input input-xs"
           >
             <option value="">All States ({availableStates.length})</option>
             {availableStates.map((s) => (
@@ -430,9 +572,13 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
           {/* District */}
           <select
             value={selectedDistrict}
-            onChange={(e) => setSelectedDistrict(e.target.value)}
+            onChange={(e) => {
+              setSelectedDistrict(e.target.value);
+              setSelectedSubDistrict('');
+              setSelectedVillage('');
+            }}
             disabled={!selectedState && availableDistricts.length === 0}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-gov-slate focus:bg-white focus:outline-none focus:ring-1 focus:ring-gov-navy disabled:opacity-60"
+            className="input input-xs"
           >
             <option value="">All Districts ({availableDistricts.length})</option>
             {availableDistricts.map((d) => (
@@ -442,11 +588,44 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
             ))}
           </select>
 
+          {/* Sub-District / Tehsil */}
+          <select
+            value={selectedSubDistrict}
+            onChange={(e) => {
+              setSelectedSubDistrict(e.target.value);
+              setSelectedVillage('');
+            }}
+            disabled={!selectedDistrict && availableSubDistricts.length === 0}
+            className="input input-xs"
+          >
+            <option value="">All Tehsils ({availableSubDistricts.length})</option>
+            {availableSubDistricts.map((sd) => (
+              <option key={sd} value={sd}>
+                {sd}
+              </option>
+            ))}
+          </select>
+
+          {/* Village */}
+          <select
+            value={selectedVillage}
+            onChange={(e) => setSelectedVillage(e.target.value)}
+            disabled={!selectedSubDistrict && availableVillages.length === 0}
+            className="input input-xs"
+          >
+            <option value="">All Villages ({availableVillages.length})</option>
+            {availableVillages.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+
           {/* Project */}
           <select
             value={selectedProjectId}
             onChange={(e) => setSelectedProjectId(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-gov-slate focus:bg-white focus:outline-none focus:ring-1 focus:ring-gov-navy"
+            className="input input-xs"
           >
             <option value="">All Projects ({projects.length})</option>
             {projects.map((p) => (
@@ -460,9 +639,10 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-gov-slate focus:bg-white focus:outline-none focus:ring-1 focus:ring-gov-navy"
+            className="input input-xs"
           >
             <option value="">All Statuses</option>
+            <option value="draft">Draft</option>
             <option value="active">Active</option>
             <option value="delayed">Delayed</option>
             <option value="under_review">Under Review</option>
@@ -474,7 +654,7 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
           <select
             value={selectedPriority}
             onChange={(e) => setSelectedPriority(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-gov-slate focus:bg-white focus:outline-none focus:ring-1 focus:ring-gov-navy"
+            className="input input-xs"
           >
             <option value="">All Priorities</option>
             <option value="critical">Critical</option>
@@ -487,7 +667,7 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
           <select
             value={selectedStage}
             onChange={(e) => setSelectedStage(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-xs text-gov-slate focus:bg-white focus:outline-none focus:ring-1 focus:ring-gov-navy truncate"
+            className="input input-xs truncate"
           >
             <option value="">All Stages ({availableStages.length})</option>
             {availableStages.map((stg) => (
@@ -501,17 +681,26 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
         {/* Results count indicator */}
         <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-100 flex items-center justify-between">
           <span>
-            Showing <strong>{filteredCases.length}</strong> of <strong>{cases.length}</strong> acquisition cases
+            Showing <strong>{filteredCases.length}</strong> of <strong>{cases.length}</strong>{' '}
+            matching acquisition cases
           </span>
           <span className="text-[10px] text-slate-400">
             Sorted by {sortField.replace('_', ' ')} ({sortOrder.toUpperCase()})
           </span>
         </div>
+
+        {/* Honest split of where each filter is actually applied */}
+        <p className="text-[10px] leading-relaxed text-slate-400">
+          Geography (LGD), project, status, priority and search are applied by the server on every
+          load. Stage and delayed/critical views are applied to the{' '}
+          <strong className="text-slate-500">{cases.length}</strong> cases the server returned for
+          those criteria.
+        </p>
       </div>
 
       {/* Content Viewport */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center p-20 space-y-3 bg-white rounded-xl border border-slate-200">
+        <div className="flex flex-col items-center justify-center space-y-3 rounded-xl border border-slate-200 bg-white p-20 shadow-gov">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gov-navy" />
           <p className="text-xs text-slate-500 font-medium">
             Querying land acquisition registry and calculating SLA trajectories...
@@ -543,7 +732,7 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
         </div>
       ) : (
         /* High-Information Operational Table */
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs">
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-gov">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
@@ -641,7 +830,7 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
                               </strong>
                             </div>
                             <p className="text-[10px] text-slate-400 line-clamp-1">
-                              {item.description || 'Statutory land acquisition proceeding'}
+                              {item.description || '—'}
                             </p>
                           </div>
                         </td>
@@ -649,10 +838,10 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
                         {/* Project */}
                         <td className="py-3 px-3 whitespace-nowrap">
                           <div className="text-xs font-medium text-gov-slate truncate max-w-[140px]">
-                            {item.project?.name || 'Standard Corridor'}
+                            {item.project?.name || 'Unassigned'}
                           </div>
                           <span className="text-[10px] text-slate-400 block font-mono">
-                            {item.project?.code || 'CORR-01'}
+                            {item.project?.code || '—'}
                           </span>
                         </td>
 
@@ -670,7 +859,7 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
                         <td className="py-3 px-3 min-w-[140px]">
                           <div className="flex justify-between text-[11px] mb-1">
                             <span className="font-medium text-gov-slate truncate max-w-[100px]">
-                              {metrics?.current_stage_title || 'Stage 1'}
+                              {metrics?.current_stage_title || '—'}
                             </span>
                             <span className="font-mono text-slate-500 text-[10px]">
                               {metrics?.progress_percentage ?? 0}%
@@ -780,7 +969,7 @@ export const CasesListPage: React.FC<CasesListPageProps> = ({
                                   Compensation: <strong>{formatCurrency(item.estimated_compensation)}</strong>
                                 </div>
                                 <div className="text-[11px] text-slate-500">
-                                  Workflow Model: {item.workflow?.name || 'Standard'}
+                                  Workflow Model: {item.workflow?.name || '—'}
                                 </div>
                               </div>
 

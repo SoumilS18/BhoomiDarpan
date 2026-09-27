@@ -1,5 +1,6 @@
 import React from 'react';
 import { AcquisitionCase } from '../../../shared/types';
+import { ROLE_LABELS } from '../../lib/domainLabels';
 import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
 import { CaseExternalContextCard } from './CaseExternalContextCard';
@@ -44,6 +45,24 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
   const disputedParcels = (caseItem.parcels || []).filter(
     (p) => p.acquisition_status === 'disputed'
   );
+
+  /**
+   * Responsible role for the case.
+   *
+   * Read from the LIVE stage definition (`workflow_stages.required_role`) for
+   * whichever stage is currently open. Nothing is hardcoded: if the workflow
+   * has no open stage, or the stage defines no required role, the UI says so
+   * instead of asserting a default owner.
+   */
+  const openStage = (caseItem.stage_instances || []).find(
+    (i) => i.status === 'in_progress' || i.status === 'pending_approval' || i.status === 'blocked'
+  );
+  const openStageRequiredRole = openStage?.stage?.required_role;
+  const responsibleRoleText = openStageRequiredRole
+    ? ROLE_LABELS[openStageRequiredRole]
+    : openStage
+      ? 'Not defined for this stage'
+      : 'No open stage';
 
   const formatCurrency = (amount: number) => {
     if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(2)} Cr`;
@@ -152,10 +171,10 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
                 Sponsoring Project
               </span>
               <div className="font-semibold text-gov-slate mt-0.5">
-                {caseItem.project?.name || 'Infrastructure Corridor Project'}
+                {caseItem.project?.name || 'Unassigned'}
               </div>
               <div className="text-[11px] text-slate-500">
-                Agency: <strong>{caseItem.project?.sponsoring_agency || 'State NHAI / PWD'}</strong>
+                Agency: <strong>{caseItem.project?.sponsoring_agency || '—'}</strong>
               </div>
             </div>
 
@@ -194,7 +213,7 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
 
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
               <span className="text-slate-500">Responsible Role:</span>
-              <span className="font-semibold text-gov-navy">Land Acquisition Officer (LAO)</span>
+              <span className="font-semibold text-gov-navy">{responsibleRoleText}</span>
             </div>
           </div>
         </div>
@@ -214,7 +233,7 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
                 Current Statutory Stage
               </span>
               <div className="text-sm font-bold text-gov-slate mt-0.5 flex items-center justify-between">
-                <span>{metrics?.current_stage_title || 'Initiation'}</span>
+                <span>{metrics?.current_stage_title || '—'}</span>
                 <Badge variant={isDelayed ? 'red' : 'navy'}>
                   {caseItem.status.toUpperCase()}
                 </Badge>

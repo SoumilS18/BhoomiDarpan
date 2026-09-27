@@ -113,7 +113,12 @@ export const TimelineGantt: React.FC<TimelineGanttProps> = ({
                     {inst.expected_start_date} <span className="text-slate-400">→</span> {inst.expected_end_date}
                   </div>
                   <div className="text-[10px] text-slate-500 mt-0.5">
-                    Planned duration: <strong>{stage?.default_duration_days || 15} days</strong>
+                    Planned duration:{' '}
+                    {typeof stage?.default_duration_days === 'number' ? (
+                      <strong>{stage.default_duration_days} days</strong>
+                    ) : (
+                      <span className="text-slate-400">Not defined for this stage</span>
+                    )}
                   </div>
                 </div>
 
@@ -159,7 +164,7 @@ export const TimelineGantt: React.FC<TimelineGanttProps> = ({
                     <span>Prerequisites &amp; Role</span>
                   </div>
                   <div className="text-gov-slate font-medium capitalize">
-                    Role: <strong>{stage?.required_role || 'Competent Authority'}</strong>
+                    Role: <strong>{stage?.required_role || '—'}</strong>
                   </div>
                   <div className="text-[10px] text-slate-500 truncate mt-0.5">
                     Docs:{' '}

@@ -15,6 +15,14 @@ import {
   NotificationEventType,
 } from '../../shared/types';
 import { useAuth } from '../context/AuthContext';
+import {
+  NOTIFICATION_EVENT_TYPE_LABELS,
+  NOTIFICATION_EVENT_TYPE_VALUES,
+  NOTIFICATION_SEVERITY_LABELS,
+  NOTIFICATION_SEVERITY_VALUES,
+  NOTIFICATION_STATUS_LABELS,
+  NOTIFICATION_STATUS_VALUES,
+} from '../lib/domainLabels';
 import { Button } from '../components/common/Button';
 import { Badge } from '../components/common/Badge';
 import { Modal } from '../components/common/Modal';
@@ -312,10 +320,11 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({ onSelectCa
               className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-gov-slate"
             >
               <option value="active">Active (Unread + Ack)</option>
-              <option value="unread">Unread Only</option>
-              <option value="acknowledged">Acknowledged Only</option>
-              <option value="resolved">Resolved</option>
-              <option value="dismissed">Dismissed</option>
+              {NOTIFICATION_STATUS_VALUES.map((s) => (
+                <option key={s} value={s}>
+                  {NOTIFICATION_STATUS_LABELS[s]} Only
+                </option>
+              ))}
               <option value="all">All Records</option>
             </select>
           </div>
@@ -329,10 +338,11 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({ onSelectCa
               className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-gov-slate"
             >
               <option value="all">All Severities</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
+              {[...NOTIFICATION_SEVERITY_VALUES].reverse().map((s) => (
+                <option key={s} value={s}>
+                  {NOTIFICATION_SEVERITY_LABELS[s]}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -345,12 +355,11 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({ onSelectCa
               className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-gov-slate"
             >
               <option value="all">All Event Types</option>
-              <option value="sla_breach">SLA Breach</option>
-              <option value="sla_warning">SLA Warning</option>
-              <option value="critical_risk">Critical Risk</option>
-              <option value="unverified_docs">Unverified Documents</option>
-              <option value="dispute_filed">Dispute Filed</option>
-              <option value="bottleneck_detected">Bottleneck Detected</option>
+              {NOTIFICATION_EVENT_TYPE_VALUES.map((t) => (
+                <option key={t} value={t}>
+                  {NOTIFICATION_EVENT_TYPE_LABELS[t]}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -423,7 +432,7 @@ export const NotificationsPage: React.FC<NotificationsPageProps> = ({ onSelectCa
                           <ArrowUpRight className="h-3 w-3" />
                         </button>
                       )}
-                      <span>Assigned Role: <strong>{notif.recipient_role || 'LAO'}</strong></span>
+                      <span>Assigned Role: <strong>{notif.recipient_role || '—'}</strong></span>
                       {notif.status && (
                         <span className="capitalize text-[10px] font-mono text-slate-400">
                           State: {notif.status}
