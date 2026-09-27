@@ -18,6 +18,7 @@ import {
   Recommendation,
   EvidenceItem,
   UserRole,
+  SpatialRelationship,
 } from '../../shared/types';
 import {
   getEscalationRulesSync,
@@ -97,6 +98,7 @@ export interface EvaluateTriggersParams {
   discrepancies?: DataDiscrepancy[];
   recommendations?: Recommendation[];
   downstreamImpactDays?: number;
+  spatialRelationships?: SpatialRelationship[];
 }
 
 /**
@@ -564,6 +566,95 @@ export async function evaluateOperationalTriggers(
         recipient_role: 'lao',
         evidence,
         metadata: { recommendation_ids: criticalRecs.map((r) => r.id) },
+      });
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // 11. Spatial Polygon Overlap (Evidence: SpatialRelationship)
+  // --------------------------------------------------------------------------
+  if (params.spatialRelationships && params.spatialRelationships.length > 0) {
+    const overlaps = params.spatialRelationships.filter(
+      (rel) =>
+        (rel.relationship_type === 'boundary_overlap' ||
+          rel.relationship_type === 'complete_enclosure') &&
+        rel.intersection_area_hectares &&
+        rel.intersection_area_hectares > 0
+    );
+
+    for (const rel of overlaps) {
+      const areaHa = rel.intersection_area_hectares || 0;
+      const overlapPct = rel.overlap_pct ?? rel.source_overlap_percentage ?? 0;
+      const isCritical = overlapPct >= 20 || areaHa >= 5;
+      const targetCaseTitle = rel.target_case_title || rel.related_case_number || 'Adjacent Case';
+      const evidence: EvidenceItem[] = [
+        {
+          id: `ev-spatial-overlap-${rel.id}`,
+          statement: `Direct GIS polygon intersection of ${areaHa.toFixed(2)} Ha (${overlapPct.toFixed(1)}% of footprint) with Case ${rel.related_case_number || rel.related_case_id}.`,
+          classification: 'calculated_metric',
+          source: 'spatialIntelligenceService',
+          confidence: 0.98,
+          policy_key: 'spatial_conflict_policy',
+          timestamp: new Date().toISOString(),
+        },
+      ];
+
+      await processCandidate({
+        event_type: 'spatial_overlap',
+        entity_id: rel.related_case_id || rel.target_case_id,
+        title: `Spatial Polygon Overlap: ${areaHa.toFixed(2)} Ha with ${rel.related_case_number || 'Adjacent Case'}`,
+        message: `Acquisition footprint collides with ${targetCaseTitle}. Suggested mitigation: ${rel.alternative_solutions?.[0]?.strategy_name || 'Boundary clearance offset review'}.`,
+        severity: isCritical ? 'critical' : 'warning',
+        recipient_role: 'lao',
+        evidence,
+        metadata: {
+          related_case_id: rel.related_case_id || rel.target_case_id,
+          related_case_number: rel.related_case_number || rel.target_case_number,
+          intersection_area_hectares: areaHa,
+          overlap_percentage: overlapPct,
+          alternative_solutions: rel.alternative_solutions,
+        },
+      });
+    }
+
+    // --------------------------------------------------------------------------
+    // 12. Cadastral Survey Collision (Evidence: Shared survey numbers in same village)
+    // --------------------------------------------------------------------------
+    const cadastralCollisions = params.spatialRelationships.filter(
+      (rel) =>
+        rel.relationship_type === 'cadastral_collision' &&
+        rel.shared_survey_numbers &&
+        rel.shared_survey_numbers.length > 0
+    );
+
+    for (const rel of cadastralCollisions) {
+      const surveyList = rel.shared_survey_numbers!.join(', ');
+      const evidence: EvidenceItem[] = [
+        {
+          id: `ev-cadastral-collision-${rel.id}`,
+          statement: `Shared survey numbers [${surveyList}] across identical revenue village and taluk with Case ${rel.related_case_number || rel.related_case_id}.`,
+          classification: 'observed_fact',
+          source: 'spatialIntelligenceService',
+          confidence: 1.0,
+          policy_key: 'cadastral_collision_policy',
+          timestamp: new Date().toISOString(),
+        },
+      ];
+
+      await processCandidate({
+        event_type: 'cadastral_collision',
+        entity_id: rel.related_case_id || rel.target_case_id,
+        title: `Cadastral Survey Collision: ${rel.shared_survey_numbers!.length} Parcel(s) with ${rel.related_case_number || 'Adjacent Case'}`,
+        message: `Parcels (${surveyList}) are simultaneously claimed or notified in multiple proceedings. Joint Section 23/30 demarcation required.`,
+        severity: 'critical',
+        recipient_role: 'revenue_inspector',
+        evidence,
+        metadata: {
+          related_case_id: rel.related_case_id || rel.target_case_id,
+          related_case_number: rel.related_case_number || rel.target_case_number,
+          shared_survey_numbers: rel.shared_survey_numbers,
+          alternative_solutions: rel.alternative_solutions,
+        },
       });
     }
   }

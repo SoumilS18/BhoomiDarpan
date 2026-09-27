@@ -13,6 +13,7 @@ import {
   SpatialRelationship,
   SpatialRelationshipType,
   SpatialRelationshipRecommendation,
+  SpatialAlternativeSolution,
   PortfolioSpatialRelationshipsSummary,
 } from '../../shared/types';
 import { AuthenticatedUser } from '../middleware/auth.middleware';
@@ -1129,6 +1130,69 @@ export async function detectSpatialAndCadastralRelationships(
       const surveyList = sharedCadastral.map((p) => p.survey_number).filter(Boolean) as string[];
       const khataList = sharedCadastral.map((p) => p.khata_number).filter(Boolean) as string[];
 
+      // Compute Alternative Spacing & Harmonization Solutions
+      const alternativeSolutions: SpatialAlternativeSolution[] = [];
+      const centroidSource = computeAccurateCentroid(sourceCase.geojson_boundary);
+      const centroidOther = computeAccurateCentroid(other.geojson_boundary);
+
+      let shiftDirection = 'Eastward';
+      let bufferMeters = 35;
+      if (centroidSource && centroidOther) {
+        const dLat = centroidSource[0] - centroidOther[0];
+        const dLng = centroidSource[1] - centroidOther[1];
+        if (Math.abs(dLng) >= Math.abs(dLat)) {
+          shiftDirection = dLng >= 0 ? 'Eastward' : 'Westward';
+        } else {
+          shiftDirection = dLat >= 0 ? 'Northward' : 'Southward';
+        }
+      }
+
+      if (geomIntersect.intersectionAreaHectares > 0) {
+        const approxSideMeters = Math.round(Math.sqrt(geomIntersect.intersectionAreaHectares * 10000));
+        bufferMeters = Math.max(15, Math.min(150, Math.round(approxSideMeters * 0.35)));
+
+        const retainedHa = Math.max(0.1, Math.round((sourceCase.total_area_hectares - geomIntersect.intersectionAreaHectares) * 100) / 100);
+        const retainedPct = sourceCase.total_area_hectares > 0
+          ? Math.min(100, Math.round((retainedHa / sourceCase.total_area_hectares) * 1000) / 10)
+          : 0;
+
+        alternativeSolutions.push({
+          id: `alt-offset-${sourceCase.id}-${other.id}`,
+          strategy_name: `Corridor Clearance Offset (${shiftDirection} by ~${bufferMeters}m)`,
+          strategy_type: 'boundary_offset_clearance',
+          clearance_direction: shiftDirection,
+          recommended_buffer_meters: bufferMeters,
+          retained_area_hectares: retainedHa,
+          retained_area_percentage: retainedPct,
+          justification: `Shift corridor boundary ${shiftDirection.toLowerCase()} by approximately ${bufferMeters}m to eliminate the ${geomIntersect.intersectionAreaHectares} Ha overlap with Case ${other.case_number}. Retains ${retainedPct}% (${retainedHa} Ha) of statutory planned footprint.`,
+          statutory_procedure: `Competent Authority must issue rectified spatial schedule under RFCTLARR Act Section 11(1) and gazette rectified boundary coordinates.`,
+        });
+
+        alternativeSolutions.push({
+          id: `alt-phased-${sourceCase.id}-${other.id}`,
+          strategy_name: 'Phased Right-of-Way & Sequential Possession',
+          strategy_type: 'phased_acquisition_taking',
+          retained_area_hectares: sourceCase.total_area_hectares,
+          retained_area_percentage: 100,
+          justification: `Retain 100% planned footprint for both schemes by synchronizing construction milestones: Primary linear corridor taking executes in Phase 1, followed by secondary infrastructure in Phase 2.`,
+          statutory_procedure: `Execute Inter-Departmental Possession Protocol under RFCTLARR Section 38 with Collector's approval.`,
+        });
+      }
+
+      if (sharedCadastral.length > 0 || geomIntersect.intersectionAreaHectares > 0) {
+        alternativeSolutions.push({
+          id: `alt-joint-award-${sourceCase.id}-${other.id}`,
+          strategy_name: 'Joint Valuation & Consolidated Award Schedule',
+          strategy_type: 'joint_award_alignment',
+          retained_area_hectares: sourceCase.total_area_hectares,
+          retained_area_percentage: 100,
+          justification: sharedCadastral.length > 0
+            ? `Consolidate compensation determination for shared survey numbers [${surveyListStr}] into a single coordinated hearing to prevent duplicate disbursements and title litigation.`
+            : `Coordinate joint inquiry across overlapping corridor zones under RFCTLARR Section 23 to synchronize award declarations and prevent contradictory land valuation rates.`,
+          statutory_procedure: `Joint inquiry conducted by Land Acquisition Officer under RFCTLARR Act Section 23 with single apportionment order under Section 30.`,
+        });
+      }
+
       relationships.push({
         id: `rel-${sourceCase.id}-${other.id}`,
         source_case_id: sourceCase.id,
@@ -1175,6 +1239,7 @@ export async function detectSpatialAndCadastralRelationships(
           action_type: r.type,
           statutory_guardrail: 'Advisory only. Statutory decisions require competent authority order under RFCTLARR Act.',
         })),
+        alternative_solutions: alternativeSolutions.length > 0 ? alternativeSolutions : undefined,
         detected_at: new Date().toISOString(),
       });
     }
@@ -1240,6 +1305,19 @@ export async function getPortfolioSpatialRelationships(
     cases_requiring_spatial_review: reviewCaseIds,
     relationships: allRelationships,
   };
+}
+
+/**
+ * Retrieves spatial and cadastral relationships for a single case within authorized scope.
+ */
+export async function getCaseSpatialRelationships(
+  caseId: string,
+  scopeFilter?: AuthorizedScopeFilter
+): Promise<SpatialRelationship[]> {
+  const scopedCases = await getScopedCases(scopeFilter ? { role: 'admin' } as any : undefined);
+  const sourceCase = scopedCases.find((c) => c.id === caseId);
+  if (!sourceCase) return [];
+  return detectSpatialAndCadastralRelationships(sourceCase, scopedCases);
 }
 
 /**

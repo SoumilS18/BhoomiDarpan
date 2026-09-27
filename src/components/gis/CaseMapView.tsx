@@ -555,6 +555,31 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
                       </strong>
                     </div>
                   )}
+
+                  {selectedFeatureProps.alternative_solutions?.length > 0 && (
+                    <div className="pt-2 border-t border-red-200/60 space-y-1.5">
+                      <span className="text-[10px] font-bold text-gov-navy uppercase tracking-wider block">
+                        Recommended Alternative Spacing:
+                      </span>
+                      {selectedFeatureProps.alternative_solutions.map((sol: any, sIdx: number) => (
+                        <div key={sIdx} className="bg-white p-2 rounded border border-red-100 text-[10px] space-y-0.5">
+                          <div className="flex items-center justify-between font-semibold text-slate-800">
+                            <span>{sol.strategy_name}</span>
+                            {sol.recommended_buffer_meters && (
+                              <span className="text-blue-700 font-mono bg-blue-50 px-1 rounded">
+                                +{sol.recommended_buffer_meters}m {sol.clearance_direction || ''}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-slate-600 text-[9px]">{sol.justification}</p>
+                          <div className="text-[9px] text-emerald-700 font-medium">
+                            Retains {sol.retained_area_hectares} Ha ({sol.retained_area_percentage}%)
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   <p className="text-[10px] text-slate-500 italic mt-1 pt-1 border-t border-red-200">
                     Calculated dynamically via polygon clipping. Non-destructive advisory evidence.
                   </p>

@@ -1153,7 +1153,9 @@ export type NotificationEventType =
   | 'data_discrepancy'
   | 'document_issue'
   | 'downstream_impact'
-  | 'unresolved_recommendation';
+  | 'unresolved_recommendation'
+  | 'spatial_overlap'
+  | 'cadastral_collision';
 
 export type NotificationStatus = 'unread' | 'acknowledged' | 'resolved' | 'dismissed';
 
@@ -1746,6 +1748,18 @@ export interface SpatialRelationshipRecommendation {
   statutory_guardrail?: string;
 }
 
+export interface SpatialAlternativeSolution {
+  id: string;
+  strategy_name: string;
+  strategy_type: 'boundary_offset_clearance' | 'joint_award_alignment' | 'phased_acquisition_taking';
+  clearance_direction?: string;
+  recommended_buffer_meters?: number;
+  retained_area_hectares: number;
+  retained_area_percentage: number;
+  justification: string;
+  statutory_procedure: string;
+}
+
 export interface SpatialRelationship {
   id: string;
   source_case_id: string;
@@ -1795,6 +1809,7 @@ export interface SpatialRelationship {
   intersection_geojson?: any; // GeoJSON geometry of the overlap polygon
   evidence_summary: string;
   recommendations: SpatialRelationshipRecommendation[];
+  alternative_solutions?: SpatialAlternativeSolution[];
   detected_at: string;
 }
 

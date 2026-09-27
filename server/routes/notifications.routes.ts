@@ -11,6 +11,7 @@ import {
 import { getSupabase, isSupabaseConfigured } from '../config/supabase';
 import { requireAuth } from '../middleware/auth.middleware';
 import { getAuthorizedScopeFilter } from '../services/portfolioAnalyzer';
+import { getCaseSpatialRelationships } from '../services/spatialIntelligenceService';
 
 const router = Router();
 
@@ -296,13 +297,15 @@ router.post('/evaluate', requireAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'No acquisition cases found for evaluation' });
     }
 
+    const scopeFilter = getAuthorizedScopeFilter(req.user);
     const allGenerated = [];
     for (const caseItem of casesList) {
-      const [stagesRes, docsRes, parcelsRes, riskRes] = await Promise.all([
+      const [stagesRes, docsRes, parcelsRes, riskRes, spatialRels] = await Promise.all([
         supabase.from('case_stage_instances').select('*, stage:workflow_stages(*)').eq('case_id', caseItem.id),
         supabase.from('documents').select('*').eq('case_id', caseItem.id),
         supabase.from('parcels').select('*').eq('case_id', caseItem.id),
         supabase.from('risk_assessments').select('*').eq('case_id', caseItem.id).order('generated_at', { ascending: false }).limit(1),
+        getCaseSpatialRelationships(caseItem.id, scopeFilter).catch(() => []),
       ]);
 
       const generated = await evaluateOperationalTriggers({
@@ -311,6 +314,7 @@ router.post('/evaluate', requireAuth, async (req: Request, res: Response) => {
         documents: docsRes.data || [],
         parcels: parcelsRes.data || [],
         riskAssessment: riskRes.data?.[0],
+        spatialRelationships: spatialRels,
       });
       allGenerated.push(...generated);
     }

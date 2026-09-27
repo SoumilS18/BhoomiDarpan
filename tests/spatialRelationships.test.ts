@@ -13,6 +13,11 @@ import {
 } from '../server/services/spatialIntelligenceService';
 import { clearInMemoryAuditLogs } from '../server/services/auditLogger';
 import { resetPoliciesToDefaults } from '../server/services/policyEngine';
+import {
+  evaluateOperationalTriggers,
+  clearInMemoryNotifications,
+  getInMemoryNotifications,
+} from '../server/services/notificationService';
 import { AcquisitionCase, Parcel } from '../shared/types';
 import { AuthenticatedUser } from '../server/middleware/auth.middleware';
 
@@ -462,6 +467,212 @@ describe('Spatial & Cadastral Relationship Detection and Warning Engine', () => 
       const summary = await getPortfolioSpatialRelationships(restrictedUser);
       expect(summary.total_relationships_detected).toBe(0);
       expect(summary.cases_requiring_spatial_review?.length).toBe(0);
+    });
+  });
+
+  describe('7. Alternative Spacing and Realignment Solutions Engine', () => {
+    it('generates concrete clearance spacing alternatives with buffer meters, direction, and retained area', async () => {
+      const caseA: AcquisitionCase = {
+        id: 'case-alpha',
+        project_id: 'proj-alpha',
+        case_number: 'ALPHA-001',
+        title: 'Highway Corridor Alpha',
+        state: 'Uttar Pradesh',
+        district: 'Varanasi',
+        tehsil: 'Pindra',
+        village: 'Ahiran',
+        total_area_hectares: 50.0,
+        estimated_compensation: 50000000,
+        status: 'in_progress',
+        current_stage: 'section_11_notification',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        geojson_boundary: polygonA,
+      };
+
+      const caseB: AcquisitionCase = {
+        id: 'case-beta',
+        project_id: 'proj-beta',
+        case_number: 'BETA-001',
+        title: 'Expressway Beta',
+        state: 'Uttar Pradesh',
+        district: 'Varanasi',
+        tehsil: 'Pindra',
+        village: 'Ahiran',
+        total_area_hectares: 45.0,
+        estimated_compensation: 45000000,
+        status: 'in_progress',
+        current_stage: 'section_19_declaration',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        geojson_boundary: polygonB_PartialOverlap,
+      };
+
+      const rels = await detectSpatialAndCadastralRelationships(caseA, [caseA, caseB]);
+      const overlapRel = rels.find((r) => r.relationship_type === 'polygon_overlap' || r.relationship_type === 'boundary_overlap');
+      expect(overlapRel).toBeDefined();
+      expect(overlapRel?.alternative_solutions).toBeDefined();
+      expect(overlapRel?.alternative_solutions?.length).toBeGreaterThanOrEqual(3);
+
+      const offsetStrategy = overlapRel?.alternative_solutions?.find((s) => s.strategy_type === 'boundary_offset_clearance');
+      expect(offsetStrategy).toBeDefined();
+      expect(offsetStrategy?.recommended_buffer_meters).toBeGreaterThan(0);
+      expect(offsetStrategy?.retained_area_hectares).toBeGreaterThan(0);
+      expect(offsetStrategy?.retained_area_percentage).toBeGreaterThan(0);
+      expect(offsetStrategy?.clearance_direction).toMatch(/Eastward|Westward|Northward|Southward|Opposing Centroid/);
+      expect(offsetStrategy?.statutory_procedure).toContain('Section 11(1)');
+
+      const phasedStrategy = overlapRel?.alternative_solutions?.find((s) => s.strategy_type === 'phased_acquisition_taking');
+      expect(phasedStrategy).toBeDefined();
+      expect(phasedStrategy?.statutory_procedure).toContain('Section 38');
+
+      const jointStrategy = overlapRel?.alternative_solutions?.find((s) => s.strategy_type === 'joint_award_alignment');
+      expect(jointStrategy).toBeDefined();
+      expect(jointStrategy?.statutory_procedure).toContain('Section 23');
+    });
+  });
+
+  describe('8. Operational Governance Friction Notifications', () => {
+    beforeEach(() => {
+      clearInMemoryNotifications();
+    });
+
+    it('generates spatial_overlap notifications for LAO with evidence and alternative mitigations', async () => {
+      const caseA: AcquisitionCase = {
+        id: 'case-notif-1',
+        project_id: 'proj-1',
+        case_number: 'NOTIF-01',
+        title: 'Corridor 1',
+        state: 'Uttar Pradesh',
+        district: 'Varanasi',
+        tehsil: 'Pindra',
+        village: 'Ahiran',
+        total_area_hectares: 50.0,
+        estimated_compensation: 50000000,
+        status: 'in_progress',
+        current_stage: 'section_11_notification',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        geojson_boundary: polygonA,
+      };
+
+      const caseB: AcquisitionCase = {
+        id: 'case-notif-2',
+        project_id: 'proj-2',
+        case_number: 'NOTIF-02',
+        title: 'Corridor 2',
+        state: 'Uttar Pradesh',
+        district: 'Varanasi',
+        tehsil: 'Pindra',
+        village: 'Ahiran',
+        total_area_hectares: 45.0,
+        estimated_compensation: 45000000,
+        status: 'in_progress',
+        current_stage: 'section_19_declaration',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        geojson_boundary: polygonB_PartialOverlap,
+      };
+
+      const rels = await detectSpatialAndCadastralRelationships(caseA, [caseA, caseB]);
+
+      const notifications = await evaluateOperationalTriggers({
+        caseItem: caseA,
+        spatialRelationships: rels,
+      });
+
+      const spatialNotifs = notifications.filter((n) => n.event_type === 'spatial_overlap');
+      expect(spatialNotifs.length).toBeGreaterThan(0);
+      const notif = spatialNotifs[0];
+      expect(notif.recipient_role).toBe('lao');
+      expect(notif.evidence.length).toBeGreaterThan(0);
+      expect(notif.evidence[0].source).toBe('spatialIntelligenceService');
+      expect(notif.metadata?.related_case_number).toBe('NOTIF-02');
+      expect(notif.metadata?.alternative_solutions).toBeDefined();
+
+      // Deduplication test: Running evaluation again should not duplicate
+      const secondRun = await evaluateOperationalTriggers({
+        caseItem: caseA,
+        spatialRelationships: rels,
+      });
+      expect(secondRun.length).toBe(0);
+    });
+
+    it('generates cadastral_collision notifications for revenue_inspector when parcels collide', async () => {
+      const caseA: AcquisitionCase = {
+        id: 'case-cad-1',
+        project_id: 'proj-1',
+        case_number: 'CAD-01',
+        title: 'Pipeline Route',
+        state: 'Uttar Pradesh',
+        district: 'Varanasi',
+        tehsil: 'Pindra',
+        village: 'Ahiran',
+        total_area_hectares: 20.0,
+        estimated_compensation: 20000000,
+        status: 'in_progress',
+        current_stage: 'section_11_notification',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const caseB: AcquisitionCase = {
+        id: 'case-cad-2',
+        project_id: 'proj-2',
+        case_number: 'CAD-02',
+        title: 'Road Widening',
+        state: 'Uttar Pradesh',
+        district: 'Varanasi',
+        tehsil: 'Pindra',
+        village: 'Ahiran',
+        total_area_hectares: 25.0,
+        estimated_compensation: 25000000,
+        status: 'in_progress',
+        current_stage: 'section_19_declaration',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const parcels: Parcel[] = [
+        {
+          id: 'p-1',
+          case_id: 'case-cad-1',
+          survey_number: '108/A',
+          landowner_names: ['Farmer A'],
+          area_acres: 2.0,
+          status: 'verified',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: 'p-2',
+          case_id: 'case-cad-2',
+          survey_number: '108/A',
+          landowner_names: ['Farmer A'],
+          area_acres: 2.0,
+          status: 'verified',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ];
+
+      seedSpatialMemoryStore([caseA, caseB], [], parcels);
+
+      const rels = await detectSpatialAndCadastralRelationships(caseA, [caseA, caseB]);
+      const cadRel = rels.find((r) => r.relationship_type === 'cadastral_survey_collision' || r.relationship_type === 'cadastral_collision');
+      expect(cadRel).toBeDefined();
+
+      const notifications = await evaluateOperationalTriggers({
+        caseItem: caseA,
+        spatialRelationships: rels,
+      });
+
+      const cadNotifs = notifications.filter((n) => n.event_type === 'cadastral_collision');
+      expect(cadNotifs.length).toBeGreaterThan(0);
+      const notif = cadNotifs[0];
+      expect(notif.recipient_role).toBe('revenue_inspector');
+      expect(notif.severity).toBe('critical');
+      expect(notif.evidence[0].statement).toContain('108/A');
     });
   });
 });

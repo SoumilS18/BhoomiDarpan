@@ -507,6 +507,43 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
                   </div>
                 </div>
 
+                {/* Alternative Spacing & Mitigation Solutions */}
+                {rel.alternative_solutions && rel.alternative_solutions.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[10px] text-gov-navy uppercase font-bold tracking-wider block">
+                      Recommended Clearance Spacing &amp; Realignment Alternatives
+                    </span>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                      {rel.alternative_solutions.map((sol: any, sIdx: number) => (
+                        <div
+                          key={sIdx}
+                          className="bg-white p-3 rounded border border-blue-100 text-[11px] space-y-1.5 shadow-2xs"
+                        >
+                          <div className="flex items-center justify-between">
+                            <strong className="text-gov-slate font-semibold text-xs">
+                              {sol.strategy_name}
+                            </strong>
+                            {sol.recommended_buffer_meters && (
+                              <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200">
+                                {sol.recommended_buffer_meters}m {sol.clearance_direction || ''}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-slate-600 text-[11px] leading-relaxed">{sol.justification}</p>
+                          <div className="pt-1 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                            <span className="text-emerald-700 font-medium">
+                              Retains {sol.retained_area_hectares} Ha ({sol.retained_area_percentage}%)
+                            </span>
+                            <span className="text-slate-400 font-mono text-[9px]">
+                              {sol.statutory_procedure?.split(':')[0]}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Structured Advisory Recommendations */}
                 {rel.recommendations && rel.recommendations.length > 0 && (
                   <div className="space-y-1.5 pt-1">

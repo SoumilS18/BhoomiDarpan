@@ -350,6 +350,7 @@ router.get('/cases/:id/gis', requireAuth, async (req: Request, res: Response) =>
             intersection_area_hectares: rel.intersection_area_hectares,
             overlap_pct: rel.overlap_pct,
             shared_survey_numbers: rel.shared_survey_numbers,
+            alternative_solutions: rel.alternative_solutions,
             color: '#dc2626', // Red warning
             fillColor: '#ef4444',
           },

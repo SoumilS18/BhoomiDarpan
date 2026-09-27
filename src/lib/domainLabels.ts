@@ -240,6 +240,8 @@ export const NOTIFICATION_EVENT_TYPE_LABELS: Record<NotificationEventType, strin
   document_issue: 'Document Issue',
   downstream_impact: 'Downstream DAG Impact',
   unresolved_recommendation: 'Unimplemented Advisory',
+  spatial_overlap: 'Spatial Polygon Overlap',
+  cadastral_collision: 'Cadastral Survey Collision',
 };
 
 /** Every `NotificationEventType` in backend declaration order. */
@@ -258,6 +260,8 @@ export const NOTIFICATION_EVENT_TYPE_VALUES: NotificationEventType[] = [
   'document_issue',
   'downstream_impact',
   'unresolved_recommendation',
+  'spatial_overlap',
+  'cadastral_collision',
 ];
 
 export function notificationEventTypeLabel(eventType: string): string {
