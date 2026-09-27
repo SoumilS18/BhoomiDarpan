@@ -125,18 +125,18 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onSelectCase
             setIsOpen(!isOpen);
             if (!isOpen) loadNotifications();
           }}
-          className={`relative p-2 rounded-lg border bg-white hover:bg-slate-50 transition-colors shadow-xs ${
+          className={`relative p-2 rounded-lg border bg-[#FFFDF9] hover:bg-sand-100/60 transition-colors shadow-2xs cursor-pointer ${
             hasUrgentAlert
-              ? 'border-red-300 text-red-700 animate-pulse'
-              : 'border-slate-200 text-slate-600 hover:text-gov-slate'
+              ? 'border-sienna-300 text-sienna-700 animate-pulse'
+              : 'border-sand-200 text-mocha-600 hover:text-mocha-900'
           }`}
           title="Institutional Notifications & Operational Alerts"
         >
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
             <span
-              className={`absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white ring-2 ring-white ${
-                hasUrgentAlert ? 'bg-red-600' : 'bg-gov-navy'
+              className={`absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[10px] font-bold text-white ring-2 ring-[#FFFDF9] ${
+                hasUrgentAlert ? 'bg-sienna-500' : 'bg-terra-700'
               }`}
             >
               {unreadCount > 9 ? '9+' : unreadCount}
@@ -147,23 +147,23 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onSelectCase
         {isOpen && (
           <>
             <div className="fixed inset-0 z-30" onClick={() => setIsOpen(false)} />
-            <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl bg-white border border-slate-200 shadow-2xl z-40 py-2 divide-y divide-slate-100 animate-in fade-in zoom-in-95 duration-150 text-gov-slate">
+            <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl bg-[#FFFDF9] border border-sand-200 shadow-2xl z-40 py-2 divide-y divide-sand-100 animate-in fade-in zoom-in-95 duration-150 text-mocha-900">
               {/* Header */}
               <div className="px-4 py-2.5 flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-gov-slate uppercase tracking-wider flex items-center gap-1.5">
-                    <ShieldAlert className="h-3.5 w-3.5 text-gov-navy" />
+                  <h4 className="text-xs font-bold text-mocha-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <ShieldAlert className="h-3.5 w-3.5 text-terra-700" />
                     <span>Operational Alerts</span>
                   </h4>
-                  <p className="text-[11px] text-slate-500">
-                    Role: <span className="font-semibold text-gov-navy">{activePersona.label}</span>
+                  <p className="text-[11px] text-mocha-500">
+                    Role: <span className="font-semibold text-terra-800">{activePersona.label}</span>
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={loadNotifications}
                     disabled={loading}
-                    className="text-[11px] text-gov-navy hover:underline disabled:opacity-50"
+                    className="text-[11px] text-terra-700 hover:underline disabled:opacity-50 cursor-pointer"
                   >
                     Refresh
                   </button>
@@ -172,7 +172,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ onSelectCase
                       setIsOpen(false);
                       setIsModalOpen(true);
                     }}
-                    className="text-[11px] font-semibold text-blue-700 hover:underline flex items-center gap-0.5"
+                    className="text-[11px] font-semibold text-terra-800 hover:underline flex items-center gap-0.5 cursor-pointer"
                   >
                     <span>Full View</span>
                     <ArrowRight className="h-3 w-3" />

@@ -4,14 +4,15 @@
 
 @layer base {
   body {
-    @apply bg-gov-canvas text-gov-slate antialiased font-sans selection:bg-gov-navy/15 selection:text-gov-navy;
+    @apply bg-gov-canvas text-gov-slate antialiased font-sans selection:bg-terra-700/15 selection:text-terra-800;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    background-color: #FAF5EC;
   }
 
   /* Accessibility focus visible rings */
   :focus-visible {
-    @apply outline-none ring-2 ring-gov-navy/40 ring-offset-2 ring-offset-white;
+    @apply outline-none ring-2 ring-terra-700/40 ring-offset-2 ring-offset-[#FFFDF9];
   }
 
   /* High-legibility numbers in institutional tables */
@@ -24,7 +25,7 @@
   /* Standard form controls — use for every text/select/date/number input so
      forms stay visually consistent across the application. */
   .input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-gov-slate placeholder:text-slate-400 shadow-sm transition-all duration-150 hover:border-slate-400 focus:border-gov-navy focus:outline-none focus:ring-2 focus:ring-gov-navy/15 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400 disabled:hover:border-slate-300;
+    @apply w-full rounded-lg border border-sand-200 bg-[#FFFDF9] px-3 py-2 text-sm text-gov-slate placeholder:text-mocha-400 shadow-sm transition-all duration-150 hover:border-sand-300 focus:border-terra-700 focus:outline-none focus:ring-2 focus:ring-terra-700/15 disabled:cursor-not-allowed disabled:bg-sand-50 disabled:text-mocha-400 disabled:hover:border-sand-200;
   }
 
   .input-xs {
@@ -32,12 +33,12 @@
   }
 
   .label {
-    @apply mb-1.5 block text-xs font-semibold text-slate-700;
+    @apply mb-1.5 block text-xs font-semibold text-mocha-700;
   }
 
   .label-required::after {
     content: ' *';
-    @apply text-gov-red font-bold;
+    @apply text-sienna-500 font-bold;
   }
 
   /* Consistent data tables */
@@ -46,20 +47,20 @@
   }
 
   .table-shell thead th {
-    @apply whitespace-nowrap border-b border-slate-200 bg-slate-50/95 backdrop-blur-sm px-3.5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500;
+    @apply whitespace-nowrap border-b border-sand-200 bg-sand-100/70 backdrop-blur-sm px-3.5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-mocha-600;
   }
 
   .table-shell tbody td {
-    @apply border-b border-slate-100 px-3.5 py-2.5 align-middle text-slate-700;
+    @apply border-b border-sand-100 px-3.5 py-2.5 align-middle text-mocha-800;
   }
 
   .table-shell tbody tr {
-    @apply transition-colors duration-150 hover:bg-slate-50/80;
+    @apply transition-colors duration-150 hover:bg-sand-100/40;
   }
 
   /* Card and Panel Utility */
   .glass-card {
-    @apply bg-white/90 backdrop-blur-md border border-slate-200/80 rounded-xl shadow-gov transition-all duration-200;
+    @apply bg-[#FFFDF9]/95 backdrop-blur-md border border-sand-200/90 rounded-xl shadow-gov transition-all duration-200;
   }
 }
 
@@ -74,13 +75,13 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #D9CCC6;
   border-radius: 9999px;
   transition: background-color 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #B85D45;
 }
 
 /* Institutional Badge Transitions */

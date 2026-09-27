@@ -15,8 +15,8 @@ export const Card: React.FC<CardProps> = ({
   return (
     <div
       className={clsx(
-        'bg-white border border-slate-200 rounded-xl shadow-gov overflow-hidden',
-        hoverEffect && 'transition-all duration-200 hover:shadow-gov-md hover:border-slate-300',
+        'bg-[#FFFDF9] border border-sand-200 rounded-xl shadow-gov overflow-hidden',
+        hoverEffect && 'transition-all duration-200 hover:shadow-gov-md hover:border-sand-300',
         className
       )}
       {...props}
@@ -33,10 +33,10 @@ export const CardHeader: React.FC<{
   className?: string;
 }> = ({ title, subtitle, action, className }) => {
   return (
-    <div className={clsx('px-5 py-4 border-b border-slate-100 flex items-center justify-between', className)}>
+    <div className={clsx('px-5 py-4 border-b border-sand-100 flex items-center justify-between', className)}>
       <div>
-        <h3 className="text-base font-semibold text-gov-slate tracking-tight">{title}</h3>
-        {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+        <h3 className="text-base font-semibold text-mocha-900 tracking-tight">{title}</h3>
+        {subtitle && <p className="text-xs text-mocha-500 mt-0.5">{subtitle}</p>}
       </div>
       {action && <div>{action}</div>}
     </div>

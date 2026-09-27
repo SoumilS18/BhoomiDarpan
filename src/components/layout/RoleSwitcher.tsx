@@ -72,24 +72,24 @@ export const RoleSwitcher: React.FC = () => {
             ? `Account menu for ${activePersona.name}`
             : 'Account menu'
         }
-        className="flex items-center gap-2.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-left shadow-gov transition-colors hover:bg-slate-50"
+        className="flex items-center gap-2.5 rounded-lg border border-sand-200 bg-[#FFFDF9] px-2.5 py-1.5 text-left shadow-gov transition-colors hover:bg-sand-100/60 cursor-pointer"
         title={hasRealSession ? 'Open your account menu' : 'Open account menu'}
       >
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gov-navy text-[10px] font-bold text-white">
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-terra-700 text-[10px] font-bold text-white shadow-xs">
           {initials}
         </div>
         <div className="hidden md:block text-left">
-          <div className="flex items-center gap-1.5 text-xs font-semibold leading-tight text-gov-slate">
+          <div className="flex items-center gap-1.5 text-xs font-semibold leading-tight text-mocha-900">
             <span className="max-w-[150px] truncate">{activePersona.name}</span>
             <span
               className={`inline-block h-1.5 w-1.5 rounded-full ${
-                hasRealSession ? 'bg-emerald-500' : 'bg-slate-300'
+                hasRealSession ? 'bg-emerald-500' : 'bg-sand-400'
               }`}
             />
           </div>
-          <div className="text-[10px] text-slate-500">{activePersona.label}</div>
+          <div className="text-[10px] text-mocha-500">{activePersona.label}</div>
         </div>
-        <ChevronDown className="ml-1 h-4 w-4 text-slate-400" />
+        <ChevronDown className="ml-1 h-4 w-4 text-mocha-400" />
       </button>
 
       {isOpen && (
@@ -97,22 +97,22 @@ export const RoleSwitcher: React.FC = () => {
           <div className="fixed inset-0 z-20" onClick={() => setIsOpen(false)} />
           <div
             role="menu"
-            className="absolute right-0 z-30 mt-2 w-80 divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white py-2 shadow-xl"
+            className="absolute right-0 z-30 mt-2 w-80 divide-y divide-sand-100 rounded-xl border border-sand-200 bg-[#FFFDF9] py-2 shadow-xl"
           >
             {/* Active account context */}
             <div className="px-4 py-3">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gov-navy text-sm font-bold text-white">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-terra-700 text-sm font-bold text-white shadow-xs">
                   {initials}
                 </div>
                 <div className="min-w-0">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-mocha-400">
                     Signed-in account
                   </span>
-                  <p className="mt-0.5 truncate text-sm font-semibold text-gov-slate">
+                  <p className="mt-0.5 truncate text-sm font-semibold text-mocha-900">
                     {activePersona.name}
                   </p>
-                  <p className="text-[11px] text-slate-500">{activePersona.label}</p>
+                  <p className="text-[11px] text-mocha-500">{activePersona.label}</p>
                 </div>
               </div>
               <div className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 border-t border-slate-100 pt-3 text-[11px]">
