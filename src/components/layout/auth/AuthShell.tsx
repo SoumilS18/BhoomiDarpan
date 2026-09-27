@@ -1,8 +1,9 @@
 import React, { useEffect } from 'react';
 import { clsx } from 'clsx';
-import { Layers, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Link, getRouteById } from '../../../router';
 import { PUBLIC_CONFIG } from '../../../lib/publicConfig';
+import { NationalEmblem } from '../../common/NationalEmblem';
 
 /**
  * Shared shell for every authentication / account-access surface.
@@ -48,33 +49,33 @@ export const AuthShell: React.FC<{
       </a>
 
       {/* Brand panel — decorative on small screens, informational on large */}
-      <aside className="relative overflow-hidden bg-gov-slate px-6 py-8 text-white sm:px-10 lg:w-[42%] lg:shrink-0 lg:py-12">
-        <div className="h-1 absolute inset-x-0 top-0 bg-gov-saffron" aria-hidden="true" />
+      <aside className="relative overflow-hidden bg-[#3D150D] px-6 py-8 text-white sm:px-10 lg:w-[42%] lg:shrink-0 lg:py-12 border-r border-[#2A1009]">
+        <div className="h-1 absolute inset-x-0 top-0 bg-gold-500" aria-hidden="true" />
         <div
           className="absolute inset-0 opacity-20"
           aria-hidden="true"
           style={{
             backgroundImage:
-              'radial-gradient(circle at 20% 15%, #1e3a8a 0%, transparent 50%), radial-gradient(circle at 80% 85%, #2563eb 0%, transparent 50%)',
+              'radial-gradient(circle at 20% 15%, #8B3A2A 0%, transparent 50%), radial-gradient(circle at 80% 85%, #C0392B 0%, transparent 50%)',
           }}
         />
 
         <div className="relative">
           <Link
             to={homePath}
-            className="inline-flex items-center gap-2 text-sm font-medium text-slate-300 transition-colors hover:text-white"
+            className="inline-flex items-center gap-2 text-sm font-medium text-sand-200 transition-colors hover:text-white"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             Back to home
           </Link>
 
           <div className="mt-8 flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/10">
-              <Layers className="h-6 w-6 text-amber-400" aria-hidden="true" />
+            <div className="flex shrink-0 items-center justify-center">
+              <NationalEmblem size={52} variant="gold" className="filter drop-shadow-xs" />
             </div>
             <div>
-              <p className="text-lg font-bold tracking-tight">{PUBLIC_CONFIG.name}</p>
-              <p className="text-[11px] font-semibold text-amber-300">{PUBLIC_CONFIG.nativeName}</p>
+              <p className="text-xl font-bold tracking-tight text-sand-50">{PUBLIC_CONFIG.name}</p>
+              <p className="text-[11px] font-semibold text-gold-300">{PUBLIC_CONFIG.nativeName}</p>
             </div>
           </div>
 

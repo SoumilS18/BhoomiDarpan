@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Layers, Menu, X, ArrowRight, LayoutDashboard } from 'lucide-react';
+import { Menu, X, ArrowRight, LayoutDashboard } from 'lucide-react';
 import { Link, useRoute, publicNavRoutes, getRouteById } from '../../../router';
 import { useAuth } from '../../../context/AuthContext';
+import { NationalEmblem } from '../../common/NationalEmblem';
 
 /**
  * Public website header. Shares the application's design language (gov
- * palette, institutional accent, Layers brand mark) but presents marketing
+ * palette, institutional accent, National Emblem brand mark) but presents marketing
  * navigation instead of operational controls. Navigation is derived from the
  * route registry (`publicNav` entries) — there is no second nav registry.
  */
@@ -22,31 +23,31 @@ export const PublicHeader: React.FC = () => {
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
 
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-gov-header">
-      {/* Institutional top accent (matches the application header) */}
-      <div className="h-0.5 bg-gov-navy-dark" />
+    <header className="sticky top-0 z-40 bg-[#FFFDF9] border-b border-sand-200 shadow-gov-header">
+      {/* Institutional dual-tone Terra & Gold accent */}
+      <div className="h-1 bg-gradient-to-r from-terra-900 via-terra-700 to-gold-500" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
-          {/* Brand */}
+          {/* Brand with seamless National Emblem */}
           <Link
             to={getRouteById('public.landing').path}
             className="flex items-center gap-3 shrink-0"
             aria-label="BhoomiSetu home"
           >
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gov-navy-dark text-white shadow-sm">
-              <Layers className="h-5 w-5 text-amber-400" />
+            <div className="flex shrink-0 items-center justify-center" title="Government of India - State Emblem">
+              <NationalEmblem size={46} variant="gold" className="filter drop-shadow-xs hover:scale-105 transition-transform" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-bold tracking-tight text-gov-slate">
+                <span className="text-xl font-bold tracking-tight text-mocha-900 font-sans">
                   BhoomiSetu
                 </span>
-                <span className="text-[10px] font-semibold text-gov-navy bg-gov-blue-soft px-2 py-0.5 rounded border border-gov-navy/20">
+                <span className="text-[10px] font-semibold text-terra-800 bg-sand-100 px-2 py-0.5 rounded border border-sand-300/80 shadow-2xs">
                   भूमिसेतु
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500 hidden md:block">
+              <p className="text-[11px] text-mocha-500 hidden md:block font-medium">
                 Land Acquisition Intelligence &amp; Decision-Support System
               </p>
             </div>

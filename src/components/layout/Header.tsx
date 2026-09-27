@@ -3,7 +3,7 @@ import { RoleSwitcher } from './RoleSwitcher';
 import { NotificationBell } from './NotificationBell';
 import { Button } from '../common/Button';
 import { NationalEmblem } from '../common/NationalEmblem';
-import { Plus, Search, Layers, CheckCircle2, AlertCircle, Menu } from 'lucide-react';
+import { Plus, Search, CheckCircle2, AlertCircle, Menu } from 'lucide-react';
 import { fetchHealth, HealthResponse } from '../../lib/api';
 import { useRoute } from '../../router';
 
@@ -73,7 +73,7 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
           {/* Logo, National Emblem & Title */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3.5">
             {/* Mobile navigation toggle (the sidebar is an overlay below `lg`) */}
             <button
               type="button"
@@ -86,19 +86,14 @@ export const Header: React.FC<HeaderProps> = ({
               <Menu className="h-5 w-5" />
             </button>
 
-            {/* State Emblem of India */}
-            <div className="flex items-center justify-center p-1 rounded-md bg-sand-100/60 border border-sand-200/80 shadow-2xs hover:bg-sand-100 transition-colors" title="Government of India - State Emblem">
-              <NationalEmblem size={34} variant="gold" className="filter drop-shadow-xs" />
-            </div>
-
-            {/* Brand Logo icon */}
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-terra-800 to-terra-950 text-white shadow-sm ring-1 ring-terra-900/20">
-              <Layers className="h-5 w-5 text-gold-400" />
+            {/* State Emblem of India - Seamlessly integrated without bounding box */}
+            <div className="flex items-center shrink-0" title="Government of India - State Emblem">
+              <NationalEmblem size={48} variant="gold" className="filter drop-shadow-xs hover:scale-105 transition-transform" />
             </div>
 
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-lg font-bold tracking-tight text-mocha-900 font-sans">
+                <span className="text-xl font-bold tracking-tight text-mocha-900 font-sans">
                   BhoomiSetu
                 </span>
                 <span className="text-[10px] font-semibold text-terra-800 bg-sand-100 px-2 py-0.5 rounded border border-sand-300/80 shadow-2xs">

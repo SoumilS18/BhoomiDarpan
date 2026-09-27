@@ -11,7 +11,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
-  Layers,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useAuth } from '../../context/AuthContext';
@@ -112,15 +111,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       >
       {/* Top: brand + navigation */}
       <div className="space-y-5">
-        {/* Branding */}
+        {/* Branding - National Emblem integrated seamlessly */}
         <div
           className={clsx(
             'flex items-center gap-2.5',
             isCollapsed && 'flex-col'
           )}
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sand-100/10 text-gold-300 ring-1 ring-gold-400/30 shadow-sm" title="Government of India">
-            <NationalEmblem size={28} variant="gold" />
+          <div className="flex shrink-0 items-center justify-center" title="Government of India - State Emblem">
+            <NationalEmblem size={isCollapsed ? 38 : 44} variant="gold" className="filter drop-shadow-xs" />
           </div>
           {!isCollapsed && (
             <div className="min-w-0">
