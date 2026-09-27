@@ -407,11 +407,29 @@ export function analyzePortfolioOperations(params: {
       bottleneckSummaryMap.set(code, entry);
     }
 
+    // Detect spatial and boundary conflicts
+    const spatialRelationships = (c as any).spatial_relationships || [];
+    const criticalSpatialRel = spatialRelationships.find(
+      (r: any) =>
+        r.relationship_type === 'boundary_overlap' ||
+        r.relationship_type === 'complete_enclosure' ||
+        r.relationship_type === 'cadastral_collision'
+    );
+    const hasSpatialConflict = Boolean(criticalSpatialRel);
+
+    if (hasSpatialConflict && (riskLevel === 'low' || !riskLevel)) {
+      riskLevel = 'high';
+      riskScore = Math.max(riskScore || 0, 75);
+      casesByRisk[riskLevel] = (casesByRisk[riskLevel] || 0) + 1;
+      atRiskCasesCount++;
+    }
+
     // -------------------------------------------------------------
     // Part C: Case Attention Queue Evaluation (Policy-Driven)
     // -------------------------------------------------------------
     const requiresAttention =
       hasActiveBottlenecks ||
+      hasSpatialConflict ||
       metrics.net_delay_days >= attentionCriteria.delay_days_threshold ||
       status === 'delayed' ||
       status === 'litigation' ||
@@ -426,6 +444,11 @@ export function analyzePortfolioOperations(params: {
     if (requiresAttention) {
       // Build transparent evidence string
       const evidenceParts: string[] = [];
+      if (criticalSpatialRel) {
+        evidenceParts.push(
+          `Spatial conflict: ${criticalSpatialRel.evidence_summary || criticalSpatialRel.relationship_type.replace(/_/g, ' ')}`
+        );
+      }
       if (hasActiveBottlenecks) {
         evidenceParts.push(`Active bottleneck on ${caseBottlenecks[0].stage_title} (+${caseBottlenecks[0].deviation_days}d)`);
       } else if (metrics.net_delay_days > 0) {
@@ -1847,6 +1870,7 @@ export function analyzePortfolioOutcomes(params: {
 export function analyzePortfolioGeography(params: {
   cases: CaseEnrichedForPortfolio[];
   totalUnitsCount?: number;
+  dependencies?: StageDependency[];
   currentDateStr?: string;
   user?: AuthenticatedUser;
   filters?: PortfolioFilterParams;
@@ -1890,7 +1914,7 @@ export function analyzePortfolioGeography(params: {
       natDelayedCases++;
     }
 
-    const riskLevel = c.latest_risk?.risk_level;
+    const riskLevel = resolveCaseRiskLevel(c, currentDate, params.dependencies);
     if (riskLevel === 'critical' || riskLevel === 'high') {
       natHighRiskCases++;
     }
@@ -1932,7 +1956,8 @@ export function analyzePortfolioGeography(params: {
         stateDelayedCases++;
       }
 
-      if (c.latest_risk?.risk_level === 'critical' || c.latest_risk?.risk_level === 'high') {
+      const stRisk = resolveCaseRiskLevel(c, currentDate, params.dependencies);
+      if (stRisk === 'critical' || stRisk === 'high') {
         stateHighRiskCases++;
       }
 
@@ -1967,7 +1992,8 @@ export function analyzePortfolioGeography(params: {
         const isDelayed = metrics.is_delayed || c.status === 'delayed' || c.status === 'litigation';
         if (isDelayed) distDelayedCases++;
 
-        const isHighRisk = c.latest_risk?.risk_level === 'critical' || c.latest_risk?.risk_level === 'high';
+        const cRisk = resolveCaseRiskLevel(c, currentDate, params.dependencies);
+        const isHighRisk = cRisk === 'critical' || cRisk === 'high';
         if (isHighRisk) distHighRiskCases++;
 
         const area = Number(c.total_area_hectares || 0);

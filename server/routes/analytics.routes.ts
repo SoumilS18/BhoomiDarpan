@@ -51,45 +51,84 @@ function extractPortfolioFilters(req: Request): PortfolioFilterParams {
 
 /**
  * Helper to fetch common portfolio data tables in parallel.
+ * Falls back seamlessly to scoped cases memory store when Supabase is unconfigured/offline.
  */
-async function fetchPortfolioRawData(supabase: any) {
-  const [casesRes, workflowsRes, depsRes, recsRes] = await Promise.all([
-    supabase
-      .from('acquisition_cases')
-      .select(`
-        *,
-        project:projects(id, name, code),
-        workflow:workflows(id, name),
-        stage_instances:case_stage_instances(
-          *,
-          stage:workflow_stages(*)
-        ),
-        parcels(id, survey_number, acquisition_status, area_acres, geojson_geometry),
-        documents(id, title, status, document_type)
-      `)
-      .order('created_at', { ascending: false }),
-    supabase
-      .from('workflows')
-      .select(`
-        id,
-        name,
-        stages:workflow_stages(*)
-      `),
-    supabase
-      .from('stage_dependencies')
-      .select('*'),
-    supabase
-      .from('recommendations')
-      .select('*')
-      .order('created_at', { ascending: false }),
-  ]);
+async function fetchPortfolioRawData(user?: any) {
+  let cases: any[] = [];
+  let workflows: any[] = [];
+  let dependencies: any[] = [];
+  let recommendations: any[] = [];
+  let casesError: any = null;
+
+  if (isSupabaseConfigured) {
+    try {
+      const supabase = getSupabase();
+      const [casesRes, workflowsRes, depsRes, recsRes] = await Promise.all([
+        supabase
+          .from('acquisition_cases')
+          .select(`
+            *,
+            project:projects(id, name, code),
+            workflow:workflows(id, name),
+            stage_instances:case_stage_instances(
+              *,
+              stage:workflow_stages(*)
+            ),
+            parcels(id, survey_number, acquisition_status, area_acres, geojson_geometry),
+            documents(id, title, status, document_type)
+          `)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('workflows')
+          .select(`
+            id,
+            name,
+            stages:workflow_stages(*)
+          `),
+        supabase
+          .from('stage_dependencies')
+          .select('*'),
+        supabase
+          .from('recommendations')
+          .select('*')
+          .order('created_at', { ascending: false }),
+      ]);
+
+      if (!casesRes.error && casesRes.data && casesRes.data.length > 0) {
+        cases = casesRes.data;
+        workflows = workflowsRes.data || [];
+        dependencies = depsRes.data || [];
+        recommendations = recsRes.data || [];
+      } else {
+        casesError = casesRes.error;
+      }
+    } catch (err: any) {
+      casesError = err;
+    }
+  }
+
+  // Graceful fallback to memory store & spatial scoped cases
+  if (cases.length === 0) {
+    try {
+      const { getScopedCases, getParcelsForCase } = await import('../services/spatialIntelligenceService');
+      cases = await getScopedCases(user);
+      for (const c of cases) {
+        if (!c.parcels || c.parcels.length === 0) {
+          c.parcels = await getParcelsForCase(c.id);
+        }
+      }
+      casesError = null;
+    } catch {
+      // Keep empty if failed
+    }
+  }
 
   return {
-    cases: (casesRes.data || []) as any[],
-    workflows: (workflowsRes.data || []) as any[],
-    dependencies: (depsRes.data || []) as any[],
-    recommendations: (recsRes.data || []) as any[],
-    casesError: casesRes.error,
+    cases,
+    workflows,
+    dependencies,
+    recommendations,
+    casesError,
   };
 }
 
@@ -98,13 +137,8 @@ async function fetchPortfolioRawData(supabase: any) {
 // -------------------------------------------------------------
 router.get(['/portfolio/overview', '/overview'], requireAuth, async (req: Request, res: Response) => {
   try {
-    if (!isSupabaseConfigured) {
-      return res.status(503).json({ error: 'Supabase not configured' });
-    }
-
-    const supabase = getSupabase();
-    const { cases, casesError } = await fetchPortfolioRawData(supabase);
-    if (casesError) {
+    const { cases, casesError } = await fetchPortfolioRawData(req.user);
+    if (casesError && cases.length === 0) {
       return res.status(500).json({ error: casesError.message });
     }
 
@@ -127,13 +161,8 @@ router.get(['/portfolio/overview', '/overview'], requireAuth, async (req: Reques
 // -------------------------------------------------------------
 router.get(['/portfolio/delays', '/delays'], requireAuth, async (req: Request, res: Response) => {
   try {
-    if (!isSupabaseConfigured) {
-      return res.status(503).json({ error: 'Supabase not configured' });
-    }
-
-    const supabase = getSupabase();
-    const { cases, casesError } = await fetchPortfolioRawData(supabase);
-    if (casesError) {
+    const { cases, casesError } = await fetchPortfolioRawData(req.user);
+    if (casesError && cases.length === 0) {
       return res.status(500).json({ error: casesError.message });
     }
 
@@ -156,13 +185,8 @@ router.get(['/portfolio/delays', '/delays'], requireAuth, async (req: Request, r
 // -------------------------------------------------------------
 router.get(['/portfolio/risk', '/risk'], requireAuth, async (req: Request, res: Response) => {
   try {
-    if (!isSupabaseConfigured) {
-      return res.status(503).json({ error: 'Supabase not configured' });
-    }
-
-    const supabase = getSupabase();
-    const { cases, casesError } = await fetchPortfolioRawData(supabase);
-    if (casesError) {
+    const { cases, casesError } = await fetchPortfolioRawData(req.user);
+    if (casesError && cases.length === 0) {
       return res.status(500).json({ error: casesError.message });
     }
 
@@ -185,13 +209,8 @@ router.get(['/portfolio/risk', '/risk'], requireAuth, async (req: Request, res: 
 // -------------------------------------------------------------
 router.get(['/portfolio/bottlenecks', '/bottlenecks'], requireAuth, async (req: Request, res: Response) => {
   try {
-    if (!isSupabaseConfigured) {
-      return res.status(503).json({ error: 'Supabase not configured' });
-    }
-
-    const supabase = getSupabase();
-    const { cases, dependencies, casesError } = await fetchPortfolioRawData(supabase);
-    if (casesError) {
+    const { cases, dependencies, casesError } = await fetchPortfolioRawData(req.user);
+    if (casesError && cases.length === 0) {
       return res.status(500).json({ error: casesError.message });
     }
 
@@ -215,13 +234,8 @@ router.get(['/portfolio/bottlenecks', '/bottlenecks'], requireAuth, async (req: 
 // -------------------------------------------------------------
 router.get(['/portfolio/trends', '/trends'], requireAuth, async (req: Request, res: Response) => {
   try {
-    if (!isSupabaseConfigured) {
-      return res.status(503).json({ error: 'Supabase not configured' });
-    }
-
-    const supabase = getSupabase();
-    const { cases, casesError } = await fetchPortfolioRawData(supabase);
-    if (casesError) {
+    const { cases, casesError } = await fetchPortfolioRawData(req.user);
+    if (casesError && cases.length === 0) {
       return res.status(500).json({ error: casesError.message });
     }
 
@@ -253,17 +267,12 @@ router.get(['/portfolio/trends', '/trends'], requireAuth, async (req: Request, r
 // -------------------------------------------------------------
 router.get(['/portfolio/geography', '/geography'], requireAuth, async (req: Request, res: Response) => {
   try {
-    if (!isSupabaseConfigured) {
-      return res.status(503).json({ error: 'Supabase not configured' });
-    }
-
-    const supabase = getSupabase();
     const [{ cases, casesError }, totalUnitsCount] = await Promise.all([
-      fetchPortfolioRawData(supabase),
+      fetchPortfolioRawData(req.user),
       getTotalUnitsCount(),
     ]);
 
-    if (casesError) {
+    if (casesError && cases.length === 0) {
       return res.status(500).json({ error: casesError.message });
     }
 
@@ -287,13 +296,8 @@ router.get(['/portfolio/geography', '/geography'], requireAuth, async (req: Requ
 // -------------------------------------------------------------
 router.get(['/portfolio/outcomes', '/outcomes'], requireAuth, async (req: Request, res: Response) => {
   try {
-    if (!isSupabaseConfigured) {
-      return res.status(503).json({ error: 'Supabase not configured' });
-    }
-
-    const supabase = getSupabase();
-    const { cases, recommendations, casesError } = await fetchPortfolioRawData(supabase);
-    if (casesError) {
+    const { cases, recommendations, casesError } = await fetchPortfolioRawData(req.user);
+    if (casesError && cases.length === 0) {
       return res.status(500).json({ error: casesError.message });
     }
 
@@ -317,15 +321,9 @@ router.get(['/portfolio/outcomes', '/outcomes'], requireAuth, async (req: Reques
 // -------------------------------------------------------------
 router.get(['/portfolio', '/'], requireAuth, async (req: Request, res: Response) => {
   try {
-    if (!isSupabaseConfigured) {
-      return res.status(503).json({ error: 'Supabase not configured' });
-    }
-
-    const supabase = getSupabase();
     const filters = extractPortfolioFilters(req);
-
-    const { cases, workflows, dependencies, casesError } = await fetchPortfolioRawData(supabase);
-    if (casesError) {
+    const { cases, workflows, dependencies, casesError } = await fetchPortfolioRawData(req.user);
+    if (casesError && cases.length === 0) {
       return res.status(500).json({ error: casesError.message });
     }
 
@@ -353,16 +351,11 @@ router.get(['/portfolio', '/'], requireAuth, async (req: Request, res: Response)
 // -------------------------------------------------------------
 router.get(['/attention-queue', '/portfolio/attention-queue'], requireAuth, async (req: Request, res: Response) => {
   try {
-    if (!isSupabaseConfigured) {
-      return res.status(503).json({ error: 'Supabase not configured' });
-    }
-
-    const supabase = getSupabase();
     const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit || 20), 10)));
     const offset = Math.max(0, parseInt(String(req.query.offset || 0), 10));
 
-    const { cases, casesError } = await fetchPortfolioRawData(supabase);
-    if (casesError) {
+    const { cases, casesError } = await fetchPortfolioRawData(req.user);
+    if (casesError && cases.length === 0) {
       return res.status(500).json({ error: casesError.message });
     }
 
