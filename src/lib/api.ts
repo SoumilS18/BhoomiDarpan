@@ -45,6 +45,7 @@ import {
   AccessRequest,
   SpatialRelationship,
   PortfolioSpatialRelationshipsSummary,
+  SpatialResolutionSimulation,
 } from '../../shared/types';
 
 
@@ -1585,6 +1586,27 @@ export async function resolveSpatialConflict(
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Failed to resolve spatial conflict (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function simulateSpatialResolution(
+  caseId: string,
+  payload: {
+    related_case_id: string;
+    strategy_type: 'boundary_offset_clearance' | 'joint_award_alignment' | 'phased_acquisition_taking';
+    buffer_meters?: number;
+    shift_direction?: string;
+  }
+): Promise<SpatialResolutionSimulation> {
+  const res = await fetch(`${API_BASE}/gis/cases/${encodeURIComponent(caseId)}/simulate-spatial-resolution`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to simulate spatial resolution (${res.status})`);
   }
   return res.json();
 }

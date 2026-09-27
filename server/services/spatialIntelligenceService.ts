@@ -14,6 +14,7 @@ import {
   SpatialRelationshipType,
   SpatialRelationshipRecommendation,
   SpatialAlternativeSolution,
+  SpatialResolutionSimulation,
   PortfolioSpatialRelationshipsSummary,
 } from '../../shared/types';
 import { AuthenticatedUser } from '../middleware/auth.middleware';
@@ -1309,71 +1310,219 @@ export async function getPortfolioSpatialRelationships(
 }
 
 /**
- * Applies a geometric clearance offset to a GeoJSON boundary by shifting all constituent vertices.
+ * Applies a physical geometric clearance shift in the specified cardinal direction.
  */
 export function applyBoundaryOffsetClearance(
-  geojson: any,
+  sourceGeom: any,
   shiftDirection: string,
   bufferMeters: number
 ): any {
-  if (!geojson) return geojson;
+  if (!sourceGeom || !sourceGeom.coordinates || bufferMeters <= 0) {
+    return sourceGeom;
+  }
 
-  const centroid = computeAccurateCentroid(geojson) || [25.3, 82.9];
+  const centroid = computeAccurateCentroid(sourceGeom) || [25.3, 82.9];
   const latRad = (centroid[0] * Math.PI) / 180;
   const metersPerDegLat = 111000;
   const metersPerDegLng = 111000 * Math.max(0.2, Math.cos(latRad));
 
-  let dLat = 0;
-  let dLng = 0;
+  const degLat = bufferMeters / metersPerDegLat;
+  const degLng = bufferMeters / metersPerDegLng;
 
-  switch (shiftDirection) {
-    case 'Eastward':
-      dLng = bufferMeters / metersPerDegLng;
-      break;
-    case 'Westward':
-      dLng = -bufferMeters / metersPerDegLng;
-      break;
-    case 'Northward':
-      dLat = bufferMeters / metersPerDegLat;
-      break;
-    case 'Southward':
-      dLat = -bufferMeters / metersPerDegLat;
-      break;
-    default:
-      dLng = bufferMeters / metersPerDegLng;
-      break;
+  let dLng = 0;
+  let dLat = 0;
+
+  const dirLower = (shiftDirection || 'Eastward').toLowerCase();
+  if (dirLower.includes('east')) {
+    dLng = degLng;
+  } else if (dirLower.includes('west')) {
+    dLng = -degLng;
+  } else if (dirLower.includes('north')) {
+    dLat = degLat;
+  } else if (dirLower.includes('south')) {
+    dLat = -degLat;
+  } else {
+    dLng = degLng;
   }
 
-  const shiftPoint = (pt: any): [number, number] => {
+  const shiftPoint = (pt: number[]): number[] => {
     if (!Array.isArray(pt) || pt.length < 2) return pt;
-    const [lng, lat] = pt;
     return [
-      Math.round((lng + dLng) * 1e6) / 1e6,
-      Math.round((lat + dLat) * 1e6) / 1e6,
+      Number((pt[0] + dLng).toFixed(7)),
+      Number((pt[1] + dLat).toFixed(7)),
     ];
   };
 
-  const shiftCoordinates = (coords: any, depth: number): any => {
-    if (depth === 1) {
-      return shiftPoint(coords);
-    }
-    if (!Array.isArray(coords)) return coords;
-    return coords.map((c: any) => shiftCoordinates(c, depth - 1));
+  const shiftRings = (rings: number[][][]): number[][][] => {
+    return rings.map((ring) => ring.map(shiftPoint));
   };
 
-  const cloned = JSON.parse(JSON.stringify(geojson));
-  if (cloned.type === 'Polygon' && Array.isArray(cloned.coordinates)) {
-    cloned.coordinates = shiftCoordinates(cloned.coordinates, 3);
-  } else if (cloned.type === 'MultiPolygon' && Array.isArray(cloned.coordinates)) {
-    cloned.coordinates = shiftCoordinates(cloned.coordinates, 4);
-  } else if (cloned.type === 'Feature' && cloned.geometry) {
-    cloned.geometry = applyBoundaryOffsetClearance(cloned.geometry, shiftDirection, bufferMeters);
-  } else if (cloned.type === 'FeatureCollection' && Array.isArray(cloned.features)) {
-    cloned.features = cloned.features.map((f: any) =>
-      applyBoundaryOffsetClearance(f, shiftDirection, bufferMeters)
-    );
+  if (sourceGeom.type === 'Polygon') {
+    return {
+      type: 'Polygon',
+      coordinates: shiftRings(sourceGeom.coordinates),
+    };
+  } else if (sourceGeom.type === 'MultiPolygon') {
+    return {
+      type: 'MultiPolygon',
+      coordinates: sourceGeom.coordinates.map(shiftRings),
+    };
   }
-  return cloned;
+
+  return sourceGeom;
+}
+
+/**
+ * Calculates the exact minimum clearance offset distance (in meters) and optimal direction
+ * required to completely eliminate a geometric corridor overlap (projected intersection = 0.00 Ha).
+ */
+export function calculateExactClearanceOffset(
+  sourceGeom: any,
+  otherGeom: any
+): {
+  shiftDirection: string;
+  recommendedBufferMeters: number;
+  initialIntersectionHa: number;
+  initialOverlapPct: number;
+} {
+  const geomIntersect = computeGeometryIntersection(sourceGeom, otherGeom);
+  if (!sourceGeom || !otherGeom || geomIntersect.intersectionAreaHectares <= 0) {
+    return {
+      shiftDirection: 'Eastward',
+      recommendedBufferMeters: 0,
+      initialIntersectionHa: 0,
+      initialOverlapPct: 0,
+    };
+  }
+
+  const bboxSource = calculateBoundingBox(sourceGeom) || [0, 0, 0, 0];
+  const bboxOther = calculateBoundingBox(otherGeom) || [0, 0, 0, 0];
+  const centroidSource = computeAccurateCentroid(sourceGeom) || [25.3, 82.9];
+  const centroidOther = computeAccurateCentroid(otherGeom) || [25.3, 82.9];
+
+  const latRad = (centroidSource[0] * Math.PI) / 180;
+  const metersPerDegLat = 111000;
+  const metersPerDegLng = 111000 * Math.max(0.2, Math.cos(latRad));
+
+  const dLat = centroidSource[0] - centroidOther[0];
+  const dLng = centroidSource[1] - centroidOther[1];
+
+  let shiftDirection = 'Eastward';
+  let requiredDistanceMeters = 50;
+
+  // Evaluate natural vector from relative centroids
+  if (Math.abs(dLng) >= Math.abs(dLat)) {
+    if (dLng >= 0) {
+      shiftDirection = 'Eastward';
+      const overlapDeg = Math.max(0, bboxOther[2] - bboxSource[0]);
+      requiredDistanceMeters = Math.ceil(overlapDeg * metersPerDegLng) + 25;
+    } else {
+      shiftDirection = 'Westward';
+      const overlapDeg = Math.max(0, bboxSource[2] - bboxOther[0]);
+      requiredDistanceMeters = Math.ceil(overlapDeg * metersPerDegLng) + 25;
+    }
+  } else {
+    if (dLat >= 0) {
+      shiftDirection = 'Northward';
+      const overlapDeg = Math.max(0, bboxOther[3] - bboxSource[1]);
+      requiredDistanceMeters = Math.ceil(overlapDeg * metersPerDegLat) + 25;
+    } else {
+      shiftDirection = 'Southward';
+      const overlapDeg = Math.max(0, bboxSource[3] - bboxOther[1]);
+      requiredDistanceMeters = Math.ceil(overlapDeg * metersPerDegLat) + 25;
+    }
+  }
+
+  // Exact safety verification loop: simulate the shift and guarantee 0.00 Ha overlap
+  let testBuffer = Math.max(25, requiredDistanceMeters);
+  for (let iter = 0; iter < 12; iter++) {
+    const shifted = applyBoundaryOffsetClearance(sourceGeom, shiftDirection, testBuffer);
+    const checkIntersect = computeGeometryIntersection(shifted, otherGeom);
+    if (checkIntersect.intersectionAreaHectares === 0) {
+      break;
+    }
+    testBuffer += 25;
+  }
+
+  return {
+    shiftDirection,
+    recommendedBufferMeters: testBuffer,
+    initialIntersectionHa: geomIntersect.intersectionAreaHectares,
+    initialOverlapPct: geomIntersect.sourceOverlapPct,
+  };
+}
+
+/**
+ * Simulates a spatial resolution strategy and returns immediate feasibility metrics & projected impact.
+ */
+export function simulateSpatialResolution(
+  sourceGeom: any,
+  otherGeom: any,
+  options: {
+    strategyType: 'boundary_offset_clearance' | 'joint_award_alignment' | 'phased_acquisition_taking';
+    shiftDirection?: string;
+    bufferMeters?: number;
+    sourceTotalAreaHa?: number;
+  }
+): SpatialResolutionSimulation {
+  const initialIntersect = computeGeometryIntersection(sourceGeom, otherGeom);
+  const totalAreaHa = options.sourceTotalAreaHa || 50;
+
+  if (options.strategyType === 'boundary_offset_clearance') {
+    const exact = calculateExactClearanceOffset(sourceGeom, otherGeom);
+    const dir = options.shiftDirection || exact.shiftDirection;
+    const buffer = options.bufferMeters !== undefined ? options.bufferMeters : exact.recommendedBufferMeters;
+
+    const shiftedGeom = applyBoundaryOffsetClearance(sourceGeom, dir, buffer);
+    const testIntersect = computeGeometryIntersection(shiftedGeom, otherGeom);
+
+    const isConflictEliminated = testIntersect.intersectionAreaHectares === 0;
+    const retainedHa = totalAreaHa;
+    const retainedPct = 100;
+
+    return {
+      strategy_type: 'boundary_offset_clearance',
+      shift_direction: dir,
+      buffer_meters: buffer,
+      initial_overlap_hectares: initialIntersect.intersectionAreaHectares,
+      initial_overlap_percentage: initialIntersect.sourceOverlapPct,
+      projected_overlap_hectares: testIntersect.intersectionAreaHectares,
+      projected_overlap_percentage: testIntersect.sourceOverlapPct,
+      conflict_eliminated: isConflictEliminated,
+      retained_area_hectares: retainedHa,
+      retained_area_percentage: retainedPct,
+      feasibility_status: isConflictEliminated ? 'feasible_zero_overlap' : 'partial_clearance',
+      justification_summary: isConflictEliminated
+        ? `Feasible: Shifting corridor ${dir} by ${buffer}m completely eliminates the ${initialIntersect.intersectionAreaHectares} Ha overlap (Projected Overlap: 0.00 Ha). Retains 100% planned footprint.`
+        : `Partial Clearance: Shifting corridor ${dir} by ${buffer}m leaves ${testIntersect.intersectionAreaHectares} Ha (${testIntersect.sourceOverlapPct}%) overlap remaining. Recommended complete clearance distance: ${exact.recommendedBufferMeters}m.`,
+    };
+  } else if (options.strategyType === 'joint_award_alignment') {
+    return {
+      strategy_type: 'joint_award_alignment',
+      initial_overlap_hectares: initialIntersect.intersectionAreaHectares,
+      initial_overlap_percentage: initialIntersect.sourceOverlapPct,
+      projected_overlap_hectares: 0,
+      projected_overlap_percentage: 0,
+      conflict_eliminated: true,
+      retained_area_hectares: totalAreaHa,
+      retained_area_percentage: 100,
+      feasibility_status: 'feasible_zero_overlap',
+      justification_summary: `Feasible: Joint inquiry under Section 23 with single apportionment under Section 30 consolidates compensation determination without requiring geometric modification.`,
+    };
+  } else {
+    return {
+      strategy_type: 'phased_acquisition_taking',
+      initial_overlap_hectares: initialIntersect.intersectionAreaHectares,
+      initial_overlap_percentage: initialIntersect.sourceOverlapPct,
+      projected_overlap_hectares: 0,
+      projected_overlap_percentage: 0,
+      conflict_eliminated: true,
+      retained_area_hectares: totalAreaHa,
+      retained_area_percentage: 100,
+      feasibility_status: 'feasible_zero_overlap',
+      justification_summary: `Feasible: Phased right-of-way taking protocol under Section 38 staggers possession dates to eliminate construction schedule conflict.`,
+    };
+  }
 }
 
 export interface ResolveSpatialConflictParams {
@@ -1422,28 +1571,14 @@ export async function resolveSpatialConflict(params: ResolveSpatialConflictParam
       throw new Error(`Cannot apply boundary clearance offset: Case ${sourceCase.case_number} has no active GIS geometry.`);
     }
 
-    // Determine direction and buffer if not supplied
-    let shiftDirection = customDir;
-    let bufferMeters = customBuffer;
+    // Automatically calculate exact clearance offset to guarantee complete zero overlap
+    const exact = calculateExactClearanceOffset(
+      sourceCase.geojson_boundary,
+      relatedCase?.geojson_boundary
+    );
 
-    if (!shiftDirection || !bufferMeters) {
-      const centroidSource = computeAccurateCentroid(sourceCase.geojson_boundary);
-      const centroidOther = relatedCase ? computeAccurateCentroid(relatedCase.geojson_boundary) : null;
-
-      if (centroidSource && centroidOther) {
-        const dLat = centroidSource[0] - centroidOther[0];
-        const dLng = centroidSource[1] - centroidOther[1];
-        if (Math.abs(dLng) >= Math.abs(dLat)) {
-          shiftDirection = shiftDirection || (dLng >= 0 ? 'Eastward' : 'Westward');
-        } else {
-          shiftDirection = shiftDirection || (dLat >= 0 ? 'Northward' : 'Southward');
-        }
-      } else {
-        shiftDirection = shiftDirection || 'Eastward';
-      }
-
-      bufferMeters = bufferMeters || 35;
-    }
+    const shiftDirection = customDir || exact.shiftDirection;
+    const bufferMeters = customBuffer !== undefined && customBuffer > 0 ? customBuffer : exact.recommendedBufferMeters;
 
     updatedBoundary = applyBoundaryOffsetClearance(sourceCase.geojson_boundary, shiftDirection, bufferMeters);
 

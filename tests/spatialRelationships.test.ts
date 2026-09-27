@@ -10,6 +10,9 @@ import {
   getPortfolioSpatialRelationships,
   seedSpatialMemoryStore,
   clearSpatialMemoryStore,
+  calculateExactClearanceOffset,
+  simulateSpatialResolution,
+  resolveSpatialConflict,
 } from '../server/services/spatialIntelligenceService';
 import { clearInMemoryAuditLogs } from '../server/services/auditLogger';
 import { resetPoliciesToDefaults } from '../server/services/policyEngine';
@@ -673,6 +676,127 @@ describe('Spatial & Cadastral Relationship Detection and Warning Engine', () => 
       expect(notif.recipient_role).toBe('revenue_inspector');
       expect(notif.severity).toBe('critical');
       expect(notif.evidence[0].statement).toContain('108/A');
+    });
+  });
+
+  describe('7. Complete Zero-Overlap Clearance Engine & Live Simulation Studio', () => {
+    it('calculates the exact minimum clearance offset distance and guarantees 0.00 Ha overlap', () => {
+      const clearance = calculateExactClearanceOffset(polygonA, polygonB_PartialOverlap);
+      expect(clearance.shiftDirection).toBeDefined();
+      expect(['Eastward', 'Westward', 'Northward', 'Southward']).toContain(clearance.shiftDirection);
+      expect(clearance.recommendedBufferMeters).toBeGreaterThan(0);
+      expect(clearance.initialIntersectionHa).toBeGreaterThan(0);
+
+      // Verify that applying this recommended buffer completely eliminates the overlap
+      const sim = simulateSpatialResolution(polygonA, polygonB_PartialOverlap, {
+        strategyType: 'boundary_offset_clearance',
+        shiftDirection: clearance.shiftDirection,
+        bufferMeters: clearance.recommendedBufferMeters,
+      });
+
+      expect(sim.conflict_eliminated).toBe(true);
+      expect(sim.projected_overlap_hectares).toBe(0);
+      expect(sim.feasibility_status).toBe('feasible_zero_overlap');
+      expect(sim.retained_area_percentage).toBe(100);
+    });
+
+    it('honestly detects partial clearance when an officer proposes an insufficient custom offset', () => {
+      // 10m buffer is insufficient for a ~1km corridor overlap
+      const sim = simulateSpatialResolution(polygonA, polygonB_PartialOverlap, {
+        strategyType: 'boundary_offset_clearance',
+        shiftDirection: 'Eastward',
+        bufferMeters: 10,
+      });
+
+      expect(sim.conflict_eliminated).toBe(false);
+      expect(sim.projected_overlap_hectares).toBeGreaterThan(0);
+      expect(sim.feasibility_status).toBe('partial_clearance');
+      expect(sim.justification_summary).toContain('Partial Clearance');
+    });
+
+    it('successfully simulates and executes resolution via REST API endpoints', async () => {
+      const case1: AcquisitionCase = {
+        id: 'case-sim-1',
+        project_id: 'proj-1',
+        case_number: 'SIM-01',
+        title: 'Highway Sector 1',
+        state: 'Uttar Pradesh',
+        district: 'Varanasi',
+        tehsil: 'Pindra',
+        village: 'Ahiran',
+        total_area_hectares: 50.0,
+        estimated_compensation: 50000000,
+        status: 'in_progress',
+        current_stage: 'section_11_notification',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        geojson_boundary: polygonA,
+      };
+
+      const case2: AcquisitionCase = {
+        id: 'case-sim-2',
+        project_id: 'proj-2',
+        case_number: 'SIM-02',
+        title: 'Highway Sector 2',
+        state: 'Uttar Pradesh',
+        district: 'Varanasi',
+        tehsil: 'Pindra',
+        village: 'Ahiran',
+        total_area_hectares: 50.0,
+        estimated_compensation: 50000000,
+        status: 'in_progress',
+        current_stage: 'section_11_notification',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        geojson_boundary: polygonB_PartialOverlap,
+      };
+
+      seedSpatialMemoryStore([case1, case2], [], []);
+
+      // 1. Call simulation endpoint
+      const simRes = await fetch(`${SERVER_URL}/api/gis/cases/case-sim-1/simulate-spatial-resolution`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer valid-test-token-admin',
+          'x-eval-role': 'admin',
+        },
+        body: JSON.stringify({
+          related_case_id: 'case-sim-2',
+          strategy_type: 'boundary_offset_clearance',
+        }),
+      });
+
+      expect(simRes.status).toBe(200);
+      const simData = await simRes.json();
+      expect(simData.feasibility_status).toBe('feasible_zero_overlap');
+      expect(simData.conflict_eliminated).toBe(true);
+      expect(simData.projected_overlap_hectares).toBe(0);
+
+      // 2. Call resolution execution endpoint
+      const resolveRes = await fetch(`${SERVER_URL}/api/gis/cases/case-sim-1/resolve-spatial-conflict`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer valid-test-token-admin',
+          'x-eval-role': 'admin',
+        },
+        body: JSON.stringify({
+          related_case_id: 'case-sim-2',
+          strategy_type: 'boundary_offset_clearance',
+          statutory_order_reference: 'SEC11/TEST/2026/01',
+          notes: 'Tested automated zero-overlap realignment',
+        }),
+      });
+
+      expect(resolveRes.status).toBe(200);
+      const resolveData = await resolveRes.json();
+      expect(resolveData.success).toBe(true);
+      expect(resolveData.updated_geojson_boundary).toBeDefined();
+
+      // Verify that after resolution, intersection is 0.00 Ha
+      const verifyIntersection = computeGeometryIntersection(resolveData.updated_geojson_boundary, polygonB_PartialOverlap);
+      expect(verifyIntersection.intersectionAreaHectares).toBe(0);
     });
   });
 });

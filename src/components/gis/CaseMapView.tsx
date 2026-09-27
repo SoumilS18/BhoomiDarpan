@@ -1,6 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { fetchCaseGIS, CaseGISResponse, resolveBhuvanLayers, resolveSpatialConflict } from '../../lib/api';
+import {
+  fetchCaseGIS,
+  CaseGISResponse,
+  resolveBhuvanLayers,
+  resolveSpatialConflict,
+  simulateSpatialResolution,
+} from '../../lib/api';
+import { SpatialResolutionSimulation } from '../../../shared/types';
 import { createBasemapTileLayer } from '../../lib/mapProvider';
 import { PARCEL_STATUS_COLORS, getBoundsFromGeoJSON } from '../../../shared/utils/geojson';
 import { Button } from '../common/Button';
@@ -58,11 +65,54 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
   // Resolution modal state
   const [resolutionModalOpen, setResolutionModalOpen] = useState(false);
   const [selectedStrategy, setSelectedStrategy] = useState<'boundary_offset_clearance' | 'joint_award_alignment' | 'phased_acquisition_taking'>('boundary_offset_clearance');
+  const [shiftDirection, setShiftDirection] = useState<'Eastward' | 'Westward' | 'Northward' | 'Southward'>('Eastward');
+  const [customBufferMeters, setCustomBufferMeters] = useState<string>('');
+  const [simulationResult, setSimulationResult] = useState<SpatialResolutionSimulation | null>(null);
+  const [isSimulating, setIsSimulating] = useState(false);
   const [orderReference, setOrderReference] = useState('SEC11/LAO/2026/04');
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [isSubmittingResolution, setIsSubmittingResolution] = useState(false);
   const [resolutionError, setResolutionError] = useState<string | null>(null);
   const [resolutionSuccessMsg, setResolutionSuccessMsg] = useState<string | null>(null);
+
+  // Trigger live simulation
+  const runSimulation = async (
+    strategy = selectedStrategy,
+    direction = shiftDirection,
+    buffer = customBufferMeters
+  ) => {
+    const relatedId =
+      selectedFeatureProps?.related_case_id ||
+      selectedFeatureProps?.target_case_id ||
+      'case-adjacent';
+
+    try {
+      setIsSimulating(true);
+      const res = await simulateSpatialResolution(caseId, {
+        related_case_id: relatedId,
+        strategy_type: strategy,
+        shift_direction: direction,
+        buffer_meters: buffer ? Number(buffer) : undefined,
+      });
+      setSimulationResult(res);
+      if (res.shift_direction && ['Eastward', 'Westward', 'Northward', 'Southward'].includes(res.shift_direction)) {
+        setShiftDirection(res.shift_direction as any);
+      }
+      if (!buffer && res.buffer_meters) {
+        setCustomBufferMeters(String(res.buffer_meters));
+      }
+    } catch (err: any) {
+      console.warn('Simulation failed:', err.message);
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
+  useEffect(() => {
+    if (resolutionModalOpen) {
+      runSimulation(selectedStrategy, shiftDirection, customBufferMeters);
+    }
+  }, [resolutionModalOpen, selectedStrategy, shiftDirection]);
 
   // Load GIS data
   const loadGIS = async () => {
@@ -866,6 +916,136 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
               </div>
             </div>
 
+            {/* Boundary Offset Parameters (When strategy 1 is chosen) */}
+            {selectedStrategy === 'boundary_offset_clearance' && (
+              <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gov-slate uppercase tracking-wider">
+                    Corridor Realignment Parameters
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomBufferMeters('');
+                      runSimulation('boundary_offset_clearance', shiftDirection, '');
+                    }}
+                    className="text-[11px] font-medium text-gov-navy hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    <span>Auto-Calculate Clearance</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                      Clearance Direction
+                    </label>
+                    <select
+                      value={shiftDirection}
+                      onChange={(e) => {
+                        const dir = e.target.value as any;
+                        setShiftDirection(dir);
+                        runSimulation(selectedStrategy, dir, customBufferMeters);
+                      }}
+                      className="w-full text-xs bg-white border border-slate-300 rounded-md px-2.5 py-1.5 focus:ring-1 focus:ring-gov-navy"
+                    >
+                      <option value="Eastward">Eastward (+X Longitude)</option>
+                      <option value="Westward">Westward (-X Longitude)</option>
+                      <option value="Northward">Northward (+Y Latitude)</option>
+                      <option value="Southward">Southward (-Y Latitude)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                      Shift Distance (Meters)
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="number"
+                        min="5"
+                        max="5000"
+                        step="5"
+                        value={customBufferMeters}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setCustomBufferMeters(val);
+                          runSimulation(selectedStrategy, shiftDirection, val);
+                        }}
+                        placeholder="Auto (Zero Overlap)"
+                        className="w-full text-xs font-mono bg-white border border-slate-300 rounded-md px-2.5 py-1.5 focus:ring-1 focus:ring-gov-navy"
+                      />
+                      <span className="text-xs text-slate-500 font-mono">m</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Live Simulation & Feasibility Preview Card */}
+            <div className="bg-slate-900 text-white p-3.5 rounded-lg border border-slate-800 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Compass className="h-4 w-4 text-emerald-400" />
+                  <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                    Real-Time Feasibility &amp; Simulation Check
+                  </span>
+                </div>
+                {isSimulating ? (
+                  <span className="flex items-center gap-1 text-[11px] text-amber-300">
+                    <RefreshCw className="h-3 w-3 animate-spin" />
+                    <span>Evaluating...</span>
+                  </span>
+                ) : simulationResult?.conflict_eliminated ? (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3" />
+                    <span>100% Conflict Eliminated</span>
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    <span>Partial Clearance</span>
+                  </span>
+                )}
+              </div>
+
+              {simulationResult && (
+                <div className="space-y-2 text-xs">
+                  <div className="grid grid-cols-3 gap-2 bg-slate-800/80 p-2 rounded border border-slate-700/60 text-center">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Initial Overlap</span>
+                      <strong className="text-red-400 font-mono">
+                        {simulationResult.initial_overlap_hectares} Ha
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Projected Overlap</span>
+                      <strong
+                        className={`font-mono ${
+                          simulationResult.projected_overlap_hectares === 0
+                            ? 'text-emerald-400'
+                            : 'text-amber-400'
+                        }`}
+                      >
+                        {simulationResult.projected_overlap_hectares.toFixed(2)} Ha
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">Retained Footprint</span>
+                      <strong className="text-emerald-400 font-mono">
+                        {simulationResult.retained_area_percentage}%
+                      </strong>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-slate-300 leading-relaxed bg-slate-800/40 p-2 rounded border border-slate-700/40">
+                    {simulationResult.justification_summary}
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* Form Inputs */}
             <div className="space-y-3">
               <div>
@@ -931,6 +1111,8 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
                       strategy_type: selectedStrategy,
                       statutory_order_reference: orderReference.trim(),
                       notes: resolutionNotes.trim() || undefined,
+                      buffer_meters: customBufferMeters ? Number(customBufferMeters) : undefined,
+                      shift_direction: shiftDirection,
                     });
 
                     setResolutionModalOpen(false);

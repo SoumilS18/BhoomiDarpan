@@ -20,6 +20,7 @@ import {
   getPortfolioSpatialRelationships,
   detectSpatialAndCadastralRelationships,
   resolveSpatialConflict,
+  simulateSpatialResolution,
 } from '../services/spatialIntelligenceService';
 import { getSpatialPolicySync } from '../services/policyEngine';
 
@@ -508,6 +509,40 @@ const handleResolveSpatialConflict = async (req: Request, res: Response) => {
 };
 router.post('/cases/:id/resolve-spatial-conflict', requireAuth, requireRole(['admin', 'project_officer', 'lao', 'revenue_inspector']), handleResolveSpatialConflict);
 router.post('/gis/cases/:id/resolve-spatial-conflict', requireAuth, requireRole(['admin', 'project_officer', 'lao', 'revenue_inspector']), handleResolveSpatialConflict);
+
+// POST /api/cases/:id/simulate-spatial-resolution - Simulate proposed clearance/resolution before execution
+const handleSimulateSpatialResolution = async (req: Request, res: Response) => {
+  try {
+    const rawCaseId = req.params.id;
+    const caseId = Array.isArray(rawCaseId) ? rawCaseId[0] : rawCaseId;
+    const { related_case_id, strategy_type, buffer_meters, shift_direction } = req.body;
+
+    const scopedCases = await getScopedCases(req.user);
+    const sourceCase = scopedCases.find((c) => c.id === caseId);
+    const relatedCase = scopedCases.find((c) => c.id === related_case_id);
+
+    if (!sourceCase) {
+      return res.status(404).json({ error: 'Source case not found or outside authorized jurisdiction.' });
+    }
+
+    const simulation = simulateSpatialResolution(
+      sourceCase.geojson_boundary,
+      relatedCase?.geojson_boundary,
+      {
+        strategyType: strategy_type || 'boundary_offset_clearance',
+        shiftDirection: shift_direction,
+        bufferMeters: buffer_meters !== undefined ? Number(buffer_meters) : undefined,
+        sourceTotalAreaHa: sourceCase.total_area_hectares,
+      }
+    );
+
+    res.json(simulation);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+router.post('/cases/:id/simulate-spatial-resolution', requireAuth, handleSimulateSpatialResolution);
+router.post('/gis/cases/:id/simulate-spatial-resolution', requireAuth, handleSimulateSpatialResolution);
 
 // POST /api/cases/:id/parcels - Add parcel with optional geometry
 router.post('/cases/:id/parcels', requireAuth, requireRole(['admin', 'project_officer', 'lao', 'revenue_inspector']), async (req: Request, res: Response) => {

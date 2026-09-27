@@ -1760,6 +1760,21 @@ export interface SpatialAlternativeSolution {
   statutory_procedure: string;
 }
 
+export interface SpatialResolutionSimulation {
+  strategy_type: 'boundary_offset_clearance' | 'joint_award_alignment' | 'phased_acquisition_taking';
+  shift_direction?: string;
+  buffer_meters?: number;
+  initial_overlap_hectares: number;
+  initial_overlap_percentage: number;
+  projected_overlap_hectares: number;
+  projected_overlap_percentage: number;
+  conflict_eliminated: boolean;
+  retained_area_hectares: number;
+  retained_area_percentage: number;
+  feasibility_status: 'feasible_zero_overlap' | 'partial_clearance' | 'requires_statutory_review';
+  justification_summary: string;
+}
+
 export interface SpatialRelationship {
   id: string;
   source_case_id: string;
