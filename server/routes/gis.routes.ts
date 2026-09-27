@@ -19,6 +19,7 @@ import {
   computeAccurateCentroid,
   getPortfolioSpatialRelationships,
   detectSpatialAndCadastralRelationships,
+  resolveSpatialConflict,
 } from '../services/spatialIntelligenceService';
 import { getSpatialPolicySync } from '../services/policyEngine';
 
@@ -467,6 +468,46 @@ router.post('/cases/:id/geojson', requireAuth, requireRole(['admin', 'project_of
     res.status(500).json({ error: err.message });
   }
 });
+
+// POST /api/cases/:id/resolve-spatial-conflict - Execute statutory conflict resolution or physical clearance offset
+const handleResolveSpatialConflict = async (req: Request, res: Response) => {
+  try {
+    const { id: caseId } = req.params;
+    const {
+      related_case_id,
+      strategy_type,
+      statutory_order_reference,
+      notes,
+      actor_name,
+      buffer_meters,
+      shift_direction,
+    } = req.body;
+
+    if (!related_case_id || !strategy_type || !statutory_order_reference) {
+      return res.status(400).json({
+        error: 'related_case_id, strategy_type, and statutory_order_reference are required.',
+      });
+    }
+
+    const result = await resolveSpatialConflict({
+      caseId: typeof caseId === 'string' ? caseId : (caseId as any)[0],
+      relatedCaseId: related_case_id,
+      strategyType: strategy_type,
+      statutoryOrderReference: statutory_order_reference,
+      notes,
+      actorName: actor_name,
+      bufferMeters: buffer_meters ? Number(buffer_meters) : undefined,
+      shiftDirection: shift_direction,
+      user: req.user,
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+router.post('/cases/:id/resolve-spatial-conflict', requireAuth, requireRole(['admin', 'project_officer', 'lao', 'revenue_inspector']), handleResolveSpatialConflict);
+router.post('/gis/cases/:id/resolve-spatial-conflict', requireAuth, requireRole(['admin', 'project_officer', 'lao', 'revenue_inspector']), handleResolveSpatialConflict);
 
 // POST /api/cases/:id/parcels - Add parcel with optional geometry
 router.post('/cases/:id/parcels', requireAuth, requireRole(['admin', 'project_officer', 'lao', 'revenue_inspector']), async (req: Request, res: Response) => {

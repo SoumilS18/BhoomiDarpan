@@ -1558,6 +1558,37 @@ export async function fetchCaseSpatialRelationships(
   return res.json();
 }
 
+export async function resolveSpatialConflict(
+  caseId: string,
+  payload: {
+    related_case_id: string;
+    strategy_type: 'boundary_offset_clearance' | 'joint_award_alignment' | 'phased_acquisition_taking';
+    statutory_order_reference: string;
+    notes?: string;
+    buffer_meters?: number;
+    shift_direction?: string;
+  }
+): Promise<{
+  success: boolean;
+  case_id: string;
+  related_case_id: string;
+  strategy_type: string;
+  statutory_order_reference: string;
+  message: string;
+  updated_geojson_boundary?: any;
+}> {
+  const res = await fetch(`${API_BASE}/gis/cases/${encodeURIComponent(caseId)}/resolve-spatial-conflict`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to resolve spatial conflict (${res.status})`);
+  }
+  return res.json();
+}
+
 // ============================================================================
 // DAY 8: INTEGRATION POLICY & MAP PROVIDER
 // ============================================================================

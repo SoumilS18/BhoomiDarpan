@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { fetchCaseGIS, CaseGISResponse, resolveBhuvanLayers } from '../../lib/api';
+import { fetchCaseGIS, CaseGISResponse, resolveBhuvanLayers, resolveSpatialConflict } from '../../lib/api';
 import { createBasemapTileLayer } from '../../lib/mapProvider';
 import { PARCEL_STATUS_COLORS, getBoundsFromGeoJSON } from '../../../shared/utils/geojson';
 import { Button } from '../common/Button';
@@ -15,6 +15,11 @@ import {
   AlertCircle,
   MapPin,
   RefreshCw,
+  ShieldAlert,
+  Gavel,
+  Compass,
+  Check,
+  X,
 } from 'lucide-react';
 
 interface CaseMapViewProps {
@@ -49,6 +54,15 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
   const [bhuvanLoading, setBhuvanLoading] = useState(false);
   const [bhuvanLayerInfo, setBhuvanLayerInfo] = useState<string | null>(null);
   const bhuvanWmsLayerRef = useRef<L.TileLayer.WMS | null>(null);
+
+  // Resolution modal state
+  const [resolutionModalOpen, setResolutionModalOpen] = useState(false);
+  const [selectedStrategy, setSelectedStrategy] = useState<'boundary_offset_clearance' | 'joint_award_alignment' | 'phased_acquisition_taking'>('boundary_offset_clearance');
+  const [orderReference, setOrderReference] = useState('SEC11/LAO/2026/04');
+  const [resolutionNotes, setResolutionNotes] = useState('');
+  const [isSubmittingResolution, setIsSubmittingResolution] = useState(false);
+  const [resolutionError, setResolutionError] = useState<string | null>(null);
+  const [resolutionSuccessMsg, setResolutionSuccessMsg] = useState<string | null>(null);
 
   // Load GIS data
   const loadGIS = async () => {
@@ -580,12 +594,24 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
                     </div>
                   )}
 
-                  <p className="text-[10px] text-slate-500 italic mt-1 pt-1 border-t border-red-200">
-                    Calculated dynamically via polygon clipping. Non-destructive advisory evidence.
-                  </p>
+                  {/* Direct Resolve Action */}
+                  <div className="pt-2 border-t border-red-200">
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => {
+                        setResolutionError(null);
+                        setResolutionModalOpen(true);
+                      }}
+                      className="w-full justify-center text-xs font-semibold bg-red-600 hover:bg-red-700 text-white shadow-xs flex items-center gap-1.5"
+                    >
+                      <ShieldAlert className="h-3.5 w-3.5" />
+                      <span>Resolve Spatial Conflict</span>
+                    </Button>
+                  </div>
                 </div>
               ) : selectedFeatureProps.type === 'related_case_boundary' ? (
-                <div className="space-y-1.5 pt-1 text-[11px]">
+                <div className="space-y-2 pt-1 text-[11px]">
                   <div>
                     <span className="text-slate-500">Related Case Reference:</span>
                     <strong className="block font-mono text-gov-navy">
@@ -603,6 +629,20 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
                     <strong className="block text-amber-900 capitalize">
                       {(selectedFeatureProps.relationship_type || '').replace(/_/g, ' ')}
                     </strong>
+                  </div>
+                  <div className="pt-2 border-t border-amber-200">
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => {
+                        setResolutionError(null);
+                        setResolutionModalOpen(true);
+                      }}
+                      className="w-full justify-center text-xs font-semibold bg-red-600 hover:bg-red-700 text-white shadow-xs flex items-center gap-1.5"
+                    >
+                      <ShieldAlert className="h-3.5 w-3.5" />
+                      <span>Resolve Corridor Collision</span>
+                    </Button>
                   </div>
                 </div>
               ) : selectedFeatureProps.type === 'boundary' ? (
@@ -691,6 +731,253 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
           </Button>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* INTERACTIVE SPATIAL RESOLUTION MODAL */}
+      {/* ========================================================================= */}
+      {resolutionModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-xl w-full p-6 space-y-5 animate-in fade-in duration-150">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-red-100 rounded-lg text-red-700">
+                  <ShieldAlert className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gov-slate">
+                    Resolve Spatial &amp; Cadastral Conflict
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Execute statutory realignment or consolidated proceedings under RFCTLARR Act
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setResolutionModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-md cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Target Conflict Summary */}
+            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs space-y-1">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Current Case:</span>
+                <strong className="text-gov-navy font-mono">{caseTitle}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Intersecting Case:</span>
+                <strong className="text-red-700 font-mono">
+                  {selectedFeatureProps?.related_case_number || 'Adjacent Corridor'}
+                </strong>
+              </div>
+              {selectedFeatureProps?.intersection_area_hectares && (
+                <div className="flex justify-between pt-1 border-t border-slate-200/60">
+                  <span className="text-slate-500">Calculated Intersection:</span>
+                  <span className="font-bold text-red-800">
+                    {selectedFeatureProps.intersection_area_hectares} Ha ({selectedFeatureProps.overlap_pct}%)
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Strategy Selection */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gov-slate uppercase tracking-wider block">
+                Select Resolution Strategy
+              </label>
+              <div className="space-y-2">
+                <label
+                  onClick={() => setSelectedStrategy('boundary_offset_clearance')}
+                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                    selectedStrategy === 'boundary_offset_clearance'
+                      ? 'bg-blue-50/60 border-blue-500 ring-1 ring-blue-500'
+                      : 'bg-white border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="strategy"
+                    checked={selectedStrategy === 'boundary_offset_clearance'}
+                    onChange={() => setSelectedStrategy('boundary_offset_clearance')}
+                    className="mt-1 text-gov-navy"
+                  />
+                  <div className="text-xs space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <strong className="text-gov-slate">1. Corridor Clearance Offset (Physical Realignment)</strong>
+                      <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-100 text-blue-800">
+                        Recommended
+                      </span>
+                    </div>
+                    <p className="text-slate-500 text-[11px]">
+                      Shift corridor boundary to eliminate polygon overlap. Automatically recalculates and saves new coordinates under RFCTLARR Section 11(1).
+                    </p>
+                  </div>
+                </label>
+
+                <label
+                  onClick={() => setSelectedStrategy('joint_award_alignment')}
+                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                    selectedStrategy === 'joint_award_alignment'
+                      ? 'bg-blue-50/60 border-blue-500 ring-1 ring-blue-500'
+                      : 'bg-white border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="strategy"
+                    checked={selectedStrategy === 'joint_award_alignment'}
+                    onChange={() => setSelectedStrategy('joint_award_alignment')}
+                    className="mt-1 text-gov-navy"
+                  />
+                  <div className="text-xs space-y-0.5">
+                    <strong className="text-gov-slate">2. Joint Valuation &amp; Consolidated Award Schedule</strong>
+                    <p className="text-slate-500 text-[11px]">
+                      Conduct single joint inquiry under Section 23 with unified apportionment under Section 30 to prevent duplicate landowner disbursements.
+                    </p>
+                  </div>
+                </label>
+
+                <label
+                  onClick={() => setSelectedStrategy('phased_acquisition_taking')}
+                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                    selectedStrategy === 'phased_acquisition_taking'
+                      ? 'bg-blue-50/60 border-blue-500 ring-1 ring-blue-500'
+                      : 'bg-white border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="strategy"
+                    checked={selectedStrategy === 'phased_acquisition_taking'}
+                    onChange={() => setSelectedStrategy('phased_acquisition_taking')}
+                    className="mt-1 text-gov-navy"
+                  />
+                  <div className="text-xs space-y-0.5">
+                    <strong className="text-gov-slate">3. Phased Right-of-Way &amp; Possession Protocol</strong>
+                    <p className="text-slate-500 text-[11px]">
+                      Synchronize execution timelines: Primary linear corridor takes possession first, followed by secondary scheme under Section 38.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Form Inputs */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                  Statutory Order / Gazetted Corrigendum Reference <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={orderReference}
+                  onChange={(e) => setOrderReference(e.target.value)}
+                  placeholder="e.g. SEC11/LAO/2026/04"
+                  className="w-full text-xs font-mono px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-gov-navy focus:border-gov-navy"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                  Officer Notes &amp; Statutory Justification (Optional)
+                </label>
+                <textarea
+                  value={resolutionNotes}
+                  onChange={(e) => setResolutionNotes(e.target.value)}
+                  rows={2}
+                  placeholder="Reasoning approved by Competent Authority..."
+                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-gov-navy focus:border-gov-navy"
+                />
+              </div>
+            </div>
+
+            {resolutionError && (
+              <div className="p-2.5 rounded bg-red-50 border border-red-200 text-xs text-red-700">
+                {resolutionError}
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setResolutionModalOpen(false)}
+                disabled={isSubmittingResolution}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={isSubmittingResolution || !orderReference.trim()}
+                onClick={async () => {
+                  try {
+                    setIsSubmittingResolution(true);
+                    setResolutionError(null);
+
+                    const relatedId =
+                      selectedFeatureProps?.related_case_id ||
+                      selectedFeatureProps?.target_case_id ||
+                      'case-adjacent';
+
+                    const res = await resolveSpatialConflict(caseId, {
+                      related_case_id: relatedId,
+                      strategy_type: selectedStrategy,
+                      statutory_order_reference: orderReference.trim(),
+                      notes: resolutionNotes.trim() || undefined,
+                    });
+
+                    setResolutionModalOpen(false);
+                    setResolutionSuccessMsg(res.message);
+                    setSelectedFeatureProps(null);
+
+                    // Reload live GIS layers to instantly reflect new boundary
+                    await loadGIS();
+                  } catch (err: any) {
+                    setResolutionError(err.message || 'Failed to resolve conflict.');
+                  } finally {
+                    setIsSubmittingResolution(false);
+                  }
+                }}
+                className="bg-gov-navy hover:bg-gov-blue text-white"
+              >
+                {isSubmittingResolution ? (
+                  <span className="flex items-center gap-1.5">
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    <span>Executing...</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    <Check className="h-3.5 w-3.5" />
+                    <span>Execute &amp; Apply Resolution</span>
+                  </span>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Notification Banner */}
+      {resolutionSuccessMsg && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-emerald-900/90 backdrop-blur-md text-white px-4 py-2.5 rounded-lg shadow-xl border border-emerald-500/40 flex items-center gap-2.5 text-xs animate-in slide-in-from-top duration-200">
+          <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
+          <span>{resolutionSuccessMsg}</span>
+          <button
+            type="button"
+            onClick={() => setResolutionSuccessMsg(null)}
+            className="text-white/70 hover:text-white ml-2 cursor-pointer"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

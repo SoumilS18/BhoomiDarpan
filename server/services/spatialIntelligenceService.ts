@@ -22,6 +22,7 @@ import { getSpatialPolicySync } from './policyEngine';
 import { validateGeoJSON } from '../utils/geojsonValidator';
 import { getTotalUnitsCount, getLGDDataSourceStatus } from './administrativeGeographyService';
 import { PARCEL_STATUS_COLORS } from '../../shared/utils/geojson';
+import { logCaseEvent } from './auditLogger';
 
 /**
  * Calculates Great-Circle (Haversine) distance between two geographic positions in kilometers.
@@ -1304,6 +1305,194 @@ export async function getPortfolioSpatialRelationships(
     cases_requiring_review_count: requiringReview,
     cases_requiring_spatial_review: reviewCaseIds,
     relationships: allRelationships,
+  };
+}
+
+/**
+ * Applies a geometric clearance offset to a GeoJSON boundary by shifting all constituent vertices.
+ */
+export function applyBoundaryOffsetClearance(
+  geojson: any,
+  shiftDirection: string,
+  bufferMeters: number
+): any {
+  if (!geojson) return geojson;
+
+  const centroid = computeAccurateCentroid(geojson) || [25.3, 82.9];
+  const latRad = (centroid[0] * Math.PI) / 180;
+  const metersPerDegLat = 111000;
+  const metersPerDegLng = 111000 * Math.max(0.2, Math.cos(latRad));
+
+  let dLat = 0;
+  let dLng = 0;
+
+  switch (shiftDirection) {
+    case 'Eastward':
+      dLng = bufferMeters / metersPerDegLng;
+      break;
+    case 'Westward':
+      dLng = -bufferMeters / metersPerDegLng;
+      break;
+    case 'Northward':
+      dLat = bufferMeters / metersPerDegLat;
+      break;
+    case 'Southward':
+      dLat = -bufferMeters / metersPerDegLat;
+      break;
+    default:
+      dLng = bufferMeters / metersPerDegLng;
+      break;
+  }
+
+  const shiftPoint = (pt: any): [number, number] => {
+    if (!Array.isArray(pt) || pt.length < 2) return pt;
+    const [lng, lat] = pt;
+    return [
+      Math.round((lng + dLng) * 1e6) / 1e6,
+      Math.round((lat + dLat) * 1e6) / 1e6,
+    ];
+  };
+
+  const shiftCoordinates = (coords: any, depth: number): any => {
+    if (depth === 1) {
+      return shiftPoint(coords);
+    }
+    if (!Array.isArray(coords)) return coords;
+    return coords.map((c: any) => shiftCoordinates(c, depth - 1));
+  };
+
+  const cloned = JSON.parse(JSON.stringify(geojson));
+  if (cloned.type === 'Polygon' && Array.isArray(cloned.coordinates)) {
+    cloned.coordinates = shiftCoordinates(cloned.coordinates, 3);
+  } else if (cloned.type === 'MultiPolygon' && Array.isArray(cloned.coordinates)) {
+    cloned.coordinates = shiftCoordinates(cloned.coordinates, 4);
+  } else if (cloned.type === 'Feature' && cloned.geometry) {
+    cloned.geometry = applyBoundaryOffsetClearance(cloned.geometry, shiftDirection, bufferMeters);
+  } else if (cloned.type === 'FeatureCollection' && Array.isArray(cloned.features)) {
+    cloned.features = cloned.features.map((f: any) =>
+      applyBoundaryOffsetClearance(f, shiftDirection, bufferMeters)
+    );
+  }
+  return cloned;
+}
+
+export interface ResolveSpatialConflictParams {
+  caseId: string;
+  relatedCaseId: string;
+  strategyType: 'boundary_offset_clearance' | 'joint_award_alignment' | 'phased_acquisition_taking';
+  statutoryOrderReference: string;
+  notes?: string;
+  actorName?: string;
+  bufferMeters?: number;
+  shiftDirection?: string;
+  user?: AuthenticatedUser;
+}
+
+/**
+ * Resolves a spatial or cadastral conflict between cases.
+ * Updates physical geometry if boundary offset clearance is chosen,
+ * logs immutable audit trail, and resolves operational governance alerts.
+ */
+export async function resolveSpatialConflict(params: ResolveSpatialConflictParams) {
+  const {
+    caseId,
+    relatedCaseId,
+    strategyType,
+    statutoryOrderReference,
+    notes,
+    actorName,
+    bufferMeters: customBuffer,
+    shiftDirection: customDir,
+    user,
+  } = params;
+
+  const scopedCases = await getScopedCases(user);
+  const sourceCase = scopedCases.find((c) => c.id === caseId);
+  const relatedCase = scopedCases.find((c) => c.id === relatedCaseId);
+
+  if (!sourceCase) {
+    throw new Error(`Case ${caseId} not found or outside authorized operational scope.`);
+  }
+
+  let updatedBoundary: any = null;
+  let resolutionSummary = '';
+
+  if (strategyType === 'boundary_offset_clearance') {
+    if (!sourceCase.geojson_boundary) {
+      throw new Error(`Cannot apply boundary clearance offset: Case ${sourceCase.case_number} has no active GIS geometry.`);
+    }
+
+    // Determine direction and buffer if not supplied
+    let shiftDirection = customDir;
+    let bufferMeters = customBuffer;
+
+    if (!shiftDirection || !bufferMeters) {
+      const centroidSource = computeAccurateCentroid(sourceCase.geojson_boundary);
+      const centroidOther = relatedCase ? computeAccurateCentroid(relatedCase.geojson_boundary) : null;
+
+      if (centroidSource && centroidOther) {
+        const dLat = centroidSource[0] - centroidOther[0];
+        const dLng = centroidSource[1] - centroidOther[1];
+        if (Math.abs(dLng) >= Math.abs(dLat)) {
+          shiftDirection = shiftDirection || (dLng >= 0 ? 'Eastward' : 'Westward');
+        } else {
+          shiftDirection = shiftDirection || (dLat >= 0 ? 'Northward' : 'Southward');
+        }
+      } else {
+        shiftDirection = shiftDirection || 'Eastward';
+      }
+
+      bufferMeters = bufferMeters || 35;
+    }
+
+    updatedBoundary = applyBoundaryOffsetClearance(sourceCase.geojson_boundary, shiftDirection, bufferMeters);
+
+    // Persist updated geometry in Supabase / memory store
+    if (isSupabaseConfigured) {
+      const supabase = getSupabase();
+      await supabase
+        .from('acquisition_cases')
+        .update({ geojson_boundary: updatedBoundary, updated_at: new Date().toISOString() })
+        .eq('id', caseId);
+    } else {
+      const memCase = inMemoryCases.find((c) => c.id === caseId);
+      if (memCase) {
+        memCase.geojson_boundary = updatedBoundary;
+        memCase.updated_at = new Date().toISOString();
+      }
+    }
+
+    resolutionSummary = `Corridor boundary shifted ${shiftDirection} by ${bufferMeters}m under RFCTLARR Section 11(1) order #${statutoryOrderReference}.`;
+  } else if (strategyType === 'joint_award_alignment') {
+    resolutionSummary = `Joint valuation and consolidated award protocol instituted under RFCTLARR Section 23/30 order #${statutoryOrderReference}.`;
+  } else {
+    resolutionSummary = `Phased right-of-way taking and possession protocol approved under RFCTLARR Section 38 order #${statutoryOrderReference}.`;
+  }
+
+  // Record audit log
+  await logCaseEvent({
+    case_id: caseId,
+    event_type: 'CASE_SPATIAL_CONFLICT_RESOLVED' as any,
+    title: `Spatial Conflict Resolved: ${strategyType.replace(/_/g, ' ').toUpperCase()}`,
+    description: `${resolutionSummary} ${notes ? `Notes: ${notes}` : ''}`,
+    actor_name: actorName || user?.full_name || 'Competent Authority',
+    metadata: {
+      case_id: caseId,
+      related_case_id: relatedCaseId,
+      strategy_type: strategyType,
+      statutory_order_reference: statutoryOrderReference,
+      notes,
+    },
+  });
+
+  return {
+    success: true,
+    case_id: caseId,
+    related_case_id: relatedCaseId,
+    strategy_type: strategyType,
+    statutory_order_reference: statutoryOrderReference,
+    message: resolutionSummary,
+    updated_geojson_boundary: updatedBoundary,
   };
 }
 
