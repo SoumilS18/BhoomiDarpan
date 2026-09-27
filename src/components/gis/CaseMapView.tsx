@@ -27,6 +27,10 @@ import {
   Compass,
   Check,
   X,
+  Sparkles,
+  FileText,
+  SlidersHorizontal,
+  ArrowRight,
 } from 'lucide-react';
 
 interface CaseMapViewProps {
@@ -783,364 +787,426 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
       </div>
 
       {/* ========================================================================= */}
+      {/* ========================================================================= */}
       {/* INTERACTIVE SPATIAL RESOLUTION MODAL */}
       {/* ========================================================================= */}
       {resolutionModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-xl w-full p-6 space-y-5 animate-in fade-in duration-150">
-            {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-red-100 rounded-lg text-red-700">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-3 sm:p-5 overflow-hidden animate-in fade-in duration-150">
+          <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-slate-200/90 flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Pinned Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-white/95 backdrop-blur-sm shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-gradient-to-br from-red-500/10 to-amber-500/10 border border-red-200/60 rounded-xl text-red-600 shadow-2xs">
                   <ShieldAlert className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-gov-slate">
-                    Resolve Spatial &amp; Cadastral Conflict
+                  <h3 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                    <span>Resolve Spatial &amp; Cadastral Conflict</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-red-100 text-red-700 border border-red-200">
+                      Active Conflict
+                    </span>
                   </h3>
-                  <p className="text-xs text-slate-500">
-                    Execute statutory realignment or consolidated proceedings under RFCTLARR Act
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    RFCTLARR Act statutory realignment, joint inquiry, and schedule synchronization
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setResolutionModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-md cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-2 rounded-full transition-colors cursor-pointer"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Target Conflict Summary */}
-            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs space-y-1">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Current Case:</span>
-                <strong className="text-gov-navy font-mono">{caseTitle}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Intersecting Case:</span>
-                <strong className="text-red-700 font-mono">
-                  {selectedFeatureProps?.related_case_number || 'Adjacent Corridor'}
-                </strong>
-              </div>
-              {selectedFeatureProps?.intersection_area_hectares && (
-                <div className="flex justify-between pt-1 border-t border-slate-200/60">
-                  <span className="text-slate-500">Calculated Intersection:</span>
-                  <span className="font-bold text-red-800">
-                    {selectedFeatureProps.intersection_area_hectares} Ha ({selectedFeatureProps.overlap_pct}%)
-                  </span>
+            {/* Scrollable Modal Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5 custom-scrollbar">
+              {/* Conflict Relationship Banner */}
+              <div className="bg-gradient-to-r from-slate-50 via-slate-50 to-red-50/30 p-4 rounded-xl border border-slate-200/80 shadow-2xs space-y-2.5">
+                <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  <span>Corridor Intersection Context</span>
+                  {selectedFeatureProps?.intersection_area_hectares && (
+                    <span className="text-red-700 font-bold font-mono">
+                      Overlap: {selectedFeatureProps.intersection_area_hectares} Ha ({selectedFeatureProps.overlap_pct}%)
+                    </span>
+                  )}
                 </div>
-              )}
-            </div>
 
-            {/* Strategy Selection */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gov-slate uppercase tracking-wider block">
-                Select Resolution Strategy
-              </label>
-              <div className="space-y-2">
-                <label
-                  onClick={() => setSelectedStrategy('boundary_offset_clearance')}
-                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                    selectedStrategy === 'boundary_offset_clearance'
-                      ? 'bg-blue-50/60 border-blue-500 ring-1 ring-blue-500'
-                      : 'bg-white border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="strategy"
-                    checked={selectedStrategy === 'boundary_offset_clearance'}
-                    onChange={() => setSelectedStrategy('boundary_offset_clearance')}
-                    className="mt-1 text-gov-navy"
-                  />
-                  <div className="text-xs space-y-0.5">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-2xs font-mono">
+                    <span className="text-slate-400 text-[10px] font-sans font-semibold uppercase">Source:</span>
+                    <strong className="text-gov-navy font-bold">{caseTitle}</strong>
+                  </div>
+
+                  <div className="p-1 rounded-full bg-red-100 text-red-600">
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </div>
+
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50/80 rounded-lg border border-red-200 shadow-2xs font-mono">
+                    <span className="text-red-400 text-[10px] font-sans font-semibold uppercase">Colliding:</span>
+                    <strong className="text-red-800 font-bold">
+                      {selectedFeatureProps?.related_case_number || 'Adjacent Corridor'}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Strategy Selection */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-gov-slate uppercase tracking-wider">
+                    Select Statutory Resolution Strategy
+                  </label>
+                  <span className="text-[11px] text-slate-400">Choose authorized protocol</span>
+                </div>
+
+                <div className="space-y-2.5">
+                  <label
+                    onClick={() => setSelectedStrategy('boundary_offset_clearance')}
+                    className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all duration-150 ${
+                      selectedStrategy === 'boundary_offset_clearance'
+                        ? 'bg-blue-50/60 border-gov-navy shadow-sm ring-1 ring-gov-navy'
+                        : 'bg-white border-slate-200 hover:bg-slate-50/80 hover:border-slate-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="strategy"
+                      checked={selectedStrategy === 'boundary_offset_clearance'}
+                      onChange={() => setSelectedStrategy('boundary_offset_clearance')}
+                      className="mt-1 text-gov-navy"
+                    />
+                    <div className="text-xs space-y-1 flex-1">
+                      <div className="flex items-center justify-between">
+                        <strong className="text-slate-900 font-bold text-[13px]">
+                          1. Corridor Clearance Offset (Physical Realignment)
+                        </strong>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                          Recommended • Sec 11(1)
+                        </span>
+                      </div>
+                      <p className="text-slate-500 text-[11px] leading-relaxed">
+                        Physically realign the acquisition corridor coordinates to achieve complete zero overlap. Automatically recalculates GIS boundary geometries.
+                      </p>
+                    </div>
+                  </label>
+
+                  <label
+                    onClick={() => setSelectedStrategy('joint_award_alignment')}
+                    className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all duration-150 ${
+                      selectedStrategy === 'joint_award_alignment'
+                        ? 'bg-blue-50/60 border-gov-navy shadow-sm ring-1 ring-gov-navy'
+                        : 'bg-white border-slate-200 hover:bg-slate-50/80 hover:border-slate-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="strategy"
+                      checked={selectedStrategy === 'joint_award_alignment'}
+                      onChange={() => setSelectedStrategy('joint_award_alignment')}
+                      className="mt-1 text-gov-navy"
+                    />
+                    <div className="text-xs space-y-1 flex-1">
+                      <div className="flex items-center justify-between">
+                        <strong className="text-slate-900 font-bold text-[13px]">
+                          2. Joint Valuation &amp; Consolidated Award Schedule
+                        </strong>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                          Sec 23 / 30
+                        </span>
+                      </div>
+                      <p className="text-slate-500 text-[11px] leading-relaxed">
+                        Conduct single joint inquiry under Section 23 with unified apportionment under Section 30 to prevent duplicate landowner disbursements.
+                      </p>
+                    </div>
+                  </label>
+
+                  <label
+                    onClick={() => setSelectedStrategy('phased_acquisition_taking')}
+                    className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all duration-150 ${
+                      selectedStrategy === 'phased_acquisition_taking'
+                        ? 'bg-blue-50/60 border-gov-navy shadow-sm ring-1 ring-gov-navy'
+                        : 'bg-white border-slate-200 hover:bg-slate-50/80 hover:border-slate-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="strategy"
+                      checked={selectedStrategy === 'phased_acquisition_taking'}
+                      onChange={() => setSelectedStrategy('phased_acquisition_taking')}
+                      className="mt-1 text-gov-navy"
+                    />
+                    <div className="text-xs space-y-1 flex-1">
+                      <div className="flex items-center justify-between">
+                        <strong className="text-slate-900 font-bold text-[13px]">
+                          3. Phased Right-of-Way &amp; Possession Protocol
+                        </strong>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                          Sec 38
+                        </span>
+                      </div>
+                      <p className="text-slate-500 text-[11px] leading-relaxed">
+                        Synchronize execution timelines: Primary linear corridor takes possession first, followed by secondary scheme taking.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Corridor Realignment Parameters (When strategy 1 is chosen) */}
+              {selectedStrategy === 'boundary_offset_clearance' && (
+                <div className="bg-gradient-to-b from-slate-50 to-slate-100/70 p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3.5">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <strong className="text-gov-slate">1. Corridor Clearance Offset (Physical Realignment)</strong>
-                      <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-blue-100 text-blue-800">
-                        Recommended
+                      <SlidersHorizontal className="h-4 w-4 text-gov-navy" />
+                      <span className="text-xs font-bold text-gov-slate uppercase tracking-wider">
+                        Corridor Realignment Parameters
                       </span>
                     </div>
-                    <p className="text-slate-500 text-[11px]">
-                      Shift corridor boundary to eliminate polygon overlap. Automatically recalculates and saves new coordinates under RFCTLARR Section 11(1).
-                    </p>
-                  </div>
-                </label>
-
-                <label
-                  onClick={() => setSelectedStrategy('joint_award_alignment')}
-                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                    selectedStrategy === 'joint_award_alignment'
-                      ? 'bg-blue-50/60 border-blue-500 ring-1 ring-blue-500'
-                      : 'bg-white border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="strategy"
-                    checked={selectedStrategy === 'joint_award_alignment'}
-                    onChange={() => setSelectedStrategy('joint_award_alignment')}
-                    className="mt-1 text-gov-navy"
-                  />
-                  <div className="text-xs space-y-0.5">
-                    <strong className="text-gov-slate">2. Joint Valuation &amp; Consolidated Award Schedule</strong>
-                    <p className="text-slate-500 text-[11px]">
-                      Conduct single joint inquiry under Section 23 with unified apportionment under Section 30 to prevent duplicate landowner disbursements.
-                    </p>
-                  </div>
-                </label>
-
-                <label
-                  onClick={() => setSelectedStrategy('phased_acquisition_taking')}
-                  className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                    selectedStrategy === 'phased_acquisition_taking'
-                      ? 'bg-blue-50/60 border-blue-500 ring-1 ring-blue-500'
-                      : 'bg-white border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="strategy"
-                    checked={selectedStrategy === 'phased_acquisition_taking'}
-                    onChange={() => setSelectedStrategy('phased_acquisition_taking')}
-                    className="mt-1 text-gov-navy"
-                  />
-                  <div className="text-xs space-y-0.5">
-                    <strong className="text-gov-slate">3. Phased Right-of-Way &amp; Possession Protocol</strong>
-                    <p className="text-slate-500 text-[11px]">
-                      Synchronize execution timelines: Primary linear corridor takes possession first, followed by secondary scheme under Section 38.
-                    </p>
-                  </div>
-                </label>
-              </div>
-            </div>
-
-            {/* Boundary Offset Parameters (When strategy 1 is chosen) */}
-            {selectedStrategy === 'boundary_offset_clearance' && (
-              <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gov-slate uppercase tracking-wider">
-                    Corridor Realignment Parameters
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCustomBufferMeters('');
-                      runSimulation('boundary_offset_clearance', shiftDirection, '');
-                    }}
-                    className="text-[11px] font-medium text-gov-navy hover:underline flex items-center gap-1 cursor-pointer"
-                  >
-                    <RefreshCw className="h-3 w-3" />
-                    <span>Auto-Calculate Clearance</span>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                      Clearance Direction
-                    </label>
-                    <select
-                      value={shiftDirection}
-                      onChange={(e) => {
-                        const dir = e.target.value as any;
-                        setShiftDirection(dir);
-                        runSimulation(selectedStrategy, dir, customBufferMeters);
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomBufferMeters('');
+                        runSimulation('boundary_offset_clearance', shiftDirection, '');
                       }}
-                      className="w-full text-xs bg-white border border-slate-300 rounded-md px-2.5 py-1.5 focus:ring-1 focus:ring-gov-navy"
+                      className="text-[11px] font-semibold text-gov-navy hover:text-gov-blue hover:underline flex items-center gap-1.5 cursor-pointer bg-white px-2.5 py-1 rounded-md border border-slate-200 shadow-2xs"
                     >
-                      <option value="Eastward">Eastward (+X Longitude)</option>
-                      <option value="Westward">Westward (-X Longitude)</option>
-                      <option value="Northward">Northward (+Y Latitude)</option>
-                      <option value="Southward">Southward (-Y Latitude)</option>
-                    </select>
+                      <Sparkles className="h-3 w-3 text-amber-500" />
+                      <span>Auto-Calculate Clearance</span>
+                    </button>
                   </div>
 
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                      Shift Distance (Meters)
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        min="5"
-                        max="5000"
-                        step="5"
-                        value={customBufferMeters}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                        Clearance Direction
+                      </label>
+                      <select
+                        value={shiftDirection}
                         onChange={(e) => {
-                          const val = e.target.value;
-                          setCustomBufferMeters(val);
-                          runSimulation(selectedStrategy, shiftDirection, val);
+                          const dir = e.target.value as any;
+                          setShiftDirection(dir);
+                          runSimulation(selectedStrategy, dir, customBufferMeters);
                         }}
-                        placeholder="Auto (Zero Overlap)"
-                        className="w-full text-xs font-mono bg-white border border-slate-300 rounded-md px-2.5 py-1.5 focus:ring-1 focus:ring-gov-navy"
-                      />
-                      <span className="text-xs text-slate-500 font-mono">m</span>
+                        className="w-full text-xs font-medium bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-gov-navy/20 focus:border-gov-navy shadow-2xs"
+                      >
+                        <option value="Eastward">Eastward (+X Longitude)</option>
+                        <option value="Westward">Westward (-X Longitude)</option>
+                        <option value="Northward">Northward (+Y Latitude)</option>
+                        <option value="Southward">Southward (-Y Latitude)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                        Shift Distance (Meters)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          min="5"
+                          max="5000"
+                          step="5"
+                          value={customBufferMeters}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomBufferMeters(val);
+                            runSimulation(selectedStrategy, shiftDirection, val);
+                          }}
+                          placeholder="Auto (Zero Overlap)"
+                          className="w-full text-xs font-mono bg-white border border-slate-300 rounded-lg pl-3 pr-8 py-2 focus:ring-2 focus:ring-gov-navy/20 focus:border-gov-navy shadow-2xs"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-mono">
+                          m
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Live Simulation & Feasibility Preview Card */}
-            <div className="bg-slate-900 text-white p-3.5 rounded-lg border border-slate-800 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Compass className="h-4 w-4 text-emerald-400" />
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
-                    Real-Time Feasibility &amp; Simulation Check
-                  </span>
+              {/* Live Simulation & Feasibility Preview Card */}
+              <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white p-4 rounded-xl border border-slate-800 shadow-xl ring-1 ring-white/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Compass className="h-4 w-4 text-emerald-400 animate-pulse" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                      Real-Time Feasibility &amp; Simulation Check
+                    </span>
+                  </div>
+                  {isSimulating ? (
+                    <span className="flex items-center gap-1.5 text-[11px] text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                      <span>Evaluating...</span>
+                    </span>
+                  ) : simulationResult?.conflict_eliminated ? (
+                    <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5 shadow-xs">
+                      <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>100% Conflict Eliminated</span>
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1.5 shadow-xs">
+                      <AlertCircle className="h-3.5 w-3.5 text-amber-400" />
+                      <span>Partial Clearance</span>
+                    </span>
+                  )}
                 </div>
-                {isSimulating ? (
-                  <span className="flex items-center gap-1 text-[11px] text-amber-300">
-                    <RefreshCw className="h-3 w-3 animate-spin" />
-                    <span>Evaluating...</span>
-                  </span>
-                ) : simulationResult?.conflict_eliminated ? (
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
-                    <CheckCircle className="h-3 w-3" />
-                    <span>100% Conflict Eliminated</span>
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    <span>Partial Clearance</span>
-                  </span>
+
+                {simulationResult && (
+                  <div className="space-y-2.5 text-xs">
+                    <div className="grid grid-cols-3 gap-2.5 bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 text-center">
+                      <div className="p-1">
+                        <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-0.5">
+                          Initial Overlap
+                        </span>
+                        <strong className="text-red-400 font-mono text-sm">
+                          {simulationResult.initial_overlap_hectares} Ha
+                        </strong>
+                      </div>
+                      <div className="p-1 border-x border-slate-800">
+                        <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-0.5">
+                          Projected Overlap
+                        </span>
+                        <strong
+                          className={`font-mono text-sm ${
+                            simulationResult.projected_overlap_hectares === 0
+                              ? 'text-emerald-400'
+                              : 'text-amber-400'
+                          }`}
+                        >
+                          {simulationResult.projected_overlap_hectares.toFixed(2)} Ha
+                        </strong>
+                      </div>
+                      <div className="p-1">
+                        <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-0.5">
+                          Retained Footprint
+                        </span>
+                        <strong className="text-emerald-400 font-mono text-sm">
+                          {simulationResult.retained_area_percentage}%
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div className="text-[11px] text-slate-300 leading-relaxed bg-slate-900/60 p-2.5 rounded-lg border-l-2 border-emerald-500 border-slate-800/80">
+                      {simulationResult.justification_summary}
+                    </div>
+                  </div>
                 )}
               </div>
 
-              {simulationResult && (
-                <div className="space-y-2 text-xs">
-                  <div className="grid grid-cols-3 gap-2 bg-slate-800/80 p-2 rounded border border-slate-700/60 text-center">
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">Initial Overlap</span>
-                      <strong className="text-red-400 font-mono">
-                        {simulationResult.initial_overlap_hectares} Ha
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">Projected Overlap</span>
-                      <strong
-                        className={`font-mono ${
-                          simulationResult.projected_overlap_hectares === 0
-                            ? 'text-emerald-400'
-                            : 'text-amber-400'
-                        }`}
-                      >
-                        {simulationResult.projected_overlap_hectares.toFixed(2)} Ha
-                      </strong>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">Retained Footprint</span>
-                      <strong className="text-emerald-400 font-mono">
-                        {simulationResult.retained_area_percentage}%
-                      </strong>
-                    </div>
+              {/* Form Inputs */}
+              <div className="space-y-3.5">
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                    Statutory Order / Gazetted Corrigendum Reference <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={orderReference}
+                      onChange={(e) => setOrderReference(e.target.value)}
+                      placeholder="e.g. SEC11/LAO/2026/04"
+                      className="w-full text-xs font-mono px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-gov-navy/20 focus:border-gov-navy shadow-2xs"
+                      required
+                    />
                   </div>
+                </div>
 
-                  <p className="text-[11px] text-slate-300 leading-relaxed bg-slate-800/40 p-2 rounded border border-slate-700/40">
-                    {simulationResult.justification_summary}
-                  </p>
+                <div>
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                    Officer Notes &amp; Statutory Justification (Optional)
+                  </label>
+                  <textarea
+                    value={resolutionNotes}
+                    onChange={(e) => setResolutionNotes(e.target.value)}
+                    rows={2}
+                    placeholder="Reasoning approved by Competent Authority / LAO..."
+                    className="w-full text-xs px-3 py-2 bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-gov-navy/20 focus:border-gov-navy shadow-2xs resize-none"
+                  />
+                </div>
+              </div>
+
+              {resolutionError && (
+                <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+                  <span>{resolutionError}</span>
                 </div>
               )}
             </div>
 
-            {/* Form Inputs */}
-            <div className="space-y-3">
-              <div>
-                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                  Statutory Order / Gazetted Corrigendum Reference <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={orderReference}
-                  onChange={(e) => setOrderReference(e.target.value)}
-                  placeholder="e.g. SEC11/LAO/2026/04"
-                  className="w-full text-xs font-mono px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-gov-navy focus:border-gov-navy"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
-                  Officer Notes &amp; Statutory Justification (Optional)
-                </label>
-                <textarea
-                  value={resolutionNotes}
-                  onChange={(e) => setResolutionNotes(e.target.value)}
-                  rows={2}
-                  placeholder="Reasoning approved by Competent Authority..."
-                  className="w-full text-xs px-3 py-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-gov-navy focus:border-gov-navy"
-                />
-              </div>
-            </div>
-
-            {resolutionError && (
-              <div className="p-2.5 rounded bg-red-50 border border-red-200 text-xs text-red-700">
-                {resolutionError}
-              </div>
-            )}
-
-            {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setResolutionModalOpen(false)}
-                disabled={isSubmittingResolution}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={isSubmittingResolution || !orderReference.trim()}
-                onClick={async () => {
-                  try {
-                    setIsSubmittingResolution(true);
-                    setResolutionError(null);
-
-                    const relatedId =
-                      selectedFeatureProps?.related_case_id ||
-                      selectedFeatureProps?.target_case_id ||
-                      'case-adjacent';
-
-                    const res = await resolveSpatialConflict(caseId, {
-                      related_case_id: relatedId,
-                      strategy_type: selectedStrategy,
-                      statutory_order_reference: orderReference.trim(),
-                      notes: resolutionNotes.trim() || undefined,
-                      buffer_meters: customBufferMeters ? Number(customBufferMeters) : undefined,
-                      shift_direction: shiftDirection,
-                    });
-
-                    setResolutionModalOpen(false);
-                    setResolutionSuccessMsg(res.message);
-                    setSelectedFeatureProps(null);
-
-                    // Reload live GIS layers to instantly reflect new boundary
-                    await loadGIS();
-                  } catch (err: any) {
-                    setResolutionError(err.message || 'Failed to resolve conflict.');
-                  } finally {
-                    setIsSubmittingResolution(false);
-                  }
-                }}
-                className="bg-gov-navy hover:bg-gov-blue text-white"
-              >
-                {isSubmittingResolution ? (
-                  <span className="flex items-center gap-1.5">
-                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                    <span>Executing...</span>
+            {/* Pinned Modal Footer */}
+            <div className="px-6 py-4 bg-slate-50/95 backdrop-blur-sm border-t border-slate-200/90 flex items-center justify-between gap-3 shrink-0">
+              <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500 font-mono">
+                {selectedStrategy === 'boundary_offset_clearance' && simulationResult?.buffer_meters ? (
+                  <span>
+                    Shift: <strong className="text-gov-navy">{simulationResult.buffer_meters}m {shiftDirection}</strong>
                   </span>
                 ) : (
-                  <span className="flex items-center gap-1.5">
-                    <Check className="h-3.5 w-3.5" />
-                    <span>Execute &amp; Apply Resolution</span>
-                  </span>
+                  <span>Statutory Protocol Action</span>
                 )}
-              </Button>
+              </div>
+
+              <div className="flex items-center gap-2.5 ml-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setResolutionModalOpen(false)}
+                  disabled={isSubmittingResolution}
+                  className="text-xs px-4"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  disabled={isSubmittingResolution || !orderReference.trim()}
+                  onClick={async () => {
+                    try {
+                      setIsSubmittingResolution(true);
+                      setResolutionError(null);
+
+                      const relatedId =
+                        selectedFeatureProps?.related_case_id ||
+                        selectedFeatureProps?.target_case_id ||
+                        'case-adjacent';
+
+                      const res = await resolveSpatialConflict(caseId, {
+                        related_case_id: relatedId,
+                        strategy_type: selectedStrategy,
+                        statutory_order_reference: orderReference.trim(),
+                        notes: resolutionNotes.trim() || undefined,
+                        buffer_meters: customBufferMeters ? Number(customBufferMeters) : undefined,
+                        shift_direction: shiftDirection,
+                      });
+
+                      setResolutionModalOpen(false);
+                      setResolutionSuccessMsg(res.message);
+                      setSelectedFeatureProps(null);
+
+                      // Reload live GIS layers to instantly reflect new boundary
+                      await loadGIS();
+                    } catch (err: any) {
+                      setResolutionError(err.message || 'Failed to resolve conflict.');
+                    } finally {
+                      setIsSubmittingResolution(false);
+                    }
+                  }}
+                  className="bg-gov-navy hover:bg-gov-blue text-white font-semibold text-xs px-4 shadow-sm"
+                >
+                  {isSubmittingResolution ? (
+                    <span className="flex items-center gap-1.5">
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                      <span>Executing...</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5">
+                      <Check className="h-3.5 w-3.5" />
+                      <span>Execute &amp; Apply Resolution</span>
+                    </span>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
