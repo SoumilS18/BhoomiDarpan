@@ -3,9 +3,8 @@ import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { SectionHeading } from '../common/SectionHeading';
 import { Project, Workflow } from '../../../shared/types';
-import { createCase } from '../../lib/api';
+import { createCase, fetchProjects } from '../../lib/api';
 import { AdministrativeSelector } from '../common/AdministrativeSelector';
-import { CreateProjectModal } from '../projects/CreateProjectModal';
 import { Plus, Trash2, AlertCircle, Building2 } from 'lucide-react';
 
 interface CreateCaseModalProps {
@@ -24,11 +23,27 @@ export const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
   onCaseCreated,
 }) => {
   const [localProjects, setLocalProjects] = useState<Project[]>(projects);
-  const [isCreateProjectOpen, setIsCreateProjectOpen] = useState(false);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
 
   useEffect(() => {
-    setLocalProjects(projects);
+    if (projects && projects.length > 0) {
+      setLocalProjects(projects);
+    }
   }, [projects]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsLoadingProjects(true);
+      fetchProjects()
+        .then((r) => {
+          if (r.projects) {
+            setLocalProjects(r.projects);
+          }
+        })
+        .catch(console.warn)
+        .finally(() => setIsLoadingProjects(false));
+    }
+  }, [isOpen]);
 
   const [projectId, setProjectId] = useState('');
   const [workflowId, setWorkflowId] = useState('');
@@ -232,19 +247,9 @@ export const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
           />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label htmlFor="case-project" className="label label-required mb-0">
-                  Infrastructure Project
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setIsCreateProjectOpen(true)}
-                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-gov-navy hover:text-gov-blue hover:underline"
-                >
-                  <Plus className="h-3 w-3" />
-                  Create Project
-                </button>
-              </div>
+              <label htmlFor="case-project" className="label label-required">
+                Infrastructure Project
+              </label>
               <select
                 id="case-project"
                 value={projectId}
@@ -253,7 +258,11 @@ export const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
                 className="input"
               >
                 <option value="">
-                  {localProjects.length === 0 ? '-- No Projects (Click + Create Project) --' : '-- Select Sponsoring Project --'}
+                  {isLoadingProjects
+                    ? '-- Loading Projects... --'
+                    : localProjects.length === 0
+                    ? '-- No Projects Available --'
+                    : '-- Select Sponsoring Project --'}
                 </option>
                 {localProjects.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -521,18 +530,6 @@ export const CreateCaseModal: React.FC<CreateCaseModalProps> = ({
           </Button>
         </div>
       </form>
-
-      <CreateProjectModal
-        isOpen={isCreateProjectOpen}
-        onClose={() => setIsCreateProjectOpen(false)}
-        defaultStateCode={stateCode}
-        defaultDistrictCode={districtCode}
-        onProjectCreated={(newProj) => {
-          setLocalProjects((prev) => [newProj, ...prev]);
-          setProjectId(newProj.id);
-          setIsCreateProjectOpen(false);
-        }}
-      />
     </Modal>
   );
 };
