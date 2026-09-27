@@ -12,6 +12,11 @@ import { detectSpatialAndCadastralRelationships, getScopedCases } from '../servi
 import { CaseExternalContextBundle, CaseDispute, AcquisitionCase } from '../../shared/types';
 import { CreateCaseSchema, AdvanceStageSchema, CreateDisputeSchema, UpdateDisputeSchema } from '../utils/validators';
 import { requireAuth, requireRole } from '../middleware/auth.middleware';
+import {
+  getCaseStatutoryAwards,
+  updateParcelStatutoryAward,
+  disburseParcelDBT,
+} from '../services/statutoryAwardService';
 
 const inMemoryDisputes = new Map<string, CaseDispute[]>();
 
@@ -938,13 +943,69 @@ router.patch(
         return res.json({ success: true, dispute: list[idx], persisted: false, degraded_mode: true });
       }
 
-      res.status(503).json({
-        error: 'Supabase not configured. Dispute update cannot be persisted in production.',
+      return res.status(503).json({
+        error: 'Database persistence unavailable. Provide valid Supabase credentials or execute in test mode.',
         persisted: false,
         status: 'database_unavailable',
       });
     } catch (err: any) {
-      res.status(500).json({ error: err.message || 'Failed to update dispute' });
+      return res.status(500).json({ error: err.message || 'Failed to update dispute' });
+    }
+  }
+);
+
+// ============================================================================
+// STATUTORY COMPENSATION & RFCTLARR 2013 AWARD ENDPOINTS
+// ============================================================================
+
+// GET /api/cases/:id/statutory-awards - Get case award calculations & summary
+router.get('/:id/statutory-awards', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const rawId = req.params.id;
+    const caseId = Array.isArray(rawId) ? rawId[0] : rawId;
+    const summary = await getCaseStatutoryAwards(caseId, req.user);
+    res.json(summary);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to retrieve statutory awards' });
+  }
+});
+
+// POST /api/cases/:id/parcels/:parcelId/calculate-award - Recalculate parcel statutory award
+router.post(
+  '/:id/parcels/:parcelId/calculate-award',
+  requireAuth,
+  requireRole(['admin', 'project_officer', 'lao', 'revenue_inspector']),
+  async (req: Request, res: Response) => {
+    try {
+      const rawId = req.params.id;
+      const rawParcelId = req.params.parcelId;
+      const caseId = Array.isArray(rawId) ? rawId[0] : rawId;
+      const parcelId = Array.isArray(rawParcelId) ? rawParcelId[0] : rawParcelId;
+
+      const result = await updateParcelStatutoryAward(caseId, parcelId, req.body, req.user);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to calculate statutory award' });
+    }
+  }
+);
+
+// POST /api/cases/:id/parcels/:parcelId/disburse-dbt - Disburse compensation via Direct Benefit Transfer (DBT)
+router.post(
+  '/:id/parcels/:parcelId/disburse-dbt',
+  requireAuth,
+  requireRole(['admin', 'lao']),
+  async (req: Request, res: Response) => {
+    try {
+      const rawId = req.params.id;
+      const rawParcelId = req.params.parcelId;
+      const caseId = Array.isArray(rawId) ? rawId[0] : rawId;
+      const parcelId = Array.isArray(rawParcelId) ? rawParcelId[0] : rawParcelId;
+
+      const result = await disburseParcelDBT(caseId, parcelId, req.body, req.user);
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to execute DBT disbursement' });
     }
   }
 );

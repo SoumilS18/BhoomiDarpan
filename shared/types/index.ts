@@ -199,6 +199,80 @@ export interface Parcel {
   created_at: string;
 }
 
+export interface AssetsValuation {
+  trees_count: number;
+  trees_value: number;
+  structures_value: number;
+  tubewell_count: number;
+  tubewell_value: number;
+  total_assets_value: number;
+}
+
+export interface RrEntitlements {
+  subsistence_grant: number;
+  transportation_grant: number;
+  cattle_shed_grant: number;
+  housing_allowance: number;
+  total_rr_value: number;
+}
+
+export interface DbtDisbursement {
+  payout_status: 'pending' | 'initiated' | 'disbursed' | 'escalated' | 'processing' | 'failed';
+  bank_name?: string;
+  bank_account_masked?: string;
+  ifsc_code?: string;
+  aadhaar_verified: boolean;
+  utr_number?: string;
+  pfms_reference_id?: string;
+  acknowledgment_token?: string;
+  disbursed_at?: string;
+  disbursed_amount?: number;
+  disbursed_by?: string;
+}
+
+export interface StatutoryAwardCalculation {
+  parcel_id: string;
+  case_id: string;
+  survey_number: string;
+  khata_number?: string;
+  landowner_names: string[];
+  land_type?: string;
+  area_acres: number;
+  circle_rate_per_acre: number;
+  base_market_value: number;
+  multiplier_factor: number;
+  multiplied_land_value: number;
+  assets_valuation: AssetsValuation;
+  total_market_value: number;
+  solatium_percentage: number; // 100%
+  solatium_amount: number;
+  additional_interest_percentage: number; // 12% p.a.
+  interest_accrual_days: number;
+  additional_interest_amount: number;
+  rr_entitlements: RrEntitlements;
+  total_statutory_award: number;
+  dbt_disbursement: DbtDisbursement;
+  statutory_order_reference?: string;
+  form_11_gazette_decree?: string;
+  calculated_at: string;
+}
+
+export interface CaseAwardSummary {
+  case_id: string;
+  case_number: string;
+  title: string;
+  total_parcels: number;
+  total_area_acres: number;
+  total_base_market_value: number;
+  total_solatium: number;
+  total_additional_interest: number;
+  total_rr_entitlements: number;
+  total_statutory_award: number;
+  total_disbursed_amount: number;
+  total_pending_amount: number;
+  awards: StatutoryAwardCalculation[];
+}
+
 export type DocumentType = 
   | 'preliminary_notice'
   | 'sec_11_notification'
@@ -2089,5 +2163,3 @@ export interface AccessRequest {
   created_at: string;
   updated_at: string;
 }
-
-

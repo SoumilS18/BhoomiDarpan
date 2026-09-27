@@ -1,9 +1,10 @@
-import React from 'react';
-import { AcquisitionCase } from '../../../shared/types';
+import React, { useState } from 'react';
+import { AcquisitionCase, Parcel } from '../../../shared/types';
 import { ROLE_LABELS } from '../../lib/domainLabels';
 import { Badge } from '../common/Badge';
 import { Button } from '../common/Button';
 import { CaseExternalContextCard } from './CaseExternalContextCard';
+import { StatutoryAwardModal } from './StatutoryAwardModal';
 import {
   FileText,
   Clock,
@@ -20,6 +21,7 @@ import {
   FileWarning,
   Flame,
   Zap,
+  IndianRupee,
 } from 'lucide-react';
 
 interface CaseOverviewTabProps {
@@ -33,6 +35,7 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
   onNavigateTab,
   onRefresh,
 }) => {
+  const [selectedAwardParcel, setSelectedAwardParcel] = useState<Parcel | null>(null);
   const metrics = caseItem.calculated_metrics;
   const isDelayed = metrics?.is_delayed || caseItem.status === 'delayed';
   const delayDays = metrics?.net_delay_days || 0;
@@ -245,6 +248,25 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
                   <strong className="text-gov-slate font-bold">{formatCurrency(caseItem.estimated_compensation)}</strong>
                 </div>
               </div>
+              {caseItem.parcels && caseItem.parcels.length > 0 && (
+                <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-[11px] text-slate-600 font-medium">
+                    {caseItem.parcels.length} Cadastral Parcels
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (caseItem.parcels && caseItem.parcels.length > 0) {
+                        setSelectedAwardParcel(caseItem.parcels[0]);
+                      }
+                    }}
+                    className="text-[11px] font-semibold text-gov-navy hover:text-gov-blue flex items-center gap-1 cursor-pointer transition-colors bg-slate-50 hover:bg-slate-100 px-2 py-1 rounded border border-slate-200"
+                  >
+                    <IndianRupee className="h-3 w-3 text-emerald-600" />
+                    <span>Statutory Form-11 Award</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
@@ -588,6 +610,21 @@ export const CaseOverviewTab: React.FC<CaseOverviewTabProps> = ({
         </div>
         <CaseExternalContextCard caseId={caseItem.id} />
       </div>
+
+      {/* ========================================================================= */}
+      {/* 4. STATUTORY AWARD STATEMENT & FORM-11 MODAL */}
+      {/* ========================================================================= */}
+      {selectedAwardParcel && (
+        <StatutoryAwardModal
+          isOpen={true}
+          caseId={caseItem.id}
+          parcel={selectedAwardParcel}
+          onClose={() => setSelectedAwardParcel(null)}
+          onAwardUpdated={() => {
+            onRefresh?.();
+          }}
+        />
+      )}
     </div>
   );
 };

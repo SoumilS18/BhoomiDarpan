@@ -46,6 +46,8 @@ import {
   SpatialRelationship,
   PortfolioSpatialRelationshipsSummary,
   SpatialResolutionSimulation,
+  StatutoryAwardCalculation,
+  CaseAwardSummary,
 } from '../../shared/types';
 
 
@@ -1607,6 +1609,73 @@ export async function simulateSpatialResolution(
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || `Failed to simulate spatial resolution (${res.status})`);
+  }
+  return res.json();
+}
+
+// ============================================================================
+// STATUTORY COMPENSATION & RFCTLARR 2013 AWARDS
+// ============================================================================
+
+export async function fetchCaseStatutoryAwards(caseId: string): Promise<CaseAwardSummary> {
+  const res = await fetch(`${API_BASE}/cases/${encodeURIComponent(caseId)}/statutory-awards`, {
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch statutory awards (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function calculateParcelAward(
+  caseId: string,
+  parcelId: string,
+  payload: {
+    circleRatePerAcre?: number;
+    multiplierFactor?: number;
+    distanceFromUrbanKm?: number;
+    interestAccrualDays?: number;
+    assets?: any;
+    rrEntitlements?: any;
+    statutoryOrderReference?: string;
+  }
+): Promise<StatutoryAwardCalculation> {
+  const res = await fetch(
+    `${API_BASE}/cases/${encodeURIComponent(caseId)}/parcels/${encodeURIComponent(parcelId)}/calculate-award`,
+    {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to calculate statutory award (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function disburseParcelDBT(
+  caseId: string,
+  parcelId: string,
+  payload: {
+    utrNumber?: string;
+    disbursedAmount?: number;
+    notes?: string;
+  }
+): Promise<StatutoryAwardCalculation> {
+  const res = await fetch(
+    `${API_BASE}/cases/${encodeURIComponent(caseId)}/parcels/${encodeURIComponent(parcelId)}/disburse-dbt`,
+    {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to disburse DBT payout (${res.status})`);
   }
   return res.json();
 }

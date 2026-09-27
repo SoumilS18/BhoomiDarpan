@@ -31,7 +31,9 @@ import {
   FileText,
   SlidersHorizontal,
   ArrowRight,
+  IndianRupee,
 } from 'lucide-react';
+import { StatutoryAwardModal } from '../cases/StatutoryAwardModal';
 
 interface CaseMapViewProps {
   caseId: string;
@@ -68,6 +70,7 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
 
   // Resolution modal state
   const [resolutionModalOpen, setResolutionModalOpen] = useState(false);
+  const [isAwardModalOpen, setIsAwardModalOpen] = useState(false);
   const [selectedStrategy, setSelectedStrategy] = useState<'boundary_offset_clearance' | 'joint_award_alignment' | 'phased_acquisition_taking'>('boundary_offset_clearance');
   const [shiftDirection, setShiftDirection] = useState<'Eastward' | 'Westward' | 'Northward' | 'Southward'>('Eastward');
   const [customBufferMeters, setCustomBufferMeters] = useState<string>('');
@@ -752,6 +755,18 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
                       </strong>
                     </div>
                   )}
+
+                  <div className="pt-2 border-t border-slate-100">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsAwardModalOpen(true)}
+                      className="w-full justify-center text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border-emerald-200 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                    >
+                      <IndianRupee className="h-3.5 w-3.5 text-emerald-700" />
+                      <span>Statutory Award Statement (Form-11)</span>
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1225,6 +1240,31 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
+      )}
+
+      {/* Statutory Award & Form-11 Decree Modal */}
+      {selectedFeatureProps?.survey_number && (
+        <StatutoryAwardModal
+          isOpen={isAwardModalOpen}
+          onClose={() => setIsAwardModalOpen(false)}
+          caseId={caseId}
+          parcel={{
+            id: selectedFeatureProps.parcel_id || 'p1',
+            case_id: caseId,
+            survey_number: selectedFeatureProps.survey_number,
+            khata_number: selectedFeatureProps.khata_number,
+            landowner_names: selectedFeatureProps.landowner_names || [],
+            land_type: selectedFeatureProps.land_type || 'agricultural',
+            area_acres: selectedFeatureProps.area_acres || 1,
+            compensation_amount: selectedFeatureProps.compensation_amount || 0,
+            acquisition_status: 'valued',
+            created_at: '',
+          }}
+          onAwardUpdated={async (updatedAward) => {
+            selectedFeatureProps.compensation_amount = updatedAward.total_statutory_award;
+            await loadGIS();
+          }}
+        />
       )}
     </div>
   );
