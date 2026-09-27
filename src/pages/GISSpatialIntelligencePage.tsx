@@ -64,14 +64,17 @@ interface GISSpatialIntelligencePageProps {
 
 export type TileBaseMap =
   | 'osm'
+  | 'positron'
+  | 'dark'
+  | 'satellite'
+  | 'topo'
+  | 'voyager'
   | 'maptiler_streets'
   | 'maptiler_satellite'
   | 'maptiler_topo'
   | 'maptiler_outdoor'
   | 'maptiler_dataviz_light'
-  | 'maptiler_dataviz_dark'
-  | 'positron'
-  | 'dark';
+  | 'maptiler_dataviz_dark';
 
 /**
  * Accessible layer toggle list item: icon + label + subtle visibility
@@ -1268,11 +1271,11 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
                 </div>
 
                 {/* Quick Base Map Presets */}
-                <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs">
+                <div className="grid grid-cols-4 gap-1 rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs">
                   <button
                     type="button"
                     onClick={() => setBaseMap('positron')}
-                    className={`flex-1 rounded-md px-2.5 py-1 font-medium transition-all ${
+                    className={`rounded-md px-1.5 py-1 font-medium text-center transition-all ${
                       baseMap === 'positron'
                         ? 'bg-white font-bold text-gov-navy shadow-gov'
                         : 'text-slate-600 hover:text-slate-900'
@@ -1283,7 +1286,7 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
                   <button
                     type="button"
                     onClick={() => setBaseMap('dark')}
-                    className={`flex-1 rounded-md px-2.5 py-1 font-medium transition-all ${
+                    className={`rounded-md px-1.5 py-1 font-medium text-center transition-all ${
                       baseMap === 'dark'
                         ? 'bg-gov-slate font-bold text-white shadow-gov'
                         : 'text-slate-600 hover:text-slate-900'
@@ -1293,8 +1296,19 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
                   </button>
                   <button
                     type="button"
+                    onClick={() => setBaseMap('satellite')}
+                    className={`rounded-md px-1.5 py-1 font-medium text-center transition-all ${
+                      baseMap === 'satellite'
+                        ? 'bg-emerald-700 font-bold text-white shadow-gov'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Satellite
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setBaseMap('osm')}
-                    className={`flex-1 rounded-md px-2.5 py-1 font-medium transition-all ${
+                    className={`rounded-md px-1.5 py-1 font-medium text-center transition-all ${
                       baseMap === 'osm'
                         ? 'bg-white font-bold text-emerald-800 shadow-gov'
                         : 'text-slate-600 hover:text-slate-900'
@@ -1311,8 +1325,13 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
                   title="Select Basemap Cartography"
                 >
                   <option value="osm">OpenStreetMap Standard</option>
+                  <option value="positron">Carto Positron (Clean Light)</option>
+                  <option value="dark">Carto Dark Matter (Night Mode)</option>
+                  <option value="satellite">Esri World Imagery (Satellite)</option>
+                  <option value="topo">Esri Topographic (Contours & Elevation)</option>
+                  <option value="voyager">Carto Voyager (Rich Road Network)</option>
                   <option value="maptiler_streets">MapTiler Streets v2</option>
-                  <option value="maptiler_satellite">MapTiler Satellite</option>
+                  <option value="maptiler_satellite">MapTiler Satellite (Hybrid)</option>
                   <option value="maptiler_topo">MapTiler Topo v2</option>
                   <option value="maptiler_outdoor">MapTiler Outdoor v2</option>
                   <option value="maptiler_dataviz_light">MapTiler Dataviz Light</option>

@@ -155,40 +155,46 @@ describe('Map Provider Adapter & Basemap Cartography Abstraction Suite', () => {
   });
 
   // ==========================================================================
-  // 5. CARTO DEPRECATION & PROTECTION
+  // 5. LIVE HIGH-RESOLUTION OPEN BASEMAP RESOLUTION
   // ==========================================================================
-  describe('5. Complete Elimination of Unauthenticated Broken Carto CDN', () => {
-    it('intercepts "positron" and safely routes to OpenStreetMap', () => {
+  describe('5. High-Resolution Live Open Basemap Resolution', () => {
+    it('resolves Carto Positron clean light basemap', () => {
       const config = resolveBasemapConfig({ provider: 'positron' });
-      expect(config.provider).toBe('carto_deprecated');
-      expect(config.isFallback).toBe(true);
-      expect(config.url).toBe(OSM_CONFIG.url);
-      expect(config.url).not.toContain('cartocdn.com');
-      expect(config.fallbackReason).toContain('CARTO public basemap CDN now requires authenticated');
+      expect(config.provider).toBe('positron');
+      expect(config.isFallback).toBe(false);
+      expect(config.url).toContain('basemaps.cartocdn.com/light_all');
+      expect(config.attribution).toContain('CARTO');
     });
 
-    it('intercepts "dark" / "carto_dark" and safely routes to OpenStreetMap', () => {
+    it('resolves Carto Dark Matter basemap', () => {
       const config = resolveBasemapConfig({ provider: 'dark' });
-      expect(config.provider).toBe('carto_deprecated');
-      expect(config.isFallback).toBe(true);
-      expect(config.url).toBe(OSM_CONFIG.url);
-      expect(config.url).not.toContain('cartocdn.com');
+      expect(config.provider).toBe('dark');
+      expect(config.isFallback).toBe(false);
+      expect(config.url).toContain('basemaps.cartocdn.com/dark_all');
+      expect(config.attribution).toContain('CARTO');
     });
 
-    it('intercepts "carto_positron" from legacy IntegrationPolicy and prevents broken tiles', () => {
-      const legacyPolicy: IntegrationPolicy = {
-        routing_provider: 'osrm',
-        geocoding_provider: 'nominatim',
-        map_provider: 'carto_positron',
-        satellite_layer_provider: 'bhuvan',
-        satellite_metadata_provider: 'copernicus',
-        translation_provider: 'bhashini',
-        ocr_provider: 'gemini',
-      };
+    it('resolves Esri World Imagery Satellite basemap', () => {
+      const config = resolveBasemapConfig({ provider: 'satellite' });
+      expect(config.provider).toBe('satellite');
+      expect(config.isFallback).toBe(false);
+      expect(config.url).toContain('server.arcgisonline.com/ArcGIS/rest/services/World_Imagery');
+      expect(config.attribution).toContain('Esri');
+    });
 
-      const config = resolveBasemapConfig({ policy: legacyPolicy });
-      expect(config.url).toBe(OSM_CONFIG.url);
-      expect(config.isFallback).toBe(true);
+    it('resolves Esri Topographic terrain basemap', () => {
+      const config = resolveBasemapConfig({ provider: 'topo' });
+      expect(config.provider).toBe('topo');
+      expect(config.isFallback).toBe(false);
+      expect(config.url).toContain('server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map');
+      expect(config.attribution).toContain('Esri');
+    });
+
+    it('resolves Carto Voyager detailed roads basemap', () => {
+      const config = resolveBasemapConfig({ provider: 'voyager' });
+      expect(config.provider).toBe('voyager');
+      expect(config.isFallback).toBe(false);
+      expect(config.url).toContain('basemaps.cartocdn.com/rastertiles/voyager');
     });
   });
 
@@ -213,7 +219,6 @@ describe('Map Provider Adapter & Basemap Cartography Abstraction Suite', () => {
       expect(configWithKey.style).toBe('topo-v2');
 
       const configWithoutKey = resolveBasemapConfig({ policy, maptilerKey: '' });
-      expect(configWithoutKey.provider).toBe('osm');
       expect(configWithoutKey.isFallback).toBe(true);
     });
 

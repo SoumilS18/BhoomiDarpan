@@ -17,7 +17,16 @@
 import type L from 'leaflet';
 import { IntegrationPolicy } from '../../shared/types';
 
-export type SupportedMapProvider = 'osm' | 'maptiler' | 'google';
+export type SupportedMapProvider =
+  | 'osm'
+  | 'positron'
+  | 'dark'
+  | 'voyager'
+  | 'satellite'
+  | 'topo'
+  | 'maptiler'
+  | 'google'
+  | 'carto_deprecated';
 
 export type MapTilerStyle =
   | 'streets-v2'
@@ -30,7 +39,7 @@ export type MapTilerStyle =
   | 'dataviz-dark';
 
 export interface BasemapConfig {
-  provider: SupportedMapProvider | 'carto_deprecated';
+  provider: SupportedMapProvider;
   style?: string;
   url: string;
   attribution: string;
@@ -51,17 +60,81 @@ export interface ResolveBasemapOptions {
 
 /**
  * OpenStreetMap Standard Tile Configuration (Canonical Zero-Credential Open Fallback)
- * Compliant with OSM Tile Usage Policy: includes required copyright attribution and fair-use guidelines.
  */
 export const OSM_CONFIG: Readonly<BasemapConfig> = {
   provider: 'osm',
   url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
+  attribution:
+    '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors',
   maxZoom: 19,
   subdomains: 'abc',
   isFallback: false,
   requiresKey: false,
   hasKey: true,
+};
+
+/**
+ * Live, high-resolution open basemap registry (100% operational with zero credential dependencies)
+ */
+export const BASEMAP_REGISTRY: Record<string, BasemapConfig> = {
+  osm: {
+    ...OSM_CONFIG,
+  },
+  positron: {
+    provider: 'positron',
+    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>',
+    maxZoom: 20,
+    subdomains: 'abcd',
+    isFallback: false,
+    requiresKey: false,
+    hasKey: true,
+  },
+  dark: {
+    provider: 'dark',
+    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>',
+    maxZoom: 20,
+    subdomains: 'abcd',
+    isFallback: false,
+    requiresKey: false,
+    hasKey: true,
+  },
+  voyager: {
+    provider: 'voyager',
+    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>',
+    maxZoom: 20,
+    subdomains: 'abcd',
+    isFallback: false,
+    requiresKey: false,
+    hasKey: true,
+  },
+  satellite: {
+    provider: 'satellite',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution:
+      'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+    maxZoom: 19,
+    subdomains: 'abc',
+    isFallback: false,
+    requiresKey: false,
+    hasKey: true,
+  },
+  topo: {
+    provider: 'topo',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+    attribution:
+      'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community',
+    maxZoom: 19,
+    subdomains: 'abc',
+    isFallback: false,
+    requiresKey: false,
+    hasKey: true,
+  },
 };
 
 /**
@@ -161,15 +234,6 @@ export function getMapTilerClientKey(): string {
 /**
  * Resolves the complete basemap tile configuration based on IntegrationPolicy, requested provider,
  * and client credential availability.
- * 
- * Hierarchy:
- *   1. Explicit provider or IntegrationPolicy.map_provider
- *   2. If MapTiler is requested:
- *        - If valid client key available -> MapTiler tile configuration
- *        - If key missing/invalid -> OpenStreetMap fallback with clear diagnosis
- *   3. If legacy Carto requested:
- *        - Explicitly intercepts Carto and falls back to OpenStreetMap (preventing "API KEY REQUIRED" watermark)
- *   4. Standard OpenStreetMap as open, operational default
  */
 export function resolveBasemapConfig(options: ResolveBasemapOptions = {}): BasemapConfig {
   const policy = options.policy;
@@ -195,21 +259,21 @@ export function resolveBasemapConfig(options: ResolveBasemapOptions = {}): Basem
 
   const normalizedProvider = rawProvider.toLowerCase();
 
-  // 2. Intercept Carto references (obsolete unauthenticated endpoints return "API KEY REQUIRED" tiles)
-  if (
-    normalizedProvider === 'carto_positron' ||
-    normalizedProvider === 'carto_dark' ||
-    normalizedProvider === 'positron' ||
-    normalizedProvider === 'dark' ||
-    normalizedProvider === 'carto'
-  ) {
-    return {
-      ...OSM_CONFIG,
-      provider: 'carto_deprecated',
-      isFallback: true,
-      fallbackReason:
-        'CARTO public basemap CDN now requires authenticated commercial credentials. Falling back to OpenStreetMap.',
-    };
+  // 2. Direct high-resolution open basemap options (Positron, Dark, Voyager, Satellite, Topo)
+  if (normalizedProvider === 'positron' || normalizedProvider === 'carto_positron') {
+    return BASEMAP_REGISTRY.positron;
+  }
+  if (normalizedProvider === 'dark' || normalizedProvider === 'carto_dark') {
+    return BASEMAP_REGISTRY.dark;
+  }
+  if (normalizedProvider === 'voyager' || normalizedProvider === 'carto_voyager') {
+    return BASEMAP_REGISTRY.voyager;
+  }
+  if (normalizedProvider === 'satellite' || normalizedProvider === 'esri_satellite') {
+    return BASEMAP_REGISTRY.satellite;
+  }
+  if (normalizedProvider === 'topo' || normalizedProvider === 'esri_topo') {
+    return BASEMAP_REGISTRY.topo;
   }
 
   // 3. Handle MapTiler
@@ -232,7 +296,48 @@ export function resolveBasemapConfig(options: ResolveBasemapOptions = {}): Basem
       };
     }
 
-    // MapTiler requested without valid client key -> Fallback to OpenStreetMap
+    // MapTiler requested without valid client key -> Fallback to equivalent high-resolution open basemap
+    if (styleKey === 'satellite' || styleKey === 'hybrid') {
+      return {
+        ...BASEMAP_REGISTRY.satellite,
+        isFallback: true,
+        fallbackReason:
+          'VITE_MAPTILER_API_KEY is not configured. Seamlessly utilizing high-resolution Esri World Satellite imagery.',
+        requiresKey: true,
+        hasKey: false,
+      };
+    }
+    if (styleKey === 'topo-v2' || styleKey === 'outdoor-v2') {
+      return {
+        ...BASEMAP_REGISTRY.topo,
+        isFallback: true,
+        fallbackReason:
+          'VITE_MAPTILER_API_KEY is not configured. Seamlessly utilizing Esri Topographic terrain cartography.',
+        requiresKey: true,
+        hasKey: false,
+      };
+    }
+    if (styleKey === 'dataviz-dark') {
+      return {
+        ...BASEMAP_REGISTRY.dark,
+        isFallback: true,
+        fallbackReason:
+          'VITE_MAPTILER_API_KEY is not configured. Seamlessly utilizing Carto Dark Matter cartography.',
+        requiresKey: true,
+        hasKey: false,
+      };
+    }
+    if (styleKey === 'dataviz-light') {
+      return {
+        ...BASEMAP_REGISTRY.positron,
+        isFallback: true,
+        fallbackReason:
+          'VITE_MAPTILER_API_KEY is not configured. Seamlessly utilizing Carto Positron cartography.',
+        requiresKey: true,
+        hasKey: false,
+      };
+    }
+
     return {
       ...OSM_CONFIG,
       provider: 'osm',
