@@ -69,6 +69,8 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
   const [bhuvanLoading, setBhuvanLoading] = useState(false);
   const [bhuvanLayerInfo, setBhuvanLayerInfo] = useState<string | null>(null);
   const bhuvanWmsLayerRef = useRef<L.TileLayer.WMS | null>(null);
+  const [baseMap, setBaseMap] = useState<string>('osm');
+  const tileLayerRef = useRef<L.TileLayer | null>(null);
 
   // Resolution modal state
   const [resolutionModalOpen, setResolutionModalOpen] = useState(false);
@@ -163,9 +165,6 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
       markerZoomAnimation: true,
     }).setView([20.5937, 78.9629], 5);
 
-    const { tileLayer } = createBasemapTileLayer({}, undefined, L);
-    tileLayer.addTo(map);
-
     // Add zoom control to top-right
     L.control.zoom({ position: 'topright' }).addTo(map);
 
@@ -174,8 +173,30 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
     return () => {
       map.remove();
       mapInstanceRef.current = null;
+      tileLayerRef.current = null;
     };
   }, []);
+
+  // Update Basemap Tile Layer
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (tileLayerRef.current) {
+      try {
+        map.removeLayer(tileLayerRef.current);
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    const { tileLayer } = createBasemapTileLayer({ provider: baseMap }, undefined, L);
+    tileLayer.addTo(map);
+    if (typeof (tileLayer as any).bringToBack === 'function') {
+      (tileLayer as any).bringToBack();
+    }
+    tileLayerRef.current = tileLayer;
+  }, [baseMap]);
 
   // Manage Bhuvan Thematic Overlay on Case Map
   useEffect(() => {
@@ -422,6 +443,55 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
           >
             Refresh GIS
           </Button>
+
+          {/* Basemap Selection */}
+          <div className="flex items-center rounded-lg border border-slate-200 bg-white/95 p-0.5 text-xs shadow-sm backdrop-blur-sm">
+            <button
+              type="button"
+              onClick={() => setBaseMap('osm')}
+              className={`rounded px-2 py-1 font-medium text-xs transition-colors ${
+                baseMap === 'osm' ? 'bg-gov-navy text-white font-bold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              OSM
+            </button>
+            <button
+              type="button"
+              onClick={() => setBaseMap('positron')}
+              className={`rounded px-2 py-1 font-medium text-xs transition-colors ${
+                baseMap === 'positron' ? 'bg-gov-navy text-white font-bold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Positron
+            </button>
+            <button
+              type="button"
+              onClick={() => setBaseMap('dark')}
+              className={`rounded px-2 py-1 font-medium text-xs transition-colors ${
+                baseMap === 'dark' ? 'bg-gov-navy text-white font-bold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Dark
+            </button>
+            <button
+              type="button"
+              onClick={() => setBaseMap('satellite')}
+              className={`rounded px-2 py-1 font-medium text-xs transition-colors ${
+                baseMap === 'satellite' ? 'bg-emerald-700 text-white font-bold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Satellite
+            </button>
+            <button
+              type="button"
+              onClick={() => setBaseMap('topo')}
+              className={`rounded px-2 py-1 font-medium text-xs transition-colors ${
+                baseMap === 'topo' ? 'bg-gov-navy text-white font-bold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Topo
+            </button>
+          </div>
 
           {hasAnyGeometry && (
             <Button
