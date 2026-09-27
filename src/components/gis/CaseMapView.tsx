@@ -32,8 +32,10 @@ import {
   SlidersHorizontal,
   ArrowRight,
   IndianRupee,
+  Navigation,
 } from 'lucide-react';
 import { StatutoryAwardModal } from '../cases/StatutoryAwardModal';
+import { ProjectCorridorModal } from './ProjectCorridorModal';
 
 interface CaseMapViewProps {
   caseId: string;
@@ -71,6 +73,7 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
   // Resolution modal state
   const [resolutionModalOpen, setResolutionModalOpen] = useState(false);
   const [isAwardModalOpen, setIsAwardModalOpen] = useState(false);
+  const [isCorridorModalOpen, setIsCorridorModalOpen] = useState(false);
   const [selectedStrategy, setSelectedStrategy] = useState<'boundary_offset_clearance' | 'joint_award_alignment' | 'phased_acquisition_taking'>('boundary_offset_clearance');
   const [shiftDirection, setShiftDirection] = useState<'Eastward' | 'Westward' | 'Northward' | 'Southward'>('Eastward');
   const [customBufferMeters, setCustomBufferMeters] = useState<string>('');
@@ -458,6 +461,15 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
           <Button
             variant="outline"
             size="sm"
+            onClick={() => setIsCorridorModalOpen(true)}
+            className="bg-white/95 backdrop-blur-sm shadow-sm hover:bg-white text-gov-navy font-semibold"
+            leftIcon={<Navigation className="h-3.5 w-3.5 text-blue-600" />}
+          >
+            Project Corridor Details
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={onOpenImportBoundary}
             className="bg-white/95 backdrop-blur-sm shadow-sm hover:bg-white text-gov-navy font-semibold"
             leftIcon={<Upload className="h-3.5 w-3.5" />}
@@ -484,15 +496,22 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
             <h4 className="text-base font-bold text-gov-slate">No Spatial Geometry Demarcated</h4>
             <p className="text-xs text-slate-500 max-w-md mt-1 mb-4">
               This case currently has no digital corridor boundary or georeferenced cadastral parcels.
-              Import standard GeoJSON geometry or demarcate individual parcels.
+              Configure project corridor alignment parameters, import standard GeoJSON geometry, or demarcate individual parcels.
             </p>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center justify-center gap-3">
               <Button
                 variant="primary"
+                onClick={() => setIsCorridorModalOpen(true)}
+                leftIcon={<Navigation className="h-4 w-4" />}
+              >
+                Configure Project Corridor Details
+              </Button>
+              <Button
+                variant="outline"
                 onClick={onOpenImportBoundary}
                 leftIcon={<Upload className="h-4 w-4" />}
               >
-                Import Case GeoJSON Corridor
+                Import Case GeoJSON
               </Button>
               <Button
                 variant="outline"
@@ -703,7 +722,7 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
                   </div>
                 </div>
               ) : selectedFeatureProps.type === 'boundary' ? (
-                <div className="space-y-1.5 pt-1 text-[11px]">
+                <div className="space-y-2 pt-1 text-[11px]">
                   <div>
                     <span className="text-slate-500">Corridor Title:</span>
                     <strong className="block text-gov-slate">{selectedFeatureProps.title}</strong>
@@ -715,6 +734,17 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
                   <div>
                     <span className="text-slate-500">Acquisition Area:</span>
                     <strong className="block text-gov-slate">{selectedFeatureProps.area}</strong>
+                  </div>
+                  <div className="pt-2 border-t border-blue-200">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setIsCorridorModalOpen(true)}
+                      className="w-full justify-center text-xs font-semibold shadow-xs flex items-center gap-1.5"
+                    >
+                      <Navigation className="h-3.5 w-3.5" />
+                      <span>Project Corridor Details</span>
+                    </Button>
                   </div>
                 </div>
               ) : (
@@ -1266,6 +1296,17 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
           }}
         />
       )}
+
+      {/* Project Corridor Alignment Configuration & Inspection Modal */}
+      <ProjectCorridorModal
+        isOpen={isCorridorModalOpen}
+        onClose={() => setIsCorridorModalOpen(false)}
+        caseId={caseId}
+        caseTitle={caseTitle}
+        onCorridorUpdated={async () => {
+          await loadGIS();
+        }}
+      />
     </div>
   );
 };

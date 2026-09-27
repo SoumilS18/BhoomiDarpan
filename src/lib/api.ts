@@ -454,6 +454,31 @@ export async function updateCaseGeoJSON(
   return res.json();
 }
 
+export async function fetchCaseCorridor(caseId: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/cases/${caseId}/corridor`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || `Failed to fetch corridor details (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function updateCaseCorridor(
+  caseId: string,
+  corridorData: any
+): Promise<{ success: boolean; corridor: any; message: string }> {
+  const res = await fetch(`${API_BASE}/cases/${caseId}/corridor`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(corridorData),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || `Failed to update project corridor (${res.status})`);
+  }
+  return res.json();
+}
+
 export async function createParcel(
   caseId: string,
   payload: {

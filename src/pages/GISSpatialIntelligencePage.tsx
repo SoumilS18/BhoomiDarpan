@@ -15,9 +15,11 @@ import {
   EyeOff,
   X,
   FileCheck,
+  Navigation,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { GeographySourceNote } from '../components/common/GeographySourceNote';
+import { ProjectCorridorModal } from '../components/gis/ProjectCorridorModal';
 import {
   fetchGISOverview,
   fetchGISCases,
@@ -131,6 +133,7 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [spatialContext, setSpatialContext] = useState<CaseSpatialContext | null>(null);
   const [selectedParcels, setSelectedParcels] = useState<any | null>(null);
+  const [isCorridorModalOpen, setIsCorridorModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [contextLoading, setContextLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1403,6 +1406,18 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
                           </span>
                         </div>
                       ) : null}
+
+                      <div className="pt-2 border-t border-blue-200/60">
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => setIsCorridorModalOpen(true)}
+                          className="w-full justify-center text-xs font-semibold shadow-xs flex items-center gap-1.5 bg-gov-navy hover:bg-gov-blue text-white"
+                        >
+                          <Navigation className="h-3.5 w-3.5" />
+                          <span>Project Corridor Details</span>
+                        </Button>
+                      </div>
                     </div>
 
                     {/* Nearby Infrastructure Proximity Block */}
@@ -1568,6 +1583,22 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
           </div>
         </div>
       </section>
+
+      {/* Project Corridor Alignment Configuration & Inspection Modal */}
+      {selectedCaseId && (
+        <ProjectCorridorModal
+          isOpen={isCorridorModalOpen}
+          onClose={() => setIsCorridorModalOpen(false)}
+          caseId={selectedCaseId}
+          caseTitle={spatialContext?.title || 'Selected Acquisition Case'}
+          onCorridorUpdated={async () => {
+            if (selectedCaseId) {
+              const ctx = await fetchGISSpatialContext(selectedCaseId);
+              setSpatialContext(ctx);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

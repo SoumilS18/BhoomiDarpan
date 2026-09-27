@@ -273,6 +273,36 @@ export interface CaseAwardSummary {
   awards: StatutoryAwardCalculation[];
 }
 
+export interface ProjectCorridorDetails {
+  case_id: string;
+  project_id?: string;
+  project_name?: string;
+  sponsoring_agency?: string;
+  corridor_name: string;
+  corridor_type: 'highway' | 'expressway' | 'railway' | 'metro' | 'pipeline' | 'transmission_line' | 'industrial' | 'ring_road';
+  total_length_km: number;
+  right_of_way_width_meters: number;
+  start_point?: {
+    latitude: number;
+    longitude: number;
+    landmark?: string;
+  };
+  end_point?: {
+    latitude: number;
+    longitude: number;
+    landmark?: string;
+  };
+  intermediate_waypoints?: Array<{
+    latitude: number;
+    longitude: number;
+    name?: string;
+  }>;
+  status?: string;
+  geojson_corridor?: any;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export type DocumentType = 
   | 'preliminary_notice'
   | 'sec_11_notification'

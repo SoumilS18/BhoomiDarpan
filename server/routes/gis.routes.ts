@@ -240,39 +240,237 @@ const handleLayers = async (req: Request, res: Response) => {
 router.get('/layers', requireAuth, handleLayers);
 router.get('/gis/layers', requireAuth, handleLayers);
 
+export const inMemoryCorridors = new Map<string, any>();
+
+export function generateCorridorGeoJSON(
+  start: { latitude: number; longitude: number },
+  end: { latitude: number; longitude: number },
+  waypoints: Array<{ latitude: number; longitude: number }> = [],
+  rowWidthMeters = 60
+) {
+  const points = [start, ...waypoints, end];
+  const bufferDegrees = (rowWidthMeters / 2) / 111320;
+  
+  const leftPoints: number[][] = [];
+  const rightPoints: number[][] = [];
+  
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    let dx = 0;
+    let dy = 0;
+    
+    if (i < points.length - 1) {
+      const next = points[i + 1];
+      dx = next.longitude - p.longitude;
+      dy = next.latitude - p.latitude;
+    } else if (i > 0) {
+      const prev = points[i - 1];
+      dx = p.longitude - prev.longitude;
+      dy = p.latitude - prev.latitude;
+    }
+    
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+    
+    leftPoints.push([Number((p.longitude + nx * bufferDegrees).toFixed(6)), Number((p.latitude + ny * bufferDegrees).toFixed(6))]);
+    rightPoints.unshift([Number((p.longitude - nx * bufferDegrees).toFixed(6)), Number((p.latitude - ny * bufferDegrees).toFixed(6))]);
+  }
+  
+  const polygonRing = [...leftPoints, ...rightPoints, leftPoints[0]];
+  
+  return {
+    type: 'Polygon',
+    coordinates: [polygonRing],
+  };
+}
+
 // ============================================================================
-// LEGACY CASE GIS ENDPOINTS (PRESERVED FOR BACKWARD COMPATIBILITY)
+// PROJECT CORRIDOR MANAGEMENT ENDPOINTS
 // ============================================================================
 
-// GET /api/cases/:id/gis - Get combined FeatureCollection of case boundary & parcels
-router.get('/cases/:id/gis', requireAuth, async (req: Request, res: Response) => {
+// GET /api/cases/:id/corridor - Get Project Corridor Details & Alignment
+router.get(['/cases/:id/corridor', '/gis/cases/:id/corridor'], requireAuth, async (req: Request, res: Response) => {
   try {
-    if (!isSupabaseConfigured) {
-      return res.status(503).json({ error: 'Supabase not configured' });
+    const rawCaseId = req.params.id;
+    const caseId = Array.isArray(rawCaseId) ? rawCaseId[0] : rawCaseId;
+
+    const scopedCases = await getScopedCases(req.user);
+    const caseItem = scopedCases.find((c) => c.id === caseId);
+
+    if (!caseItem) {
+      return res.status(404).json({ error: 'Case not found or outside authorized operational scope.' });
     }
 
-    const { id: caseId } = req.params;
-    const supabase = getSupabase();
-
-    // Fetch case boundary and parcels
-    const { data: caseItem, error: caseErr } = await supabase
-      .from('acquisition_cases')
-      .select('id, case_number, title, total_area_hectares, geojson_boundary')
-      .eq('id', caseId)
-      .single();
-
-    if (caseErr || !caseItem) {
-      return res.status(404).json({ error: 'Case not found' });
+    const stored = inMemoryCorridors.get(caseId);
+    if (stored) {
+      return res.json(stored);
     }
 
-    const { data: parcels, error: parcelErr } = await supabase
-      .from('parcels')
-      .select('*')
-      .eq('case_id', caseId)
-      .order('created_at', { ascending: true });
+    // Default corridor metadata derived from case and project
+    const defaultCorridor = {
+      case_id: caseId,
+      project_id: caseItem.project_id,
+      project_name: caseItem.project?.name || 'Infrastructure Scheme',
+      sponsoring_agency: caseItem.project?.sponsoring_agency || 'Competent Authority',
+      corridor_name: `${caseItem.title} - Alignment Package`,
+      corridor_type: 'highway',
+      total_length_km: Math.max(5, Math.round((caseItem.total_area_hectares || 10) * 1.5)),
+      right_of_way_width_meters: 60,
+      start_point: {
+        latitude: 18.5204,
+        longitude: 73.8567,
+        landmark: `Origin: Village ${caseItem.village} Sector 1`,
+      },
+      end_point: {
+        latitude: 18.5913,
+        longitude: 73.7389,
+        landmark: `Terminus: District ${caseItem.district} Peripheral Arterial`,
+      },
+      intermediate_waypoints: [],
+      geojson_corridor: caseItem.geojson_boundary,
+      status: 'active_alignment',
+      updated_at: new Date().toISOString(),
+    };
 
-    if (parcelErr) {
-      return res.status(500).json({ error: parcelErr.message });
+    inMemoryCorridors.set(caseId, defaultCorridor);
+    res.json(defaultCorridor);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to retrieve project corridor details' });
+  }
+});
+
+// POST /api/cases/:id/corridor - Create or update Project Corridor Details & GIS Geometry
+router.post(
+  ['/cases/:id/corridor', '/gis/cases/:id/corridor'],
+  requireAuth,
+  requireRole(['admin', 'project_officer', 'lao', 'revenue_inspector']),
+  async (req: Request, res: Response) => {
+    try {
+      const rawCaseId = req.params.id;
+      const caseId = Array.isArray(rawCaseId) ? rawCaseId[0] : rawCaseId;
+
+      const scopedCases = await getScopedCases(req.user);
+      const caseItem = scopedCases.find((c) => c.id === caseId);
+
+      if (!caseItem) {
+        return res.status(404).json({ error: 'Case not found or outside authorized scope.' });
+      }
+
+      const body = req.body || {};
+      let corridorGeoJSON = body.geojson_corridor;
+
+      if (!corridorGeoJSON && body.start_point && body.end_point) {
+        corridorGeoJSON = generateCorridorGeoJSON(
+          body.start_point,
+          body.end_point,
+          body.intermediate_waypoints || [],
+          body.right_of_way_width_meters || 60
+        );
+      }
+
+      const updatedCorridor = {
+        case_id: caseId,
+        project_id: caseItem.project_id,
+        project_name: caseItem.project?.name || 'Infrastructure Scheme',
+        sponsoring_agency: body.sponsoring_agency || caseItem.project?.sponsoring_agency || 'Competent Authority',
+        corridor_name: body.corridor_name || `${caseItem.title} - Alignment Package`,
+        corridor_type: body.corridor_type || 'highway',
+        total_length_km: Number(body.total_length_km) || 25,
+        right_of_way_width_meters: Number(body.right_of_way_width_meters) || 60,
+        start_point: body.start_point || { latitude: 18.5204, longitude: 73.8567, landmark: 'Origin Anchor' },
+        end_point: body.end_point || { latitude: 18.5913, longitude: 73.7389, landmark: 'Terminus Anchor' },
+        intermediate_waypoints: body.intermediate_waypoints || [],
+        geojson_corridor: corridorGeoJSON,
+        status: 'active_alignment',
+        updated_at: new Date().toISOString(),
+      };
+
+      inMemoryCorridors.set(caseId, updatedCorridor);
+
+      // Also update case geojson_boundary if generated
+      if (corridorGeoJSON) {
+        caseItem.geojson_boundary = corridorGeoJSON;
+        if (isSupabaseConfigured) {
+          try {
+            const supabase = getSupabase();
+            await supabase
+              .from('acquisition_cases')
+              .update({ geojson_boundary: corridorGeoJSON })
+              .eq('id', caseId);
+          } catch {
+            // Memory store updated
+          }
+        }
+      }
+
+      await logCaseEvent({
+        case_id: caseId,
+        event_type: 'CASE_UPDATED',
+        title: `Project Corridor Configured: ${updatedCorridor.corridor_name}`,
+        description: `Alignment span of ${updatedCorridor.total_length_km} km with ${updatedCorridor.right_of_way_width_meters}m RoW buffer projected to GIS layer.`,
+        actor_name: req.user?.full_name || 'Revenue Officer',
+        metadata: {
+          corridor_type: updatedCorridor.corridor_type,
+          span_km: updatedCorridor.total_length_km,
+          row_width_meters: updatedCorridor.right_of_way_width_meters,
+        },
+      });
+
+      res.json({
+        success: true,
+        message: 'Project corridor alignment and Right-of-Way buffer saved and projected to GIS map!',
+        corridor: updatedCorridor,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'Failed to update project corridor details' });
+    }
+  }
+);
+
+// ============================================================================
+// CASE GIS ENDPOINTS
+// ============================================================================
+
+// GET /api/cases/:id/gis - Get combined FeatureCollection of case boundary, corridor & parcels
+router.get(['/cases/:id/gis', '/gis/cases/:id'], requireAuth, async (req: Request, res: Response) => {
+  try {
+    const rawCaseId = req.params.id;
+    const caseId = Array.isArray(rawCaseId) ? rawCaseId[0] : rawCaseId;
+
+    const scopedCases = await getScopedCases(req.user);
+    let caseItem = scopedCases.find((c) => c.id === caseId);
+    let parcels: any[] = [];
+
+    if (isSupabaseConfigured) {
+      try {
+        const supabase = getSupabase();
+        const { data: dbCase } = await supabase
+          .from('acquisition_cases')
+          .select('id, case_number, title, total_area_hectares, geojson_boundary')
+          .eq('id', caseId)
+          .single();
+
+        if (dbCase) caseItem = { ...caseItem, ...dbCase } as any;
+
+        const { data: dbParcels } = await supabase
+          .from('parcels')
+          .select('*')
+          .eq('case_id', caseId)
+          .order('created_at', { ascending: true });
+
+        if (dbParcels) parcels = dbParcels;
+      } catch {
+        // Fall back to memory store
+      }
+    }
+
+    if (!caseItem) {
+      return res.status(404).json({ error: 'Case not found or outside authorized operational jurisdiction.' });
+    }
+
+    if (parcels.length === 0) {
+      parcels = await getParcelsForCase(caseId);
     }
 
     const features: any[] = [];
@@ -333,7 +531,6 @@ router.get('/cases/:id/gis', requireAuth, async (req: Request, res: Response) =>
     });
 
     // 3. Detect and include Spatial & Cadastral Relationships
-    const scopedCases = await getScopedCases(req.user);
     const fullSourceCase = (scopedCases.find((c) => c.id === caseId) || caseItem) as any as AcquisitionCase;
     const relationships = await detectSpatialAndCadastralRelationships(fullSourceCase, scopedCases);
 
