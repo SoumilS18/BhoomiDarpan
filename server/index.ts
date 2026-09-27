@@ -93,9 +93,21 @@ export function createApiApp() {
   app.use('/api', integrationsRouter);
   app.use('/api', administrationRouter);
 
-  // Serve built frontend assets in production
+  // Runtime config endpoint loaded by <script src="/config.js"></script>
+  app.get('/config.js', (_req: Request, res: Response) => {
+    const runtimeConfig = {
+      SUPABASE_URL: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '',
+      SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
+      MAPTILER_API_KEY: process.env.VITE_MAPTILER_API_KEY || process.env.MAPTILER_API_KEY || '',
+    };
+    res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.send(`window.__BHOOMISETU__ = ${JSON.stringify(runtimeConfig)};`);
+  });
+
+  // Serve built frontend assets in production (index: false ensures SPA fallback handles HTML with injection)
   const distPath = path.resolve(process.cwd(), 'dist');
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, { index: false }));
 
   // Fallback 404 for unmatched API routes
   app.use('/api/*', (_req: Request, res: Response) => {
@@ -125,6 +137,7 @@ export function createApiApp() {
       const injection = `<script>window.__BHOOMISETU__ = ${JSON.stringify(runtimeConfig)};</script>`;
       html = html.replace('</head>', `${injection}\n</head>`);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.send(html);
     } catch {
       res.sendFile(indexPath, (err) => { if (err) next(); });
