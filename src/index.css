@@ -107,3 +107,19 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Leaflet High-Performance GPU Acceleration */
+.leaflet-container {
+  transform: translate3d(0, 0, 0);
+  -webkit-transform: translate3d(0, 0, 0);
+  will-change: transform;
+}
+
+.leaflet-tile-container {
+  will-change: transform;
+}
+
+.leaflet-pane > svg,
+.leaflet-pane > canvas {
+  will-change: transform;
+}

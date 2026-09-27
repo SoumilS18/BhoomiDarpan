@@ -125,6 +125,7 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
   const projectsLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const parcelsLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const clustersLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const caseLayersMapRef = useRef<Map<string, { layer?: any; marker?: any; defaultColor: string; defaultWeight: number; bounds?: L.LatLngBounds }>>(new Map());
 
   // Data state
   const [overview, setOverview] = useState<GISOverview | null>(null);
@@ -351,7 +352,7 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
     loadData();
   }, [stateFilter, districtFilter, subDistrictFilter, villageFilter, statusFilter, riskFilter, mappingFilter]);
 
-  // 2. Initialize Leaflet Map
+  // 2. Initialize Leaflet Map (Hardware-Accelerated Canvas & High-FPS Smooth Zoom)
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
@@ -363,6 +364,11 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
     const map = L.map(mapContainerRef.current, {
       zoomControl: false,
       attributionControl: false,
+      preferCanvas: true,
+      wheelDebounceTime: 40,
+      wheelPxPerZoomLevel: 100,
+      fadeAnimation: true,
+      markerZoomAnimation: true,
     }).setView([22.5, 78.9], 5);
 
     // Zoom control on top-right
@@ -409,15 +415,16 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
     tileLayerRef.current = tileLayer;
   }, [baseMap, integrationPolicy]);
 
-  // 4. Render Layers when Data / Toggles Change
+  // 4. Render Layers when Data / Toggles Change (Optimized O(N) single-pass)
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    // Clear existing layers
+    // Clear existing layers and case lookup
     casesLayerGroupRef.current?.clearLayers();
     projectsLayerGroupRef.current?.clearLayers();
     clustersLayerGroupRef.current?.clearLayers();
+    caseLayersMapRef.current.clear();
 
     const allBounds = L.latLngBounds([]);
 
@@ -464,18 +471,20 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
       casesData.features.forEach((cFeat: any) => {
         const props = cFeat.properties;
         const color = getRiskColor(props.risk_level);
-        const isSelected = props.case_id === selectedCaseId;
+        let geoLayer: any = null;
+        let centroidMarker: any = null;
+        let bounds: L.LatLngBounds | undefined = undefined;
 
         // Polygon boundary
         if (cFeat.geometry) {
           try {
-            const geoLayer = L.geoJSON(cFeat, {
+            geoLayer = L.geoJSON(cFeat, {
               style: {
-                color: isSelected ? '#1d4ed8' : color,
-                weight: isSelected ? 3.5 : 2,
+                color,
+                weight: 2,
                 opacity: 0.9,
                 fillColor: color,
-                fillOpacity: isSelected ? 0.4 : 0.2,
+                fillOpacity: 0.22,
               },
               onEachFeature: (_, layer) => {
                 layer.on('click', () => {
@@ -488,14 +497,15 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
               },
             });
             casesLayerGroupRef.current?.addLayer(geoLayer);
-            allBounds.extend(geoLayer.getBounds());
+            bounds = geoLayer.getBounds();
+            if (bounds) allBounds.extend(bounds);
           } catch {}
         }
 
         // Centroid marker
         if (props.centroid && Array.isArray(props.centroid)) {
           const [cLat, cLng] = props.centroid;
-          const marker = L.circleMarker([cLat, cLng], {
+          centroidMarker = L.circleMarker([cLat, cLng], {
             radius: props.risk_level === 'critical' ? 9 : 7,
             fillColor: color,
             color: '#ffffff',
@@ -504,17 +514,27 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
             fillOpacity: 0.95,
           });
 
-          marker.on('click', () => {
+          centroidMarker.on('click', () => {
             setSelectedCaseId(props.case_id);
           });
 
-          marker.bindTooltip(
+          centroidMarker.bindTooltip(
             `<strong>${props.case_number}</strong>: ${props.title}`,
             { direction: 'top' }
           );
 
-          casesLayerGroupRef.current?.addLayer(marker);
+          casesLayerGroupRef.current?.addLayer(centroidMarker);
           allBounds.extend([cLat, cLng]);
+        }
+
+        if (props.case_id) {
+          caseLayersMapRef.current.set(props.case_id, {
+            layer: geoLayer,
+            marker: centroidMarker,
+            defaultColor: color,
+            defaultWeight: 2,
+            bounds,
+          });
         }
       });
     }
@@ -544,11 +564,52 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
       });
     }
 
-    // Fit map bounds if features exist
+    // Fit map bounds if features exist on dataset load/toggle change
     if (allBounds.isValid()) {
       map.fitBounds(allBounds, { padding: [40, 40], maxZoom: 14 });
     }
-  }, [casesData, projectsData, overview, showCases, showProjects, showClusters, selectedCaseId]);
+  }, [casesData, projectsData, overview, showCases, showProjects, showClusters]);
+
+  // 4b. Fast In-Place Selection & Smooth Fly-To (Zero Layer Rebuild)
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    caseLayersMapRef.current.forEach((item, cId) => {
+      const isSelected = cId === selectedCaseId;
+      if (item.layer) {
+        item.layer.eachLayer((subLayer: any) => {
+          if (typeof subLayer.setStyle === 'function') {
+            subLayer.setStyle({
+              color: isSelected ? '#8B3A2A' : item.defaultColor,
+              weight: isSelected ? 3.5 : item.defaultWeight,
+              fillOpacity: isSelected ? 0.45 : 0.22,
+            });
+            if (isSelected) {
+              subLayer.bringToFront?.();
+            }
+          }
+        });
+      }
+      if (item.marker && typeof item.marker.setStyle === 'function') {
+        item.marker.setStyle({
+          radius: isSelected ? 11 : 7,
+          weight: isSelected ? 3 : 2,
+          color: isSelected ? '#8B3A2A' : '#ffffff',
+        });
+        if (isSelected) {
+          item.marker.bringToFront?.();
+        }
+      }
+    });
+
+    if (selectedCaseId && caseLayersMapRef.current.has(selectedCaseId)) {
+      const item = caseLayersMapRef.current.get(selectedCaseId);
+      if (item?.bounds && item.bounds.isValid()) {
+        map.flyToBounds(item.bounds, { padding: [60, 60], maxZoom: 14, duration: 0.5 });
+      }
+    }
+  }, [selectedCaseId]);
 
   // 4b. Location-Aware Spatial Map Navigation on Geography Filter Change
   useEffect(() => {

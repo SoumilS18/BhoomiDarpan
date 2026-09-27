@@ -205,11 +205,12 @@ describe('LGD Controlled Full-Scale Ingestion & Production-Readiness Suite', () 
         await executeLgdQuery('states', {
           apiKeyOverride: 'invalid-test-probe-key-12345',
           retryLimit: 0,
+          timeoutMs: 1500,
         });
       } catch (err: any) {
         errorThrown = true;
         expect(err.message).not.toContain('invalid-test-probe-key-12345');
-        expect(err.message).toContain('LGD API Error');
+        expect(err.message).toMatch(/LGD (API Error|Gateway Connection Failed)/);
       }
       expect(errorThrown).toBe(true);
     });

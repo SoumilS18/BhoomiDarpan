@@ -33,9 +33,15 @@ export const PortfolioMapView: React.FC<PortfolioMapViewProps> = ({
       mapInstanceRef.current = null;
     }
 
+    // Hardware-accelerated Canvas Map
     const map = L.map(mapContainerRef.current, {
       zoomControl: false,
       attributionControl: true,
+      preferCanvas: true,
+      wheelDebounceTime: 40,
+      wheelPxPerZoomLevel: 100,
+      fadeAnimation: true,
+      markerZoomAnimation: true,
     }).setView([22.5, 82.0], 5);
 
     const { tileLayer } = createBasemapTileLayer({}, undefined, L);

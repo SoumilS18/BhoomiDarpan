@@ -278,6 +278,10 @@ export function createBasemapTileLayer(
     maxZoom: config.maxZoom,
     subdomains: config.subdomains,
     attribution: config.attribution,
+    keepBuffer: 6,
+    updateWhenIdle: false,
+    updateWhenZooming: false,
+    updateInterval: 100,
   });
 
   let fallbackTriggered = false;

@@ -152,10 +152,15 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
       mapInstanceRef.current = null;
     }
 
-    // Default center: India center or fallback
+    // Default center: India center or fallback (Hardware-accelerated Canvas)
     const map = L.map(mapContainerRef.current, {
       zoomControl: false,
       attributionControl: true,
+      preferCanvas: true,
+      wheelDebounceTime: 40,
+      wheelPxPerZoomLevel: 100,
+      fadeAnimation: true,
+      markerZoomAnimation: true,
     }).setView([20.5937, 78.9629], 5);
 
     const { tileLayer } = createBasemapTileLayer({}, undefined, L);
