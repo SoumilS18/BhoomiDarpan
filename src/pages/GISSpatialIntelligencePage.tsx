@@ -64,10 +64,12 @@ interface GISSpatialIntelligencePageProps {
 
 export type TileBaseMap =
   | 'osm'
-  | 'positron'
-  | 'dark'
   | 'satellite'
+  | 'dark'
+  | 'light'
+  | 'positron'
   | 'topo'
+  | 'streets'
   | 'voyager'
   | 'maptiler_streets'
   | 'maptiler_satellite'
@@ -1274,25 +1276,14 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
                 <div className="grid grid-cols-4 gap-1 rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs">
                   <button
                     type="button"
-                    onClick={() => setBaseMap('positron')}
+                    onClick={() => setBaseMap('osm')}
                     className={`rounded-md px-1.5 py-1 font-medium text-center transition-all ${
-                      baseMap === 'positron'
+                      baseMap === 'osm'
                         ? 'bg-white font-bold text-gov-navy shadow-gov'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    Positron
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBaseMap('dark')}
-                    className={`rounded-md px-1.5 py-1 font-medium text-center transition-all ${
-                      baseMap === 'dark'
-                        ? 'bg-gov-slate font-bold text-white shadow-gov'
-                        : 'text-slate-600 hover:text-slate-900'
-                    }`}
-                  >
-                    Dark
+                    OSM
                   </button>
                   <button
                     type="button"
@@ -1307,14 +1298,25 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
                   </button>
                   <button
                     type="button"
-                    onClick={() => setBaseMap('osm')}
+                    onClick={() => setBaseMap('dark')}
                     className={`rounded-md px-1.5 py-1 font-medium text-center transition-all ${
-                      baseMap === 'osm'
-                        ? 'bg-white font-bold text-emerald-800 shadow-gov'
+                      baseMap === 'dark'
+                        ? 'bg-gov-slate font-bold text-white shadow-gov'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    OSM
+                    Dark
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBaseMap('light')}
+                    className={`rounded-md px-1.5 py-1 font-medium text-center transition-all ${
+                      baseMap === 'light' || baseMap === 'positron'
+                        ? 'bg-white font-bold text-gov-navy shadow-gov'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Light
                   </button>
                 </div>
 
@@ -1324,18 +1326,12 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
                   className="input input-xs"
                   title="Select Basemap Cartography"
                 >
-                  <option value="osm">OpenStreetMap Standard</option>
-                  <option value="positron">Carto Positron (Clean Light)</option>
-                  <option value="dark">Carto Dark Matter (Night Mode)</option>
-                  <option value="satellite">Esri World Imagery (Satellite)</option>
-                  <option value="topo">Esri Topographic (Contours & Elevation)</option>
-                  <option value="voyager">Carto Voyager (Rich Road Network)</option>
-                  <option value="maptiler_streets">MapTiler Streets v2</option>
-                  <option value="maptiler_satellite">MapTiler Satellite (Hybrid)</option>
-                  <option value="maptiler_topo">MapTiler Topo v2</option>
-                  <option value="maptiler_outdoor">MapTiler Outdoor v2</option>
-                  <option value="maptiler_dataviz_light">MapTiler Dataviz Light</option>
-                  <option value="maptiler_dataviz_dark">MapTiler Dataviz Dark</option>
+                  <option value="osm">OpenStreetMap Standard (Open / Zero-Key)</option>
+                  <option value="satellite">Esri World Imagery (Optical Satellite HD)</option>
+                  <option value="dark">Esri Dark Canvas (High-Contrast Night)</option>
+                  <option value="light">Esri Light Canvas (Clean Neutral Gray)</option>
+                  <option value="topo">Esri Topographic (Contours & Relief)</option>
+                  <option value="streets">Esri World Street Map (Highways & Landmarks)</option>
                 </select>
               </div>
             </div>

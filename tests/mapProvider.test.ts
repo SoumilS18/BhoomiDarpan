@@ -155,23 +155,25 @@ describe('Map Provider Adapter & Basemap Cartography Abstraction Suite', () => {
   });
 
   // ==========================================================================
-  // 5. LIVE HIGH-RESOLUTION OPEN BASEMAP RESOLUTION
+  // 5. LIVE HIGH-RESOLUTION OPEN BASEMAP RESOLUTION (ZERO WATERMARK)
   // ==========================================================================
-  describe('5. High-Resolution Live Open Basemap Resolution', () => {
-    it('resolves Carto Positron clean light basemap', () => {
-      const config = resolveBasemapConfig({ provider: 'positron' });
-      expect(config.provider).toBe('positron');
+  describe('5. High-Resolution Live Open Basemap Resolution (Zero Watermark)', () => {
+    it('resolves Esri Light Canvas clean light basemap', () => {
+      const config = resolveBasemapConfig({ provider: 'light' });
+      expect(config.provider).toBe('light');
       expect(config.isFallback).toBe(false);
-      expect(config.url).toContain('basemaps.cartocdn.com/light_all');
-      expect(config.attribution).toContain('CARTO');
+      expect(config.url).toContain('server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base');
+      expect(config.attribution).toContain('Esri');
+      expect(config.url).not.toContain('cartocdn.com');
     });
 
-    it('resolves Carto Dark Matter basemap', () => {
+    it('resolves Esri Dark Canvas basemap', () => {
       const config = resolveBasemapConfig({ provider: 'dark' });
       expect(config.provider).toBe('dark');
       expect(config.isFallback).toBe(false);
-      expect(config.url).toContain('basemaps.cartocdn.com/dark_all');
-      expect(config.attribution).toContain('CARTO');
+      expect(config.url).toContain('server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base');
+      expect(config.attribution).toContain('Esri');
+      expect(config.url).not.toContain('cartocdn.com');
     });
 
     it('resolves Esri World Imagery Satellite basemap', () => {
@@ -190,11 +192,12 @@ describe('Map Provider Adapter & Basemap Cartography Abstraction Suite', () => {
       expect(config.attribution).toContain('Esri');
     });
 
-    it('resolves Carto Voyager detailed roads basemap', () => {
-      const config = resolveBasemapConfig({ provider: 'voyager' });
-      expect(config.provider).toBe('voyager');
+    it('resolves Esri World Street Map basemap', () => {
+      const config = resolveBasemapConfig({ provider: 'streets' });
+      expect(config.provider).toBe('streets');
       expect(config.isFallback).toBe(false);
-      expect(config.url).toContain('basemaps.cartocdn.com/rastertiles/voyager');
+      expect(config.url).toContain('server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map');
+      expect(config.attribution).toContain('Esri');
     });
   });
 

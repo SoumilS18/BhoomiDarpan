@@ -457,30 +457,30 @@ export const CaseMapView: React.FC<CaseMapViewProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => setBaseMap('positron')}
-              className={`rounded px-2 py-1 font-medium text-xs transition-colors ${
-                baseMap === 'positron' ? 'bg-gov-navy text-white font-bold' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Positron
-            </button>
-            <button
-              type="button"
-              onClick={() => setBaseMap('dark')}
-              className={`rounded px-2 py-1 font-medium text-xs transition-colors ${
-                baseMap === 'dark' ? 'bg-gov-navy text-white font-bold' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Dark
-            </button>
-            <button
-              type="button"
               onClick={() => setBaseMap('satellite')}
               className={`rounded px-2 py-1 font-medium text-xs transition-colors ${
                 baseMap === 'satellite' ? 'bg-emerald-700 text-white font-bold' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Satellite
+            </button>
+            <button
+              type="button"
+              onClick={() => setBaseMap('dark')}
+              className={`rounded px-2 py-1 font-medium text-xs transition-colors ${
+                baseMap === 'dark' ? 'bg-gov-slate text-white font-bold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Dark
+            </button>
+            <button
+              type="button"
+              onClick={() => setBaseMap('light')}
+              className={`rounded px-2 py-1 font-medium text-xs transition-colors ${
+                baseMap === 'light' || baseMap === 'positron' ? 'bg-gov-navy text-white font-bold' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Light
             </button>
             <button
               type="button"

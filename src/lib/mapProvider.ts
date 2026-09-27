@@ -19,14 +19,15 @@ import { IntegrationPolicy } from '../../shared/types';
 
 export type SupportedMapProvider =
   | 'osm'
-  | 'positron'
-  | 'dark'
-  | 'voyager'
   | 'satellite'
+  | 'dark'
+  | 'light'
+  | 'positron'
   | 'topo'
+  | 'streets'
+  | 'voyager'
   | 'maptiler'
-  | 'google'
-  | 'carto_deprecated';
+  | 'google';
 
 export type MapTilerStyle =
   | 'streets-v2'
@@ -74,44 +75,11 @@ export const OSM_CONFIG: Readonly<BasemapConfig> = {
 };
 
 /**
- * Live, high-resolution open basemap registry (100% operational with zero credential dependencies)
+ * Live, high-resolution open basemap registry (100% operational with zero credential dependencies & zero watermarks)
  */
 export const BASEMAP_REGISTRY: Record<string, BasemapConfig> = {
   osm: {
     ...OSM_CONFIG,
-  },
-  positron: {
-    provider: 'positron',
-    url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>',
-    maxZoom: 20,
-    subdomains: 'abcd',
-    isFallback: false,
-    requiresKey: false,
-    hasKey: true,
-  },
-  dark: {
-    provider: 'dark',
-    url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>',
-    maxZoom: 20,
-    subdomains: 'abcd',
-    isFallback: false,
-    requiresKey: false,
-    hasKey: true,
-  },
-  voyager: {
-    provider: 'voyager',
-    url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">CARTO</a>',
-    maxZoom: 20,
-    subdomains: 'abcd',
-    isFallback: false,
-    requiresKey: false,
-    hasKey: true,
   },
   satellite: {
     provider: 'satellite',
@@ -124,11 +92,66 @@ export const BASEMAP_REGISTRY: Record<string, BasemapConfig> = {
     requiresKey: false,
     hasKey: true,
   },
+  dark: {
+    provider: 'dark',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    attribution:
+      'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community',
+    maxZoom: 16,
+    subdomains: 'abc',
+    isFallback: false,
+    requiresKey: false,
+    hasKey: true,
+  },
+  light: {
+    provider: 'light',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    attribution:
+      'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community',
+    maxZoom: 16,
+    subdomains: 'abc',
+    isFallback: false,
+    requiresKey: false,
+    hasKey: true,
+  },
+  positron: {
+    provider: 'positron',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    attribution:
+      'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community',
+    maxZoom: 16,
+    subdomains: 'abc',
+    isFallback: false,
+    requiresKey: false,
+    hasKey: true,
+  },
   topo: {
     provider: 'topo',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
     attribution:
       'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community',
+    maxZoom: 19,
+    subdomains: 'abc',
+    isFallback: false,
+    requiresKey: false,
+    hasKey: true,
+  },
+  streets: {
+    provider: 'streets',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    attribution:
+      'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom',
+    maxZoom: 19,
+    subdomains: 'abc',
+    isFallback: false,
+    requiresKey: false,
+    hasKey: true,
+  },
+  voyager: {
+    provider: 'voyager',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    attribution:
+      'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom',
     maxZoom: 19,
     subdomains: 'abc',
     isFallback: false,
@@ -259,21 +282,24 @@ export function resolveBasemapConfig(options: ResolveBasemapOptions = {}): Basem
 
   const normalizedProvider = rawProvider.toLowerCase();
 
-  // 2. Direct high-resolution open basemap options (Positron, Dark, Voyager, Satellite, Topo)
-  if (normalizedProvider === 'positron' || normalizedProvider === 'carto_positron') {
-    return BASEMAP_REGISTRY.positron;
+  // 2. Direct high-resolution open basemap options (Positron/Light, Dark, Satellite, Topo, Streets, Voyager, OSM)
+  if (normalizedProvider === 'positron' || normalizedProvider === 'light' || normalizedProvider === 'carto_positron' || normalizedProvider === 'esri_light') {
+    return BASEMAP_REGISTRY.light;
   }
-  if (normalizedProvider === 'dark' || normalizedProvider === 'carto_dark') {
+  if (normalizedProvider === 'dark' || normalizedProvider === 'carto_dark' || normalizedProvider === 'esri_dark') {
     return BASEMAP_REGISTRY.dark;
-  }
-  if (normalizedProvider === 'voyager' || normalizedProvider === 'carto_voyager') {
-    return BASEMAP_REGISTRY.voyager;
   }
   if (normalizedProvider === 'satellite' || normalizedProvider === 'esri_satellite') {
     return BASEMAP_REGISTRY.satellite;
   }
   if (normalizedProvider === 'topo' || normalizedProvider === 'esri_topo') {
     return BASEMAP_REGISTRY.topo;
+  }
+  if (normalizedProvider === 'streets' || normalizedProvider === 'esri_streets' || normalizedProvider === 'voyager' || normalizedProvider === 'carto_voyager') {
+    return BASEMAP_REGISTRY.streets;
+  }
+  if (normalizedProvider === 'osm' || normalizedProvider === 'openstreetmap') {
+    return BASEMAP_REGISTRY.osm;
   }
 
   // 3. Handle MapTiler
@@ -322,22 +348,21 @@ export function resolveBasemapConfig(options: ResolveBasemapOptions = {}): Basem
         ...BASEMAP_REGISTRY.dark,
         isFallback: true,
         fallbackReason:
-          'VITE_MAPTILER_API_KEY is not configured. Seamlessly utilizing Carto Dark Matter cartography.',
+          'VITE_MAPTILER_API_KEY is not configured. Seamlessly utilizing Esri Dark Canvas cartography.',
         requiresKey: true,
         hasKey: false,
       };
     }
     if (styleKey === 'dataviz-light') {
       return {
-        ...BASEMAP_REGISTRY.positron,
+        ...BASEMAP_REGISTRY.light,
         isFallback: true,
         fallbackReason:
-          'VITE_MAPTILER_API_KEY is not configured. Seamlessly utilizing Carto Positron cartography.',
+          'VITE_MAPTILER_API_KEY is not configured. Seamlessly utilizing Esri Light Canvas cartography.',
         requiresKey: true,
         hasKey: false,
       };
     }
-
     return {
       ...OSM_CONFIG,
       provider: 'osm',
