@@ -86,9 +86,9 @@ export const Header: React.FC<HeaderProps> = ({
               <Menu className="h-5 w-5" />
             </button>
 
-            {/* State Emblem of India - Seamlessly integrated without bounding box */}
+            {/* State Emblem of India - Precise golden engraving outline */}
             <div className="flex items-center shrink-0" title="Government of India - State Emblem">
-              <NationalEmblem size={48} variant="gold" className="filter drop-shadow-xs hover:scale-105 transition-transform" />
+              <NationalEmblem size={50} className="filter drop-shadow-xs hover:scale-105 transition-transform" />
             </div>
 
             <div>

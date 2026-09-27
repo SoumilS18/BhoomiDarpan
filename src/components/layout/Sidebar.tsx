@@ -119,7 +119,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         >
           <div className="flex shrink-0 items-center justify-center" title="Government of India - State Emblem">
-            <NationalEmblem size={isCollapsed ? 38 : 44} variant="gold" className="filter drop-shadow-xs" />
+            <NationalEmblem size={isCollapsed ? 38 : 46} className="filter drop-shadow-xs" />
           </div>
           {!isCollapsed && (
             <div className="min-w-0">

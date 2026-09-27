@@ -36,7 +36,7 @@ export const PublicHeader: React.FC = () => {
             aria-label="BhoomiSetu home"
           >
             <div className="flex shrink-0 items-center justify-center" title="Government of India - State Emblem">
-              <NationalEmblem size={46} variant="gold" className="filter drop-shadow-xs hover:scale-105 transition-transform" />
+              <NationalEmblem size={50} className="filter drop-shadow-xs hover:scale-105 transition-transform" />
             </div>
             <div>
               <div className="flex items-center gap-2">

@@ -69,9 +69,9 @@ export const AuthShell: React.FC<{
             Back to home
           </Link>
 
-          <div className="mt-8 flex items-center gap-3">
+          <div className="mt-8 flex items-center gap-3.5">
             <div className="flex shrink-0 items-center justify-center">
-              <NationalEmblem size={52} variant="gold" className="filter drop-shadow-xs" />
+              <NationalEmblem size={56} className="filter drop-shadow-xs" />
             </div>
             <div>
               <p className="text-xl font-bold tracking-tight text-sand-50">{PUBLIC_CONFIG.name}</p>
