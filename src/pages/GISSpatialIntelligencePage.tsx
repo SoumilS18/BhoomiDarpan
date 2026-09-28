@@ -964,6 +964,9 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
       {spatialMode === '3d' ? (
         <section className="animate-in fade-in zoom-in-98 duration-200">
           <DigitalTwin3DStudio
+            casesData={casesData}
+            projectsData={projectsData}
+            selectedCaseId={selectedCaseId}
             onSelectCase={onSelectCase}
             onClose={() => setSpatialMode('2d')}
           />
