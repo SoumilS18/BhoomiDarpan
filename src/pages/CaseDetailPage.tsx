@@ -21,6 +21,7 @@ import { DownstreamImpactView } from '../components/intelligence/DownstreamImpac
 import { WhatIfSimulator } from '../components/intelligence/WhatIfSimulator';
 import { RecommendationsList } from '../components/intelligence/RecommendationsList';
 import { DisputesTab } from '../components/disputes/DisputesTab';
+import { DigitalTwin3DStudio } from '../components/gis/DigitalTwin3DStudio';
 import {
   ArrowLeft,
   Clock,
@@ -29,6 +30,7 @@ import {
   History,
   RefreshCw,
   Layers,
+  Compass,
   Plus,
   Sparkles,
   Scale,
@@ -110,6 +112,7 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
   const [isAddParcelModalOpen, setIsAddParcelModalOpen] = useState(false);
   const [selectedParcelId, setSelectedParcelId] = useState<string | undefined>(undefined);
   const [gisRefreshKey, setGisRefreshKey] = useState(0);
+  const [gisViewMode, setGisViewMode] = useState<'2d' | '3d'>('2d');
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeletingCase, setIsDeletingCase] = useState(false);
@@ -542,9 +545,39 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
           <Card className="border-slate-200">
             <CardHeader
               title="Cadastral GIS & Spatial Representation"
-              subtitle="Interactive georeferenced boundary, cadastral parcels, and Bhuvan thematic satellite overlays"
+              subtitle="Interactive georeferenced boundary, cadastral parcels, and 3D digital twin"
               action={
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* View Mode Toggle: 2D vs 3D */}
+                  <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs font-semibold">
+                    <button
+                      type="button"
+                      onClick={() => setGisViewMode('2d')}
+                      className={clsx(
+                        'flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all cursor-pointer',
+                        gisViewMode === '2d'
+                          ? 'bg-white text-gov-navy shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      )}
+                    >
+                      <Layers className="h-3.5 w-3.5" />
+                      2D Map
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGisViewMode('3d')}
+                      className={clsx(
+                        'flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all cursor-pointer',
+                        gisViewMode === '3d'
+                          ? 'bg-terra-800 text-white shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      )}
+                    >
+                      <Compass className="h-3.5 w-3.5" />
+                      3D Digital Twin
+                    </button>
+                  </div>
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -565,15 +598,25 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
               }
             />
             <CardContent>
-              <CaseMapView
-                caseId={caseItem.id}
-                caseTitle={caseItem.title}
-                onOpenImportBoundary={() => setIsGeoJSONModalOpen(true)}
-                onOpenAddParcel={() => setIsAddParcelModalOpen(true)}
-                onSelectParcel={(pId) => setSelectedParcelId(pId)}
-                selectedParcelId={selectedParcelId}
-                refreshTrigger={gisRefreshKey}
-              />
+              {gisViewMode === '3d' ? (
+                <div className="animate-in fade-in zoom-in-98 duration-200">
+                  <DigitalTwin3DStudio
+                    initialCase={caseItem}
+                    selectedCaseId={caseItem.id}
+                    onClose={() => setGisViewMode('2d')}
+                  />
+                </div>
+              ) : (
+                <CaseMapView
+                  caseId={caseItem.id}
+                  caseTitle={caseItem.title}
+                  onOpenImportBoundary={() => setIsGeoJSONModalOpen(true)}
+                  onOpenAddParcel={() => setIsAddParcelModalOpen(true)}
+                  onSelectParcel={(pId) => setSelectedParcelId(pId)}
+                  selectedParcelId={selectedParcelId}
+                  refreshTrigger={gisRefreshKey}
+                />
+              )}
             </CardContent>
           </Card>
 
