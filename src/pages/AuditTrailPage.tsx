@@ -278,21 +278,21 @@ export const AuditTrailPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="text-right shrink-0 min-w-[110px] pl-3 sm:border-l sm:border-sand-100">
-                    <div className="text-xs font-bold text-mocha-900 whitespace-nowrap">
+                  <div className="text-right shrink-0 min-w-[145px] sm:min-w-[160px] pl-4 sm:border-l sm:border-sand-200/80 flex flex-col justify-center items-end">
+                    <div className="text-xs font-bold text-mocha-950 whitespace-nowrap">
                       {new Date(ev.timestamp).toLocaleDateString('en-IN', {
                         day: '2-digit',
                         month: 'short',
                         year: 'numeric',
                       })}
                     </div>
-                    <div className="text-[11px] text-mocha-500 font-mono mt-0.5 whitespace-nowrap">
+                    <div className="text-[10px] text-mocha-500 font-mono mt-0.5 whitespace-nowrap font-medium">
                       {new Date(ev.timestamp).toLocaleTimeString('en-IN', {
                         hour: '2-digit',
                         minute: '2-digit',
                         second: '2-digit',
                         hour12: true,
-                      })}
+                      }).toUpperCase()}
                     </div>
                   </div>
                 </div>

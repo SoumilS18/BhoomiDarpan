@@ -379,12 +379,12 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
                   <table className="w-full text-left text-xs divide-y divide-sand-200 table-fixed">
                     <thead>
                       <tr className="bg-sand-100/80 text-mocha-700 font-semibold uppercase tracking-wider text-[11px]">
-                        <th className="py-3 px-3.5 w-[22%]">Officer Name</th>
-                        <th className="py-3 px-3.5 w-[24%]">Email / Account</th>
-                        <th className="py-3 px-3.5 w-[20%]">Department &amp; Org</th>
-                        <th className="py-3 px-3.5 w-[14%]">Role Assigned</th>
-                        <th className="py-3 px-3.5 w-[10%]">Jurisdiction</th>
-                        <th className="py-3 px-3.5 w-[10%] text-right">Actions</th>
+                        <th className="py-3 px-3 w-[21%]">Officer Name</th>
+                        <th className="py-3 px-3 w-[22%]">Email / Account</th>
+                        <th className="py-3 px-3 w-[18%]">Department &amp; Org</th>
+                        <th className="py-3 px-3 w-[14%]">Role Assigned</th>
+                        <th className="py-3 px-3 w-[14%]">Jurisdiction</th>
+                        <th className="py-3 px-3 w-[11%] text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-sand-100 bg-white">
@@ -403,37 +403,37 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
                           const isCurrentUser = session && session.userId === u.id;
                           return (
                             <tr key={u.id} className="hover:bg-sand-50/70 transition-colors">
-                              <td className="py-2.5 px-3.5 font-semibold text-mocha-900">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span className="h-6 w-6 rounded-full bg-terra-100 text-terra-800 font-bold flex items-center justify-center text-[10px] shrink-0">
+                              <td className="py-2.5 px-3 font-semibold text-mocha-900">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="h-5.5 w-5.5 rounded-full bg-terra-100 text-terra-800 font-bold flex items-center justify-center text-[10px] shrink-0">
                                     {u.full_name ? u.full_name.charAt(0).toUpperCase() : 'U'}
                                   </span>
-                                  <span className="truncate max-w-[140px]" title={u.full_name || 'Unnamed Officer'}>
+                                  <span className="truncate" title={u.full_name || 'Unnamed Officer'}>
                                     {u.full_name || 'Unnamed Officer'}
                                   </span>
                                   {isCurrentUser && (
-                                    <span className="text-[9px] text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-bold border border-emerald-200 shrink-0">
+                                    <span className="text-[9px] text-emerald-700 bg-emerald-50 px-1 py-0.2 rounded font-bold border border-emerald-200 shrink-0">
                                       You
                                     </span>
                                   )}
                                 </div>
                               </td>
-                              <td className="py-2.5 px-3.5 font-mono text-[11px] text-mocha-700">
+                              <td className="py-2.5 px-3 font-mono text-[11px] text-mocha-700">
                                 <span className="truncate block" title={u.email}>
                                   {u.email}
                                 </span>
                               </td>
-                              <td className="py-2.5 px-3.5 text-mocha-600">
+                              <td className="py-2.5 px-3 text-mocha-600">
                                 <span className="truncate block text-[11px]" title={u.department || '—'}>
                                   {u.department || '—'}
                                 </span>
                               </td>
-                              <td className="py-2.5 px-3.5">
+                              <td className="py-2.5 px-3">
                                 <Badge variant={u.role === 'admin' ? 'red' : u.role === 'lao' ? 'amber' : 'navy'}>
                                   {ROLE_LABELS[u.role as UserRole] || u.role}
                                 </Badge>
                               </td>
-                              <td className="py-2.5 px-3.5 text-mocha-600 text-[11px]">
+                              <td className="py-2.5 px-3 text-mocha-600 text-[11px]">
                                 <span className="truncate block" title={u.jurisdiction_district_lgd_code ? `District: ${u.jurisdiction_district_lgd_code}` : u.jurisdiction_state_lgd_code ? `State: ${u.jurisdiction_state_lgd_code}` : 'National Scope'}>
                                   {u.jurisdiction_district_lgd_code
                                     ? `District: ${u.jurisdiction_district_lgd_code}`
@@ -442,18 +442,18 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
                                     : 'National Scope'}
                                 </span>
                               </td>
-                              <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
+                              <td className="py-2.5 px-3 text-right whitespace-nowrap">
                                 {isCurrentUser ? (
                                   <span className="text-[10px] text-slate-400 italic">Self-protected</span>
                                 ) : (
-                                  <Button
-                                    variant="danger"
-                                    size="sm"
+                                  <button
+                                    type="button"
                                     onClick={() => setUserToRevoke(u)}
-                                    leftIcon={<UserX className="h-3 w-3" />}
+                                    className="inline-flex items-center justify-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-md bg-rose-700 hover:bg-rose-800 text-white transition-colors shadow-2xs cursor-pointer"
                                   >
-                                    Revoke Access
-                                  </Button>
+                                    <UserX className="h-3 w-3" />
+                                    <span>Revoke</span>
+                                  </button>
                                 )}
                               </td>
                             </tr>
