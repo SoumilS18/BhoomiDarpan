@@ -20,6 +20,7 @@ import {
 import { clsx } from 'clsx';
 import { GeographySourceNote } from '../components/common/GeographySourceNote';
 import { ProjectCorridorModal } from '../components/gis/ProjectCorridorModal';
+import { DigitalTwin3DStudio } from '../components/gis/DigitalTwin3DStudio';
 import {
   fetchGISOverview,
   fetchGISCases,
@@ -140,6 +141,7 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
   const [spatialContext, setSpatialContext] = useState<CaseSpatialContext | null>(null);
   const [selectedParcels, setSelectedParcels] = useState<any | null>(null);
   const [isCorridorModalOpen, setIsCorridorModalOpen] = useState(false);
+  const [spatialMode, setSpatialMode] = useState<'2d' | '3d'>('2d');
   const [isLoading, setIsLoading] = useState(true);
   const [contextLoading, setContextLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -828,15 +830,47 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
         title="GIS & Spatial Decision Intelligence"
         subtitle="Real-time geodetic corridor mapping, infrastructure alignment, proximity friction clusters & cadastral verification."
         actions={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={loadData}
-            disabled={isLoading}
-            leftIcon={<RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />}
-          >
-            Refresh
-          </Button>
+          <div className="flex items-center gap-3">
+            {/* 2D / 3D Spatial Intelligence Switcher */}
+            <div className="flex bg-sand-200/80 p-1 rounded-xl border border-sand-300 shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setSpatialMode('2d')}
+                className={clsx(
+                  'px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer',
+                  spatialMode === '2d'
+                    ? 'bg-white text-mocha-900 shadow-xs border border-sand-300'
+                    : 'text-mocha-600 hover:text-mocha-900'
+                )}
+              >
+                <Layers className="h-3.5 w-3.5 text-terra-700" />
+                <span>2D Cadastral Map</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSpatialMode('3d')}
+                className={clsx(
+                  'px-3 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer',
+                  spatialMode === '3d'
+                    ? 'bg-slate-900 text-cyan-300 shadow-xs border border-slate-700'
+                    : 'text-mocha-600 hover:text-mocha-900'
+                )}
+              >
+                <Compass className="h-3.5 w-3.5 text-cyan-400 animate-pulse" />
+                <span>3D Digital Twin</span>
+              </button>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={loadData}
+              disabled={isLoading}
+              leftIcon={<RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />}
+            >
+              Refresh
+            </Button>
+          </div>
         }
       />
 
@@ -926,14 +960,24 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
         </div>
       </section>
 
-      {/* 3. Multi-Dimensional Filter Bar */}
-      <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-gov">
-        {/* Geographic & Workflow Filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="mr-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            <Sliders className="h-3.5 w-3.5 text-gov-navy" />
-            Geographic Scope
-          </div>
+      {/* 3D Digital Twin Studio Viewport */}
+      {spatialMode === '3d' ? (
+        <section className="animate-in fade-in zoom-in-98 duration-200">
+          <DigitalTwin3DStudio
+            onSelectCase={onSelectCase}
+            onClose={() => setSpatialMode('2d')}
+          />
+        </section>
+      ) : (
+        <>
+          {/* 3. Multi-Dimensional Filter Bar */}
+          <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-gov">
+            {/* Geographic & Workflow Filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="mr-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <Sliders className="h-3.5 w-3.5 text-gov-navy" />
+                Geographic Scope
+              </div>
 
           <GeographySourceNote variant="badge" />
 
@@ -1659,6 +1703,8 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
           </div>
         </div>
       </section>
+    </>
+  )}
 
       {/* Project Corridor Alignment Configuration & Inspection Modal */}
       {selectedCaseId && (
