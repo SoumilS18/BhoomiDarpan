@@ -21,6 +21,10 @@ import notificationsRouter from './routes/notifications.routes';
 import integrationsRouter from './routes/integrations.routes';
 import { administrationRouter } from './routes/administration.routes';
 import authRouter from './routes/auth.routes';
+import rehabilitationRouter from './routes/rehabilitation.routes';
+import reportsRouter from './routes/reports.routes';
+import vaultRouter from './routes/vault.routes';
+import auditRouter from './routes/audit.routes';
 import { referenceMirrorEnabled } from './config/geographySourceRegistry';
 import { isVillageDatabasePopulated, buildVillageDatabase, isVillageBuilding } from './services/villageStorageEngine';
 
@@ -87,6 +91,10 @@ export function createApiApp() {
   app.use('/api/notifications', notificationsRouter);
   app.use('/api/administration', administrationRouter);
   app.use('/api/gis', gisRouter);
+  app.use('/api/rehabilitation', rehabilitationRouter);
+  app.use('/api/reports', reportsRouter);
+  app.use('/api', vaultRouter);
+  app.use('/api', auditRouter);
   app.use('/api', documentsRouter);
   app.use('/api', gisRouter);
   app.use('/api', intelligenceRouter);

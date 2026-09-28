@@ -2193,3 +2193,252 @@ export interface AccessRequest {
   created_at: string;
   updated_at: string;
 }
+
+// ============================================================================
+// REHABILITATION & RESETTLEMENT (R&R) DOMAIN MODELS (RFCTLARR 2013 CHAPTER V)
+// ============================================================================
+
+export type RehabPlanStatus = 'draft' | 'sia_reviewed' | 'public_hearing' | 'approved' | 'executing' | 'completed';
+
+export interface ResettlementColony {
+  id: string;
+  name: string;
+  location: string;
+  lgd_village_code?: string;
+  plots_planned: number;
+  plots_allotted: number;
+  civic_amenities: {
+    schools: boolean;
+    health_centers: boolean;
+    drinking_water: boolean;
+    electricity: boolean;
+    roads: boolean;
+    community_hall: boolean;
+  };
+  completion_pct: number;
+}
+
+export interface RehabilitationPlan {
+  id: string;
+  case_id?: string;
+  case_number?: string;
+  project_id?: string;
+  project_name?: string;
+  plan_number: string;
+  title: string;
+  status: RehabPlanStatus;
+  affected_families_count: number;
+  displaced_families_count: number;
+  budget_allocated_inr: number;
+  budget_disbursed_inr: number;
+  administrator_name: string;
+  approval_date?: string;
+  resettlement_colonies: ResettlementColony[];
+  entitlements_summary: {
+    housing_units_allocated: number;
+    subsistence_grants_disbursed: number;
+    annuity_pension_count: number;
+    employment_provided_count: number;
+    skill_development_trained: number;
+  };
+  statutory_provisions: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export type VulnerabilityCategory = 'general' | 'sc' | 'st' | 'bpl' | 'landless_laborer' | 'artisan' | 'women_headed';
+export type EntitlementStatus = 'identified' | 'verified' | 'approved' | 'disbursed' | 'appealed';
+
+export interface AffectedFamily {
+  id: string;
+  case_id?: string;
+  case_number?: string;
+  project_id?: string;
+  project_name?: string;
+  family_head_name: string;
+  aadhaar_masked: string;
+  bhu_aadhaar_ulpin?: string;
+  survey_number: string;
+  village_name: string;
+  subdistrict: string;
+  district: string;
+  state: string;
+  family_members_count: number;
+  vulnerability_category: VulnerabilityCategory;
+  land_acquired_hectares: number;
+  is_displaced: boolean;
+  entitlements: {
+    resettlement_house_allotted: boolean;
+    house_unit_no?: string;
+    subsistence_grant_amount: number;
+    transportation_allowance: number;
+    cattle_shed_grant: number;
+    one_time_resettlement_allowance: number;
+    annuity_monthly_amount: number;
+    mandatory_job_offered: boolean;
+  };
+  total_package_inr: number;
+  disbursement_status: EntitlementStatus;
+  disbursed_amount_inr: number;
+  bank_account_verified: boolean;
+  disbursement_date?: string;
+  grievance_status?: 'none' | 'pending' | 'resolved';
+  created_at: string;
+}
+
+export interface RehabilitationSummary {
+  total_plans: number;
+  approved_plans: number;
+  executing_plans: number;
+  total_affected_families: number;
+  total_displaced_families: number;
+  total_budget_allocated_inr: number;
+  total_budget_disbursed_inr: number;
+  resettlement_colonies_count: number;
+  housing_units_completed: number;
+  vulnerability_breakdown: Record<VulnerabilityCategory, number>;
+  disbursement_status_breakdown: Record<EntitlementStatus, number>;
+}
+
+// ============================================================================
+// STATUTORY MIS REPORTS DOMAIN MODELS (RFCTLARR 2013)
+// ============================================================================
+
+export type StatutoryReportId = 
+  | 'form_1_sia'
+  | 'form_2_sec11'
+  | 'sec15_hearing'
+  | 'form_4_sec19'
+  | 'sec23_award'
+  | 'sec30_solatium'
+  | 'sec31_rr_award'
+  | 'cag_compliance'
+  | 'spatial_cadastre_audit';
+
+export interface StatutoryReportMeta {
+  id: StatutoryReportId;
+  code: string;
+  title: string;
+  hindiTitle: string;
+  actSection: string;
+  category: 'statutory' | 'valuation' | 'rehabilitation' | 'compliance' | 'spatial';
+  description: string;
+  mandatoryForms: string[];
+  frequency: 'Per Case Stage' | 'Quarterly' | 'On Demand';
+  applicableRoles: UserRole[];
+}
+
+export interface GeneratedStatutoryReport {
+  meta: StatutoryReportMeta;
+  generated_at: string;
+  generated_by: string;
+  filters_applied: {
+    state?: string;
+    district?: string;
+    case_id?: string;
+    project_id?: string;
+    date_from?: string;
+    date_to?: string;
+  };
+  summary: {
+    total_records: number;
+    total_area_hectares?: number;
+    total_financial_commitment_inr?: number;
+    compliance_score_pct?: number;
+  };
+  columns: { key: string; label: string; type?: 'text' | 'number' | 'currency' | 'date' | 'badge' }[];
+  rows: Record<string, any>[];
+  statutory_notes: string[];
+}
+
+// ============================================================================
+// DOCUMENT VAULT DOMAIN MODELS
+// ============================================================================
+
+export type VaultDocumentCategory = 
+  | 'gazette_notification'
+  | 'land_record_7_12'
+  | 'mutation_entry'
+  | 'sia_report'
+  | 'court_order'
+  | 'valuation_certificate'
+  | 'survey_map'
+  | 'public_hearing_minutes'
+  | 'rr_scheme'
+  | 'award_declaration';
+
+export interface VaultDocument {
+  id: string;
+  case_id?: string;
+  case_number?: string;
+  project_id?: string;
+  project_name?: string;
+  title: string;
+  category: VaultDocumentCategory;
+  file_name: string;
+  file_size_bytes: number;
+  mime_type: string;
+  storage_url?: string;
+  ocr_extracted: boolean;
+  ocr_confidence?: number;
+  extracted_entities?: {
+    survey_numbers?: string[];
+    village?: string;
+    district?: string;
+    statutory_sections?: string[];
+    dates?: string[];
+    financial_amounts?: number[];
+  };
+  sha256_hash: string;
+  verification_status: 'verified' | 'flagged' | 'pending_review';
+  uploaded_by: string;
+  uploaded_at: string;
+}
+
+export interface DocumentVaultStats {
+  total_documents: number;
+  verified_documents: number;
+  pending_ocr_documents: number;
+  flagged_documents: number;
+  category_breakdown: Record<VaultDocumentCategory, number>;
+  storage_total_bytes: number;
+}
+
+// ============================================================================
+// IMMUTABLE AUDIT TRAIL DOMAIN MODELS
+// ============================================================================
+
+export type AuditSeverity = 'info' | 'warning' | 'critical';
+
+export interface AuditTrailEvent {
+  id: string;
+  timestamp: string;
+  sequence_id: number;
+  entity_type: 'case' | 'stage' | 'document' | 'policy' | 'rehab_plan' | 'affected_family' | 'user' | 'integration';
+  entity_id: string;
+  entity_title?: string;
+  action: string;
+  actor_name: string;
+  actor_email: string;
+  actor_role: UserRole;
+  actor_ip?: string;
+  severity: AuditSeverity;
+  previous_state?: Record<string, any>;
+  new_state?: Record<string, any>;
+  changes_summary?: string;
+  statutory_ref?: string;
+  hash_signature: string;
+}
+
+export interface AuditTrailFilterParams {
+  entity_type?: string;
+  action?: string;
+  severity?: AuditSeverity;
+  actor_email?: string;
+  search?: string;
+  date_from?: string;
+  date_to?: string;
+  limit?: number;
+  offset?: number;
+}
+

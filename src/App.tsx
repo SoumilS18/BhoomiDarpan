@@ -309,6 +309,9 @@ export const App: React.FC = () => {
           />
         );
 
+      case 'module.user_directory':
+        return <Element section="users" />;
+
       case 'module.admin':
         return (
           <Element

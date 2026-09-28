@@ -25,6 +25,7 @@ export {
   getRouteById,
   isRouteVisibleToRole,
   navRoutesForRole,
+  navSectionsForRole,
   publicNavRoutes,
   routeArea,
   ROUTE_BY_ID,
@@ -34,6 +35,8 @@ export {
   type IconKey,
   type LazyPage,
   type ModuleId,
+  type NavSection,
+  type NavSectionDef,
   type RouteArea,
 } from './routes';
 export {

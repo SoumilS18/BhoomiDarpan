@@ -50,6 +50,18 @@ import {
   StatutoryAwardCalculation,
   CaseAwardSummary,
   UserProfile,
+  RehabilitationPlan,
+  AffectedFamily,
+  RehabilitationSummary,
+  RehabPlanStatus,
+  EntitlementStatus,
+  StatutoryReportMeta,
+  GeneratedStatutoryReport,
+  StatutoryReportId,
+  VaultDocument,
+  DocumentVaultStats,
+  AuditTrailEvent,
+  AuditTrailFilterParams,
 } from '../../shared/types';
 
 
@@ -2046,6 +2058,238 @@ export async function deleteProject(projectId: string): Promise<{
   }
   return res.json();
 }
+
+// ============================================================================
+// REHABILITATION & RESETTLEMENT API METHODS
+// ============================================================================
+
+export async function fetchRehabilitationPlans(): Promise<RehabilitationPlan[]> {
+  const res = await fetch(`${API_BASE}/rehabilitation/plans`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch rehabilitation plans (${res.status})`);
+  }
+  const data = await res.json();
+  return data.plans || [];
+}
+
+export async function fetchRehabilitationPlanById(id: string): Promise<RehabilitationPlan> {
+  const res = await fetch(`${API_BASE}/rehabilitation/plans/${id}`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch rehabilitation plan (${res.status})`);
+  }
+  const data = await res.json();
+  return data.plan;
+}
+
+export async function createRehabilitationPlan(plan: Partial<RehabilitationPlan>): Promise<RehabilitationPlan> {
+  const res = await fetch(`${API_BASE}/rehabilitation/plans`, {
+    method: 'POST',
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(plan),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to create rehabilitation plan (${res.status})`);
+  }
+  const data = await res.json();
+  return data.plan;
+}
+
+export async function updateRehabilitationPlanStatus(id: string, status: RehabPlanStatus): Promise<RehabilitationPlan> {
+  const res = await fetch(`${API_BASE}/rehabilitation/plans/${id}/status`, {
+    method: 'PATCH',
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to update plan status (${res.status})`);
+  }
+  const data = await res.json();
+  return data.plan;
+}
+
+export async function fetchAffectedFamilies(params?: {
+  case_id?: string;
+  project_id?: string;
+  vulnerability?: string;
+  status?: string;
+  search?: string;
+}): Promise<AffectedFamily[]> {
+  const query = new URLSearchParams();
+  if (params?.case_id) query.set('case_id', params.case_id);
+  if (params?.project_id) query.set('project_id', params.project_id);
+  if (params?.vulnerability) query.set('vulnerability', params.vulnerability);
+  if (params?.status) query.set('status', params.status);
+  if (params?.search) query.set('search', params.search);
+
+  const res = await fetch(`${API_BASE}/rehabilitation/families?${query.toString()}`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch affected families (${res.status})`);
+  }
+  const data = await res.json();
+  return data.families || [];
+}
+
+export async function fetchAffectedFamilyById(id: string): Promise<AffectedFamily> {
+  const res = await fetch(`${API_BASE}/rehabilitation/families/${id}`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch affected family (${res.status})`);
+  }
+  const data = await res.json();
+  return data.family;
+}
+
+export async function createAffectedFamily(family: Partial<AffectedFamily>): Promise<AffectedFamily> {
+  const res = await fetch(`${API_BASE}/rehabilitation/families`, {
+    method: 'POST',
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(family),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to create affected family (${res.status})`);
+  }
+  const data = await res.json();
+  return data.family;
+}
+
+export async function updateAffectedFamilyDisbursement(
+  id: string,
+  status: EntitlementStatus,
+  amount?: number
+): Promise<AffectedFamily> {
+  const res = await fetch(`${API_BASE}/rehabilitation/families/${id}/disbursement`, {
+    method: 'PATCH',
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status, amount }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to update family disbursement (${res.status})`);
+  }
+  const data = await res.json();
+  return data.family;
+}
+
+export async function fetchRehabilitationSummary(): Promise<RehabilitationSummary> {
+  const res = await fetch(`${API_BASE}/rehabilitation/summary`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch rehabilitation summary (${res.status})`);
+  }
+  const data = await res.json();
+  return data.summary;
+}
+
+// ============================================================================
+// STATUTORY MIS REPORTS API METHODS
+// ============================================================================
+
+export async function fetchStatutoryReportCatalogue(): Promise<StatutoryReportMeta[]> {
+  const res = await fetch(`${API_BASE}/reports/catalogue`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch report catalogue (${res.status})`);
+  }
+  const data = await res.json();
+  return data.catalogue || [];
+}
+
+export async function generateStatutoryReport(
+  reportId: StatutoryReportId,
+  filters?: {
+    state?: string;
+    district?: string;
+    case_id?: string;
+    project_id?: string;
+    date_from?: string;
+    date_to?: string;
+  }
+): Promise<GeneratedStatutoryReport> {
+  const query = new URLSearchParams();
+  if (filters?.state) query.set('state', filters.state);
+  if (filters?.district) query.set('district', filters.district);
+  if (filters?.case_id) query.set('case_id', filters.case_id);
+  if (filters?.project_id) query.set('project_id', filters.project_id);
+  if (filters?.date_from) query.set('date_from', filters.date_from);
+  if (filters?.date_to) query.set('date_to', filters.date_to);
+
+  const res = await fetch(`${API_BASE}/reports/generate/${reportId}?${query.toString()}`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to generate statutory report (${res.status})`);
+  }
+  const data = await res.json();
+  return data.report;
+}
+
+// ============================================================================
+// DOCUMENT VAULT API METHODS
+// ============================================================================
+
+export async function fetchDocumentVault(params?: {
+  category?: string;
+  case_id?: string;
+  project_id?: string;
+  status?: string;
+  search?: string;
+}): Promise<VaultDocument[]> {
+  const query = new URLSearchParams();
+  if (params?.category) query.set('category', params.category);
+  if (params?.case_id) query.set('case_id', params.case_id);
+  if (params?.project_id) query.set('project_id', params.project_id);
+  if (params?.status) query.set('status', params.status);
+  if (params?.search) query.set('search', params.search);
+
+  const res = await fetch(`${API_BASE}/vault?${query.toString()}`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch document vault (${res.status})`);
+  }
+  const data = await res.json();
+  return data.documents || [];
+}
+
+export async function fetchDocumentVaultStats(): Promise<DocumentVaultStats> {
+  const res = await fetch(`${API_BASE}/vault/stats`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch document vault stats (${res.status})`);
+  }
+  const data = await res.json();
+  return data.stats;
+}
+
+// ============================================================================
+// IMMUTABLE AUDIT TRAIL API METHODS
+// ============================================================================
+
+export async function fetchAuditTrail(params?: AuditTrailFilterParams): Promise<{
+  events: AuditTrailEvent[];
+  total: number;
+}> {
+  const query = new URLSearchParams();
+  if (params?.entity_type) query.set('entity_type', params.entity_type);
+  if (params?.action) query.set('action', params.action);
+  if (params?.severity) query.set('severity', params.severity);
+  if (params?.actor_email) query.set('actor_email', params.actor_email);
+  if (params?.search) query.set('search', params.search);
+  if (params?.limit) query.set('limit', String(params.limit));
+  if (params?.offset) query.set('offset', String(params.offset));
+
+  const res = await fetch(`${API_BASE}/audit-trail?${query.toString()}`, { headers: getAuthHeaders() });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to fetch audit trail (${res.status})`);
+  }
+  return res.json();
+}
+
 
 
 

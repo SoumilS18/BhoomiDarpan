@@ -26,15 +26,25 @@ import type { UserRole } from '../../shared/types';
 // Types
 // ---------------------------------------------------------------------------
 
+export type NavSection = 'operations' | 'rehabilitation' | 'intelligence' | 'governance';
+
 export type ModuleId =
   | 'dashboard'
   | 'cases'
   | 'projects'
   | 'gis'
-  | 'intelligence'
+  | 'rehab_plans'
+  | 'affected_families'
   | 'analytics'
+  | 'reports'
+  | 'vault'
   | 'notifications'
+  | 'connectors'
   | 'governance'
+  | 'audit_trail'
+  | 'user_directory'
+  | 'system_config'
+  | 'intelligence'
   | 'admin';
 
 /** Serialisable icon identifier - resolved to a lucide component inside the sidebar. */
@@ -43,10 +53,18 @@ export type IconKey =
   | 'cases'
   | 'projects'
   | 'gis'
-  | 'intelligence'
+  | 'home'
+  | 'users'
   | 'analytics'
+  | 'reports'
+  | 'vault'
   | 'notifications'
+  | 'connectors'
   | 'governance'
+  | 'audit_trail'
+  | 'user_directory'
+  | 'system_config'
+  | 'intelligence'
   | 'admin';
 
 export type BadgeSource = 'caseCount' | 'unreadNotifications';
@@ -68,6 +86,8 @@ export interface RouteDef {
   path: string;
   /** Experience area; omitted means the authenticated application ('app'). */
   area?: RouteArea;
+  /** Section grouping in sidebar. */
+  section?: NavSection;
   /** Sidebar grouping. `null` for routes reached from within a module. */
   module: ModuleId | null;
   /** Human label used by navigation. */
@@ -103,8 +123,7 @@ export interface RouteDef {
 }
 
 // ---------------------------------------------------------------------------
-// Role sets - preserved verbatim from the previous Sidebar implementation so
-// that navigation visibility is unchanged for the existing eight surfaces.
+// Role sets - defined for statutory role visibility
 // ---------------------------------------------------------------------------
 
 const ALL_ROLES: UserRole[] = [
@@ -122,13 +141,13 @@ const ALL_ROLES_EXCEPT_REVENUE_INSPECTOR: UserRole[] = ALL_ROLES.filter(
   (role) => role !== 'revenue_inspector'
 );
 
-/** Mirrors the previous `ROLE_AUTHORIZED_DESTINATIONS` entry for `intelligence`. */
-const INTELLIGENCE_ROLES: UserRole[] = ['admin', 'lao', 'approver', 'project_officer'];
-
-/** Mirrors the previous `ROLE_AUTHORIZED_DESTINATIONS` entry for `analytics`. */
-const ANALYTICS_ROLES: UserRole[] = ['admin', 'lao', 'approver'];
-
-/** Mirrors the previous `ROLE_AUTHORIZED_DESTINATIONS` entry for `admin`. */
+const REHAB_PLANS_ROLES: UserRole[] = ['admin', 'lao', 'project_officer', 'approver', 'legal_officer', 'viewer'];
+const AFFECTED_FAMILIES_ROLES: UserRole[] = ['admin', 'lao', 'revenue_inspector', 'project_officer', 'approver', 'viewer'];
+const ANALYTICS_ROLES: UserRole[] = ['admin', 'lao', 'approver', 'project_officer', 'viewer'];
+const REPORTS_ROLES: UserRole[] = ['admin', 'lao', 'project_officer', 'legal_officer', 'approver', 'viewer'];
+const CONNECTORS_ROLES: UserRole[] = ['admin', 'lao', 'project_officer'];
+const GOVERNANCE_ROLES: UserRole[] = ['admin', 'lao', 'approver', 'legal_officer'];
+const AUDIT_TRAIL_ROLES: UserRole[] = ['admin', 'lao', 'legal_officer', 'approver'];
 const ADMIN_ROLES: UserRole[] = ['admin'];
 
 // ---------------------------------------------------------------------------
@@ -152,6 +171,27 @@ const GISSpatialIntelligencePage = React.lazy(() =>
   import('../pages/GISSpatialIntelligencePage').then((m) => ({
     default: m.GISSpatialIntelligencePage,
   }))
+);
+const RehabilitationPlansPage = React.lazy(() =>
+  import('../pages/RehabilitationPlansPage').then((m) => ({ default: m.RehabilitationPlansPage }))
+);
+const AffectedFamiliesPage = React.lazy(() =>
+  import('../pages/AffectedFamiliesPage').then((m) => ({ default: m.AffectedFamiliesPage }))
+);
+const StatutoryReportsPage = React.lazy(() =>
+  import('../pages/StatutoryReportsPage').then((m) => ({ default: m.StatutoryReportsPage }))
+);
+const DocumentVaultPage = React.lazy(() =>
+  import('../pages/DocumentVaultPage').then((m) => ({ default: m.DocumentVaultPage }))
+);
+const AuditTrailPage = React.lazy(() =>
+  import('../pages/AuditTrailPage').then((m) => ({ default: m.AuditTrailPage }))
+);
+const SystemConfigPage = React.lazy(() =>
+  import('../pages/SystemConfigPage').then((m) => ({ default: m.SystemConfigPage }))
+);
+const IntegrationsPage = React.lazy(() =>
+  import('../pages/IntegrationsPage').then((m) => ({ default: m.IntegrationsPage }))
 );
 const IntelligencePage = React.lazy(() =>
   import('../pages/IntelligencePage').then((m) => ({ default: m.IntelligencePage }))
@@ -473,11 +513,14 @@ export const ROUTES: RouteDef[] = [
   },
 
   // -------------------------------------------------------------------------
-  // Authenticated application area (unchanged operational surfaces)
+  // Authenticated application area (Structured into Operations, Rehabilitation, Intelligence, Governance & Audit)
   // -------------------------------------------------------------------------
+  
+  // Section 1: OPERATIONS
   {
     id: 'module.dashboard',
     path: '/dashboard',
+    section: 'operations',
     module: 'dashboard',
     title: 'Operational Dashboard',
     hindiLabel: 'डैशबोर्ड',
@@ -492,6 +535,7 @@ export const ROUTES: RouteDef[] = [
   {
     id: 'module.cases',
     path: '/cases',
+    section: 'operations',
     module: 'cases',
     title: 'Acquisition Cases',
     hindiLabel: 'भू-अर्जन मामले',
@@ -522,6 +566,7 @@ export const ROUTES: RouteDef[] = [
   {
     id: 'module.projects',
     path: '/projects',
+    section: 'operations',
     module: 'projects',
     title: 'Projects Portfolio',
     hindiLabel: 'परियोजनाएं',
@@ -550,6 +595,7 @@ export const ROUTES: RouteDef[] = [
   {
     id: 'module.gis',
     path: '/gis',
+    section: 'operations',
     module: 'gis',
     title: 'GIS & Spatial Cadastre',
     hindiLabel: 'स्थानिक नक्शा',
@@ -561,28 +607,48 @@ export const ROUTES: RouteDef[] = [
     keepAlive: true,
     element: GISSpatialIntelligencePage,
   },
+
+  // Section 2: REHABILITATION
   {
-    // `:view` is optional, so bare `/intelligence` resolves to the default sub-tab.
-    id: 'module.intelligence',
-    path: '/intelligence/:view?',
-    module: 'intelligence',
-    title: 'Cross-Case Intelligence',
-    hindiLabel: 'विश्लेषण केंद्र',
-    breadcrumb: 'Cross-Case Intelligence',
-    description: 'Systemic bottlenecks, root causes & DAG impact',
-    iconKey: 'intelligence',
-    roles: INTELLIGENCE_ROLES,
+    id: 'module.rehab_plans',
+    path: '/rehabilitation/plans',
+    section: 'rehabilitation',
+    module: 'rehab_plans',
+    title: 'Rehabilitation Plans',
+    hindiLabel: 'पुनर्वास योजनाएं',
+    breadcrumb: 'Rehabilitation Plans',
+    description: 'Statutory R&R schemes, resettlement colonies & civic infrastructure',
+    iconKey: 'home',
+    roles: REHAB_PLANS_ROLES,
     nav: true,
     keepAlive: true,
-    element: IntelligencePage,
+    element: RehabilitationPlansPage,
   },
+  {
+    id: 'module.affected_families',
+    path: '/rehabilitation/families',
+    section: 'rehabilitation',
+    module: 'affected_families',
+    title: 'Affected Families',
+    hindiLabel: 'प्रभावित परिवार',
+    breadcrumb: 'Affected Families',
+    description: 'Project-affected families (PAF) census, entitlements & direct disbursement',
+    iconKey: 'users',
+    roles: AFFECTED_FAMILIES_ROLES,
+    nav: true,
+    keepAlive: true,
+    element: AffectedFamiliesPage,
+  },
+
+  // Section 3: INTELLIGENCE
   {
     id: 'module.analytics',
     path: '/analytics/:view?',
+    section: 'intelligence',
     module: 'analytics',
-    title: 'Portfolio Analytics',
-    hindiLabel: 'सांख्यिकी',
-    breadcrumb: 'Portfolio Analytics',
+    title: 'Executive Analytics',
+    hindiLabel: 'कार्यकारी विश्लेषण',
+    breadcrumb: 'Executive Analytics',
     description: 'Trends, geography, SLAs & observed outcomes',
     iconKey: 'analytics',
     roles: ANALYTICS_ROLES,
@@ -591,13 +657,44 @@ export const ROUTES: RouteDef[] = [
     element: AnalyticsPage,
   },
   {
+    id: 'module.reports',
+    path: '/intelligence/reports',
+    section: 'intelligence',
+    module: 'reports',
+    title: 'MIS Statutory Reports',
+    hindiLabel: 'सांविधिक प्रतिवेदन',
+    breadcrumb: 'MIS Statutory Reports',
+    description: 'Form I to IV statutory declarations, Section 30 Solatium registers & CAG audit statements',
+    iconKey: 'reports',
+    roles: REPORTS_ROLES,
+    nav: true,
+    keepAlive: true,
+    element: StatutoryReportsPage,
+  },
+  {
+    id: 'module.vault',
+    path: '/documents',
+    section: 'intelligence',
+    module: 'vault',
+    title: 'Document Vault',
+    hindiLabel: 'दस्तावेज़ संग्रह',
+    breadcrumb: 'Document Vault',
+    description: 'Tamper-evident legal gazettes, 7/12 land records, mutation extracts & OCR entities',
+    iconKey: 'vault',
+    roles: ALL_ROLES,
+    nav: true,
+    keepAlive: true,
+    element: DocumentVaultPage,
+  },
+  {
     id: 'module.notifications',
     path: '/notifications',
+    section: 'intelligence',
     module: 'notifications',
-    title: 'Notification Center',
-    hindiLabel: 'अधिसूचनाएं',
-    breadcrumb: 'Notification Center',
-    description: 'SLA triggers, escalation workflow & audit logs',
+    title: 'Alerts & Critical Tasks',
+    hindiLabel: 'अलर्ट एवं कार्य',
+    breadcrumb: 'Alerts & Critical Tasks',
+    description: 'Statutory deadline triggers, escalation workflow & pending actions',
     iconKey: 'notifications',
     roles: ALL_ROLES,
     nav: true,
@@ -606,26 +703,102 @@ export const ROUTES: RouteDef[] = [
     element: NotificationsPage,
   },
   {
-    // Previously implemented but unreachable (imported by nothing). Registered
-    // here so the surface becomes deep-linkable. Visibility is deliberately
-    // limited to the role that can actually action policy changes, because
-    // `PUT /api/policies/:key` is guarded by requireRole(['admin']) server-side.
+    // Alias / deep-link for Cross-Case Intelligence
+    id: 'module.intelligence',
+    path: '/intelligence/:view?',
+    section: 'intelligence',
+    module: 'intelligence',
+    title: 'Cross-Case Intelligence',
+    hindiLabel: 'विश्लेषण केंद्र',
+    breadcrumb: 'Cross-Case Intelligence',
+    description: 'Systemic bottlenecks, root causes & DAG impact',
+    iconKey: 'intelligence',
+    roles: ['admin', 'lao', 'approver', 'project_officer'],
+    nav: false,
+    keepAlive: true,
+    element: IntelligencePage,
+  },
+
+  // Section 4: GOVERNANCE & AUDIT
+  {
+    id: 'module.connectors',
+    path: '/integrations',
+    section: 'governance',
+    module: 'connectors',
+    title: 'National Connectors',
+    hindiLabel: 'राष्ट्रीय संयोजक',
+    breadcrumb: 'National Connectors',
+    description: 'Live connectivity with ISRO Bhuvan, LGD Geography, Gemini AI & Circle Rate engines',
+    iconKey: 'connectors',
+    roles: CONNECTORS_ROLES,
+    nav: true,
+    keepAlive: false,
+    element: IntegrationsPage,
+  },
+  {
     id: 'module.governance',
     path: '/governance/:view?',
+    section: 'governance',
     module: 'governance',
-    title: 'Governance & Policies',
-    hindiLabel: 'शासन',
-    breadcrumb: 'Governance & Policies',
-    description: 'Operational alerts, escalation actions & configurable policies',
+    title: 'Governance & Compliance',
+    hindiLabel: 'शासन एवं अनुपालन',
+    breadcrumb: 'Governance & Compliance',
+    description: 'Operational alerts, escalation actions & configurable statutory policies',
     iconKey: 'governance',
-    roles: ADMIN_ROLES,
+    roles: GOVERNANCE_ROLES,
     nav: true,
     keepAlive: false,
     element: GovernancePage,
   },
   {
+    id: 'module.audit_trail',
+    path: '/governance/audit-trail',
+    section: 'governance',
+    module: 'audit_trail',
+    title: 'Immutable Audit Trail',
+    hindiLabel: 'अपरिवर्तनीय लेखापरीक्षा',
+    breadcrumb: 'Immutable Audit Trail',
+    description: 'Cryptographically timestamped ledger of all stage advancements, awards & policy adjustments',
+    iconKey: 'audit_trail',
+    roles: AUDIT_TRAIL_ROLES,
+    nav: true,
+    keepAlive: false,
+    element: AuditTrailPage,
+  },
+  {
+    id: 'module.user_directory',
+    path: '/admin/users',
+    section: 'governance',
+    module: 'user_directory',
+    title: 'User Directory & Roles',
+    hindiLabel: 'उपयोगकर्ता निर्देशिका',
+    breadcrumb: 'User Directory & Roles',
+    description: 'Officer access provisioning, role permissions & departmental jurisdiction',
+    iconKey: 'user_directory',
+    roles: ADMIN_ROLES,
+    nav: true,
+    keepAlive: false,
+    element: AdministrationPage,
+  },
+  {
+    id: 'module.system_config',
+    path: '/admin/system',
+    section: 'governance',
+    module: 'system_config',
+    title: 'System Configuration',
+    hindiLabel: 'सिस्टम विन्यास',
+    breadcrumb: 'System Configuration',
+    description: 'National tile providers, SLA timers, database replication & fallback parameters',
+    iconKey: 'system_config',
+    roles: ADMIN_ROLES,
+    nav: true,
+    keepAlive: false,
+    element: SystemConfigPage,
+  },
+  {
     id: 'module.admin',
     path: '/admin/:section?',
+    section: 'governance',
     module: 'admin',
     title: 'Administration',
     hindiLabel: 'प्रशासन',
@@ -633,13 +806,12 @@ export const ROUTES: RouteDef[] = [
     description: 'Users, policies, workflow engines & integration registry',
     iconKey: 'admin',
     roles: ADMIN_ROLES,
-    nav: true,
+    nav: false,
     keepAlive: false,
     element: AdministrationPage,
   },
   {
-    // Terminal catch-all. `comparePatternScore` always ranks a wildcard below
-    // any specific pattern, so table position is belt-and-braces only.
+    // Terminal catch-all.
     id: 'system.notFound',
     path: '*',
     module: null,
@@ -664,6 +836,7 @@ export const ROUTE_REDIRECTS: Record<string, string> = {
   // Spec'd aliases for the authentication surfaces.
   '/sign-in': '/login',
   '/account-activation': '/activate-account',
+  '/rehabilitation': '/rehabilitation/plans',
 };
 
 /** Returns the canonical target for a redirect path, or `null` when none applies. */
@@ -710,6 +883,31 @@ export function navRoutesForRole(role: UserRole): RouteDef[] {
   }));
 }
 
+export interface NavSectionDef {
+  id: NavSection;
+  title: string;
+  items: RouteDef[];
+}
+
+/** Grouped navigation sections with role-filtered destinations. */
+export function navSectionsForRole(role: UserRole): NavSectionDef[] {
+  const routes = navRoutesForRole(role);
+  const sections: { id: NavSection; title: string }[] = [
+    { id: 'operations', title: 'Operations' },
+    { id: 'rehabilitation', title: 'Rehabilitation' },
+    { id: 'intelligence', title: 'Intelligence' },
+    { id: 'governance', title: 'Governance & Audit' },
+  ];
+
+  return sections
+    .map((sec) => ({
+      id: sec.id,
+      title: sec.title,
+      items: routes.filter((r) => (r.section || 'operations') === sec.id),
+    }))
+    .filter((sec) => sec.items.length > 0);
+}
+
 /** Header destinations for the public website, in registry order. */
 export function publicNavRoutes(): RouteDef[] {
   return ROUTES.filter((route) => route.area === 'public' && route.publicNav === true).map(
@@ -732,5 +930,6 @@ export function routeArea(route: RouteDef): RouteArea {
 export function isRouteVisibleToRole(route: RouteDef, role: UserRole): boolean {
   return route.roles.includes(role);
 }
+
 
 
