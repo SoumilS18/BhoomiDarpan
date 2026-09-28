@@ -23,9 +23,9 @@ import { AuditTrailEvent, AuditSeverity } from '../../shared/types';
 import { fetchAuditTrail, createAuditEvent } from '../lib/api';
 
 const SEVERITY_BADGES: Record<AuditSeverity, { label: string; bg: string; text: string; border: string }> = {
-  info: { label: 'Operational Event', bg: 'bg-sand-100', text: 'text-mocha-800', border: 'border-sand-300' },
-  warning: { label: 'Policy / Parameter Change', bg: 'bg-amber-50', text: 'text-amber-800', border: 'border-amber-300' },
-  critical: { label: 'Statutory Action / Override', bg: 'bg-rose-50', text: 'text-rose-800', border: 'border-rose-300' },
+  info: { label: 'Operational Event', bg: 'bg-emerald-50 text-emerald-800 border-emerald-300', text: '', border: '' },
+  warning: { label: 'Policy / Parameter Change', bg: 'bg-amber-50 text-amber-800 border-amber-300', text: '', border: '' },
+  critical: { label: 'Statutory Action / Override', bg: 'bg-rose-50 text-rose-800 border-rose-300', text: '', border: '' },
 };
 
 export const AuditTrailPage: React.FC = () => {
@@ -35,6 +35,7 @@ export const AuditTrailPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [entityFilter, setEntityFilter] = useState<string>('all');
+  const [copiedHashId, setCopiedHashId] = useState<string | null>(null);
 
   // Add Observation Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -49,6 +50,12 @@ export const AuditTrailPage: React.FC = () => {
     statutory_ref: 'RFCTLARR Act 2013 Section 15(2)',
     changes_summary: '',
   });
+
+  const handleCopyHash = (id: string, hash: string) => {
+    navigator.clipboard.writeText(hash);
+    setCopiedHashId(id);
+    setTimeout(() => setCopiedHashId(null), 2000);
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -154,7 +161,7 @@ export const AuditTrailPage: React.FC = () => {
       />
 
       {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3 rounded-xl border border-sand-200 shadow-2xs">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-sand-200 shadow-2xs">
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
           <input
@@ -171,7 +178,7 @@ export const AuditTrailPage: React.FC = () => {
           <select
             value={severityFilter}
             onChange={(e) => setSeverityFilter(e.target.value)}
-            className="text-xs rounded-lg border border-sand-300 px-3 py-1.5 bg-white text-mocha-800 focus:ring-2 focus:ring-terra-600"
+            className="text-xs rounded-lg border border-sand-300 px-3 py-1.5 bg-white text-mocha-800 focus:ring-2 focus:ring-terra-600 font-medium"
           >
             <option value="all">All Severity Levels</option>
             <option value="info">Operational Events (Info)</option>
@@ -182,7 +189,7 @@ export const AuditTrailPage: React.FC = () => {
           <select
             value={entityFilter}
             onChange={(e) => setEntityFilter(e.target.value)}
-            className="text-xs rounded-lg border border-sand-300 px-3 py-1.5 bg-white text-mocha-800 focus:ring-2 focus:ring-terra-600"
+            className="text-xs rounded-lg border border-sand-300 px-3 py-1.5 bg-white text-mocha-800 focus:ring-2 focus:ring-terra-600 font-medium"
           >
             <option value="all">All Entity Domains</option>
             <option value="case">Acquisition Cases</option>
@@ -195,66 +202,97 @@ export const AuditTrailPage: React.FC = () => {
       </div>
 
       {/* Event Stream */}
-      <div className="space-y-3">
+      <div className="space-y-3.5">
         {events.length > 0 ? (
           events.map((ev) => {
             const sevMeta = SEVERITY_BADGES[ev.severity] || SEVERITY_BADGES.info;
 
             return (
-              <Card key={ev.id} className="p-4.5 hover:border-sand-400 transition-all border-sand-200">
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                  <div className="space-y-1.5 flex-1 min-w-0">
+              <Card key={ev.id} className="p-4.5 hover:border-terra-300 hover:shadow-md transition-all border-sand-200 bg-[#FFFDF9]/95">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                  <div className="space-y-2 flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-terra-800 bg-sand-100 px-2 py-0.5 rounded border border-sand-200">
+                      <span className="font-mono text-xs font-bold text-terra-900 bg-sand-100/90 px-2 py-0.5 rounded border border-sand-300 shadow-2xs">
                         #{ev.sequence_id}
                       </span>
-                      <span className="font-bold text-xs text-mocha-900 tracking-tight">
+                      <h4 className="font-bold text-xs sm:text-sm text-mocha-950 tracking-tight">
                         {ev.action.replace(/_/g, ' ')}
-                      </span>
-                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${sevMeta.bg} ${sevMeta.text} ${sevMeta.border}`}>
+                      </h4>
+                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${sevMeta.bg}`}>
                         {sevMeta.label}
                       </span>
                     </div>
 
                     {ev.entity_title && (
-                      <p className="text-xs font-semibold text-mocha-800">
-                        Entity: <span className="text-terra-900">{ev.entity_title}</span> ({ev.entity_type})
-                      </p>
+                      <div className="text-xs text-mocha-800">
+                        <span className="text-mocha-500 font-medium">Entity:</span>{' '}
+                        <strong className="text-mocha-950 font-bold">{ev.entity_title}</strong>{' '}
+                        <span className="text-terra-800 text-[10px] uppercase font-bold bg-sand-100 px-1.5 py-0.5 rounded border border-sand-200">
+                          {ev.entity_type}
+                        </span>
+                      </div>
                     )}
 
                     {ev.changes_summary && (
-                      <p className="text-xs text-mocha-600 leading-relaxed max-w-4xl">
+                      <p className="text-xs text-mocha-700 leading-relaxed max-w-4xl bg-sand-50/60 p-2.5 rounded-lg border border-sand-200/70">
                         {ev.changes_summary}
                       </p>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-4 text-[11px] text-mocha-500 pt-1 font-mono">
-                      <span>Actor: <strong className="text-mocha-800 font-sans">{ev.actor_name}</strong> ({ev.actor_email})</span>
-                      <span>Role: <strong className="uppercase text-terra-800 font-sans">{ev.actor_role}</strong></span>
+                    {/* Officer & Statutory Reference Metadata */}
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-mocha-600 pt-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <User className="h-3.5 w-3.5 text-mocha-400" />
+                        <span>Actor: <strong className="text-mocha-900 font-semibold">{ev.actor_name}</strong> <span className="text-mocha-400 font-mono text-[11px]">({ev.actor_email})</span></span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-mocha-400">Role:</span>
+                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold uppercase tracking-wider bg-terra-50 text-terra-800 border border-terra-200">
+                          {ev.actor_role}
+                        </span>
+                      </div>
                       {ev.statutory_ref && (
-                        <span>Statutory Ref: <strong className="text-mocha-700 font-sans">{ev.statutory_ref}</strong></span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-mocha-400">Statutory Ref:</span>
+                          <span className="font-semibold text-mocha-800 bg-sand-100/80 px-2 py-0.5 rounded text-[11px] border border-sand-200">{ev.statutory_ref}</span>
+                        </div>
                       )}
                     </div>
 
                     {/* Cryptographic SHA-256 Hash */}
-                    <div className="pt-2 border-t border-sand-100 flex items-center gap-2">
-                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                      <span className="text-[10px] text-mocha-400 font-mono truncate">
-                        Hash Signature: <strong className="text-mocha-700">{ev.hash_signature}</strong>
-                      </span>
+                    <div className="pt-2 border-t border-sand-100 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        <span className="text-[11px] text-mocha-500 font-medium shrink-0">SHA-256 Hash:</span>
+                        <span className="font-mono text-[11px] text-mocha-700 bg-sand-100/90 px-2 py-0.5 rounded border border-sand-200/80 truncate max-w-xl select-all">
+                          {ev.hash_signature}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyHash(ev.id, ev.hash_signature)}
+                        className="text-[10px] font-semibold text-terra-700 hover:text-terra-900 bg-sand-100/60 hover:bg-sand-200/60 px-2 py-0.5 rounded border border-sand-300 transition-colors shrink-0 cursor-pointer"
+                      >
+                        {copiedHashId === ev.id ? 'Copied!' : 'Copy Hash'}
+                      </button>
                     </div>
                   </div>
 
-                  <div className="text-right shrink-0">
-                    <div className="text-xs font-bold text-mocha-800">
+                  <div className="text-right shrink-0 min-w-[110px] pl-3 sm:border-l sm:border-sand-100">
+                    <div className="text-xs font-bold text-mocha-900 whitespace-nowrap">
                       {new Date(ev.timestamp).toLocaleDateString('en-IN', {
                         day: '2-digit',
                         month: 'short',
                         year: 'numeric',
                       })}
                     </div>
-                    <div className="text-[10px] text-mocha-500 font-mono mt-0.5">
-                      {new Date(ev.timestamp).toLocaleTimeString('en-IN')}
+                    <div className="text-[11px] text-mocha-500 font-mono mt-0.5 whitespace-nowrap">
+                      {new Date(ev.timestamp).toLocaleTimeString('en-IN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: true,
+                      })}
                     </div>
                   </div>
                 </div>

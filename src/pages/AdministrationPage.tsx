@@ -375,19 +375,19 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
                   Loading officer directory...
                 </div>
               ) : (
-                <div className="overflow-x-auto border border-sand-200 rounded-lg">
-                  <table className="table-shell">
+                <div className="border border-sand-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                  <table className="w-full text-left text-xs divide-y divide-sand-200 table-fixed">
                     <thead>
-                      <tr>
-                        <th>Officer Name</th>
-                        <th>Email / Account</th>
-                        <th>Department &amp; Organization</th>
-                        <th>Role Assigned</th>
-                        <th>Jurisdiction</th>
-                        <th className="text-right">Actions</th>
+                      <tr className="bg-sand-100/80 text-mocha-700 font-semibold uppercase tracking-wider text-[11px]">
+                        <th className="py-3 px-3.5 w-[22%]">Officer Name</th>
+                        <th className="py-3 px-3.5 w-[24%]">Email / Account</th>
+                        <th className="py-3 px-3.5 w-[20%]">Department &amp; Org</th>
+                        <th className="py-3 px-3.5 w-[14%]">Role Assigned</th>
+                        <th className="py-3 px-3.5 w-[10%]">Jurisdiction</th>
+                        <th className="py-3 px-3.5 w-[10%] text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-sand-100 bg-white">
                       {usersList
                         .filter((u) => {
                           if (!userSearch.trim()) return true;
@@ -402,35 +402,47 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
                         .map((u) => {
                           const isCurrentUser = session && session.userId === u.id;
                           return (
-                            <tr key={u.id}>
-                              <td className="font-semibold text-gov-slate">
-                                <div className="flex items-center gap-2">
-                                  <span className="h-6 w-6 rounded-full bg-terra-100 text-terra-800 font-bold flex items-center justify-center text-[10px]">
+                            <tr key={u.id} className="hover:bg-sand-50/70 transition-colors">
+                              <td className="py-2.5 px-3.5 font-semibold text-mocha-900">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="h-6 w-6 rounded-full bg-terra-100 text-terra-800 font-bold flex items-center justify-center text-[10px] shrink-0">
                                     {u.full_name ? u.full_name.charAt(0).toUpperCase() : 'U'}
                                   </span>
-                                  <span>{u.full_name || 'Unnamed Officer'}</span>
+                                  <span className="truncate max-w-[140px]" title={u.full_name || 'Unnamed Officer'}>
+                                    {u.full_name || 'Unnamed Officer'}
+                                  </span>
                                   {isCurrentUser && (
-                                    <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold border border-emerald-200">
+                                    <span className="text-[9px] text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-bold border border-emerald-200 shrink-0">
                                       You
                                     </span>
                                   )}
                                 </div>
                               </td>
-                              <td className="font-mono text-[11px] text-mocha-700">{u.email}</td>
-                              <td className="text-mocha-600">{u.department || '—'}</td>
-                              <td>
+                              <td className="py-2.5 px-3.5 font-mono text-[11px] text-mocha-700">
+                                <span className="truncate block" title={u.email}>
+                                  {u.email}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3.5 text-mocha-600">
+                                <span className="truncate block text-[11px]" title={u.department || '—'}>
+                                  {u.department || '—'}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3.5">
                                 <Badge variant={u.role === 'admin' ? 'red' : u.role === 'lao' ? 'amber' : 'navy'}>
                                   {ROLE_LABELS[u.role as UserRole] || u.role}
                                 </Badge>
                               </td>
-                              <td className="text-mocha-600 text-[11px]">
-                                {u.jurisdiction_district_lgd_code
-                                  ? `District LGD: ${u.jurisdiction_district_lgd_code}`
-                                  : u.jurisdiction_state_lgd_code
-                                  ? `State LGD: ${u.jurisdiction_state_lgd_code}`
-                                  : 'National Scope'}
+                              <td className="py-2.5 px-3.5 text-mocha-600 text-[11px]">
+                                <span className="truncate block" title={u.jurisdiction_district_lgd_code ? `District: ${u.jurisdiction_district_lgd_code}` : u.jurisdiction_state_lgd_code ? `State: ${u.jurisdiction_state_lgd_code}` : 'National Scope'}>
+                                  {u.jurisdiction_district_lgd_code
+                                    ? `District: ${u.jurisdiction_district_lgd_code}`
+                                    : u.jurisdiction_state_lgd_code
+                                    ? `State: ${u.jurisdiction_state_lgd_code}`
+                                    : 'National Scope'}
+                                </span>
                               </td>
-                              <td className="text-right">
+                              <td className="py-2.5 px-3.5 text-right whitespace-nowrap">
                                 {isCurrentUser ? (
                                   <span className="text-[10px] text-slate-400 italic">Self-protected</span>
                                 ) : (
