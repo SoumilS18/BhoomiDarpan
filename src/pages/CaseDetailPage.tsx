@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchCaseById, fetchCaseIntelligence, deleteCase } from '../lib/api';
+import { fetchCaseById, fetchCaseIntelligence, deleteCase, createAuditEvent } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { AcquisitionCase, CaseStageInstance, CaseIntelligenceBundle } from '../../shared/types';
 import { Button } from '../components/common/Button';
@@ -114,6 +114,39 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeletingCase, setIsDeletingCase] = useState(false);
   const [deleteCaseError, setDeleteCaseError] = useState<string | null>(null);
+
+  // Case Audit Observation Modal State
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [auditAction, setAuditAction] = useState('STATUTORY_FIELD_INSPECTION_RECORDED');
+  const [auditSummary, setAuditSummary] = useState('');
+  const [auditSeverity, setAuditSeverity] = useState<'info' | 'warning' | 'critical'>('info');
+  const [isSubmittingAudit, setIsSubmittingAudit] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+
+  const handleRecordAudit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!auditSummary.trim() || !caseItem) return;
+    setIsSubmittingAudit(true);
+    setAuditError(null);
+    try {
+      await createAuditEvent({
+        action: auditAction,
+        entity_type: 'case',
+        entity_id: caseItem.id,
+        entity_title: caseItem.title,
+        severity: auditSeverity,
+        statutory_ref: caseItem.case_number ? `Case ${caseItem.case_number}` : 'Statutory Case Ledger',
+        changes_summary: auditSummary.trim(),
+      });
+      setShowAuditModal(false);
+      setAuditSummary('');
+      loadCaseDetails();
+    } catch (err: any) {
+      setAuditError(err.message || 'Failed to record audit observation');
+    } finally {
+      setIsSubmittingAudit(false);
+    }
+  };
 
   const handleDeleteCase = async () => {
     if (!caseItem) return;
@@ -695,6 +728,16 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
           <CardHeader
             title="Statutory Chronological Audit & Event Ledger"
             subtitle="Immutable record of administrative decisions, stage updates, document verifications, and disputes"
+            action={
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAuditModal(true)}
+                leftIcon={<Plus className="h-3.5 w-3.5" />}
+              >
+                Log Audit Observation
+              </Button>
+            }
           />
           <CardContent>
             {caseItem.audit_logs && caseItem.audit_logs.length > 0 ? (
@@ -818,6 +861,98 @@ export const CaseDetailPage: React.FC<CaseDetailPageProps> = ({
                 Confirm Delete Case
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Case Audit Observation Modal */}
+      {showAuditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white rounded-xl max-w-lg w-full p-5 shadow-2xl border border-slate-200 space-y-4 my-8">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <History className="h-4 w-4 text-gov-navy" />
+                  Log Audit &amp; Inspection Observation
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Append an entry to the immutable statutory audit trail for {caseItem?.case_number}.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAuditModal(false)}
+                className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {auditError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-800">
+                {auditError}
+              </div>
+            )}
+
+            <form onSubmit={handleRecordAudit} className="space-y-3.5 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Observation Type</label>
+                <select
+                  value={auditAction}
+                  onChange={(e) => setAuditAction(e.target.value)}
+                  className="w-full text-xs rounded-lg border border-slate-300 px-3 py-2 bg-white text-slate-900 focus:ring-2 focus:ring-gov-navy"
+                >
+                  <option value="STATUTORY_FIELD_INSPECTION_RECORDED">Statutory Field Inspection Recorded</option>
+                  <option value="SECTION_15_HEARING_MINUTES_FILED">Section 15 Hearing Minutes Filed</option>
+                  <option value="COMPLIANCE_VERIFICATION_COMPLETED">Compliance Verification Completed</option>
+                  <option value="VALUATION_CROSS_VERIFICATION">Collector Valuation Cross-Verification</option>
+                  <option value="CADASTRAL_DISPUTE_RECONCILIATION">Cadastral Dispute Reconciliation</option>
+                  <option value="ADMINISTRATIVE_REMARKS_LOGGED">Administrative Officer Remarks</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Severity Level</label>
+                <select
+                  value={auditSeverity}
+                  onChange={(e) => setAuditSeverity(e.target.value as any)}
+                  className="w-full text-xs rounded-lg border border-slate-300 px-3 py-2 bg-white text-slate-900 focus:ring-2 focus:ring-gov-navy"
+                >
+                  <option value="info">Operational / Routine (Info)</option>
+                  <option value="warning">Policy Warning (Requires Review)</option>
+                  <option value="critical">Statutory Action / Judicial (Critical)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Observation &amp; Inspection Details *</label>
+                <textarea
+                  required
+                  rows={3}
+                  placeholder="Enter hearing proceedings, field measurement confirmation, or compliance remarks..."
+                  value={auditSummary}
+                  onChange={(e) => setAuditSummary(e.target.value)}
+                  className="w-full text-xs rounded-lg border border-slate-300 px-3 py-2 bg-slate-50/50 text-slate-900 focus:bg-white focus:ring-2 focus:ring-gov-navy leading-relaxed"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAuditModal(false)}
+                  disabled={isSubmittingAudit}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  type="submit"
+                  isLoading={isSubmittingAudit}
+                >
+                  Sign &amp; Record to Ledger
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -7,6 +7,7 @@ import { extractDocumentIntelligence } from '../services/documentExtractor';
 import { logCaseEvent } from '../services/auditLogger';
 import { DocumentStatus } from '../../shared/types';
 import { requireAuth, requireRole } from '../middleware/auth.middleware';
+import { addVaultDocument } from '../services/vaultService';
 
 const router = Router();
 
@@ -125,6 +126,28 @@ router.post('/cases/:id/documents', requireAuth, requireRole(['admin', 'project_
         mime_type: mimeType,
         file_size_bytes: fileSizeBytes,
       },
+    });
+
+    // Also index into Document Vault
+    await addVaultDocument({
+      case_id: typeof caseId === 'string' ? caseId : (caseId as any)[0],
+      title,
+      category: (document_type.toLowerCase().includes('gazette')
+        ? 'gazette_notification'
+        : document_type.toLowerCase().includes('7_12') || document_type.toLowerCase().includes('land')
+        ? 'land_record_7_12'
+        : document_type.toLowerCase().includes('sia')
+        ? 'sia_report'
+        : document_type.toLowerCase().includes('court')
+        ? 'court_order'
+        : document_type.toLowerCase().includes('rr') || document_type.toLowerCase().includes('rehab')
+        ? 'rr_scheme'
+        : 'valuation_certificate') as any,
+      file_name: req.file?.originalname || `${title}.pdf`,
+      file_size_bytes: fileSizeBytes,
+      mime_type: mimeType,
+      storage_url: fileUrl,
+      uploaded_by: actorName || 'Officer',
     });
 
     res.status(201).json({ document: docRecord });

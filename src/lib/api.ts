@@ -2265,6 +2265,20 @@ export async function fetchDocumentVaultStats(): Promise<DocumentVaultStats> {
   return data.stats;
 }
 
+export async function createVaultDocument(doc: Partial<VaultDocument>): Promise<VaultDocument> {
+  const res = await fetch(`${API_BASE}/vault`, {
+    method: 'POST',
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(doc),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to upload document to vault (${res.status})`);
+  }
+  const data = await res.json();
+  return data.document;
+}
+
 // ============================================================================
 // IMMUTABLE AUDIT TRAIL API METHODS
 // ============================================================================
@@ -2288,6 +2302,28 @@ export async function fetchAuditTrail(params?: AuditTrailFilterParams): Promise<
     throw new Error(err.error || `Failed to fetch audit trail (${res.status})`);
   }
   return res.json();
+}
+
+export async function createAuditEvent(event: {
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  entity_title?: string;
+  severity?: 'info' | 'warning' | 'critical';
+  statutory_ref?: string;
+  changes_summary?: string;
+}): Promise<AuditTrailEvent> {
+  const res = await fetch(`${API_BASE}/audit-trail`, {
+    method: 'POST',
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(event),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `Failed to record audit observation (${res.status})`);
+  }
+  const data = await res.json();
+  return data.event;
 }
 
 

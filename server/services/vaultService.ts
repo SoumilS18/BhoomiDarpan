@@ -185,3 +185,29 @@ export async function getDocumentVaultStats(): Promise<DocumentVaultStats> {
     storage_total_bytes: totalBytes,
   };
 }
+
+export async function addVaultDocument(doc: Partial<VaultDocument>): Promise<VaultDocument> {
+  const newDoc: VaultDocument = {
+    id: doc.id || `doc-v-${Date.now()}`,
+    case_id: doc.case_id,
+    case_number: doc.case_number,
+    project_id: doc.project_id,
+    project_name: doc.project_name,
+    title: doc.title || 'Untitled Document',
+    category: doc.category || 'gazette_notification',
+    file_name: doc.file_name || 'document.pdf',
+    file_size_bytes: doc.file_size_bytes || 1024 * 1024,
+    mime_type: doc.mime_type || 'application/pdf',
+    storage_url: doc.storage_url || `/storage/vault/${doc.file_name || 'document.pdf'}`,
+    ocr_extracted: doc.ocr_extracted ?? true,
+    ocr_confidence: doc.ocr_confidence ?? 98.0,
+    extracted_entities: doc.extracted_entities || {},
+    sha256_hash: doc.sha256_hash || `hash-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+    verification_status: doc.verification_status || 'verified',
+    uploaded_by: doc.uploaded_by || 'officer@bhoomidarpan.gov.in',
+    uploaded_at: new Date().toISOString(),
+  };
+
+  mockVaultDocuments.unshift(newDoc);
+  return newDoc;
+}

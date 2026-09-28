@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { requireAuth } from '../middleware/auth.middleware';
-import { getAuditTrailEvents } from '../services/auditService';
+import { getAuditTrailEvents, logAuditEvent } from '../services/auditService';
 
 const router = Router();
 
@@ -21,6 +21,32 @@ router.get('/audit-trail', requireAuth, async (req: Request, res: Response) => {
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to fetch audit trail events' });
+  }
+});
+
+router.post('/audit-trail', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { action, entity_type, entity_id, entity_title, severity, statutory_ref, changes_summary } = req.body;
+    if (!action || !entity_type || !entity_id) {
+      return res.status(400).json({ error: 'action, entity_type, and entity_id are required' });
+    }
+
+    const newEvent = await logAuditEvent({
+      action,
+      entity_type,
+      entity_id,
+      entity_title: entity_title || entity_id,
+      severity: severity || 'info',
+      statutory_ref: statutory_ref || 'Official Administrative Record',
+      changes_summary: changes_summary || 'Inspection observation recorded.',
+      actor_name: req.user?.full_name || 'Authorized Officer',
+      actor_email: req.user?.email || 'officer@bhoomidarpan.gov.in',
+      actor_role: req.user?.role || 'lao',
+    });
+
+    res.status(201).json({ event: newEvent });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Failed to record audit observation' });
   }
 });
 
