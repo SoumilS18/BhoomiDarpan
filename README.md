@@ -1,13 +1,13 @@
-# BhoomiSetu (भूमिसेतु)
+# BhoomiDarpan (भूमिदर्पण)
 ### Statutory Land Acquisition Monitoring, Spatial Decision Intelligence & Inter-Agency Coordination Platform
 
-BhoomiSetu is a modern government enterprise platform designed for transparent, data-driven statutory land acquisition (under the **RFCTLARR Act 2013**, NHAI Act, and State Land Policies). It unifies cadastral GIS demarcation, legal document intelligence, dynamic workflow state machines, and predictive risk analytics with zero domain hardcoding.
+BhoomiDarpan is a modern government enterprise platform designed for transparent, data-driven statutory land acquisition (under the **RFCTLARR Act 2013**, NHAI Act, and State Land Policies). It unifies cadastral GIS demarcation, legal document intelligence, dynamic workflow state machines, and predictive risk analytics with zero domain hardcoding.
 
 ---
 
 ## 1. System Architecture & Foundation (Day 1)
 
-Day 1 establishes the **Real Data + Integration Foundation** of BhoomiSetu:
+Day 1 establishes the **Real Data + Integration Foundation** of BhoomiDarpan:
 - **Canonical Database Migrations**: 6 sequential numbered SQL migrations governing the entire PostgreSQL schema.
 - **Provider-Independent Data Source Registry**: Tracks external adapters (Database, AI, Geocoding, Administrative Data) and reports live operational telemetry without storing secrets in the database.
 - **Universal Data Provenance Ledger**: Categorizes data origins (`USER_ENTERED`, `DATABASE_DERIVED`, `EXTERNALLY_SOURCED`, `AI_EXTRACTED`, `AI_GENERATED_ASSISTED`, `SYSTEM_CALCULATED`) with human officer verification trails.
@@ -21,7 +21,7 @@ Day 1 establishes the **Real Data + Integration Foundation** of BhoomiSetu:
 
 ## 2. Environment Configuration
 
-All credentials are configured in `BhoomiSetu/.env`. **Never commit `.env` to Git.** Both root and project `.gitignore` protect local secrets.
+All credentials are configured in `BhoomiDarpan/.env`. **Never commit `.env` to Git.** Both root and project `.gitignore` protect local secrets.
 
 ### Variable Reference & Security Boundary
 

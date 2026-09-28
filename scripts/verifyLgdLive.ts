@@ -21,7 +21,7 @@ if (fs.existsSync(envPath)) {
 
 async function runLiveVerification() {
   console.log('================================================================');
-  console.log('BhoomiSetu Live LGD data.gov.in Integration Verification');
+  console.log('BhoomiDarpan Live LGD data.gov.in Integration Verification');
   console.log('================================================================\n');
 
   const config = getLgdServerConfig();

@@ -1,5 +1,5 @@
 -- ============================================================================
--- BHOOMISETU MIGRATION: 20260920000003_day3_intelligence.sql
+-- BHOOMIDARPAN MIGRATION: 20260920000003_day3_intelligence.sql
 -- Day 3: Core Intelligence, Bottlenecks, and Action Recommendations
 -- ============================================================================
 

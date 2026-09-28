@@ -205,7 +205,7 @@ export class CopernicusCdseProvider implements ISatelliteMetadataProvider {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/geo+json,application/json',
-          'User-Agent': 'BhoomiSetu-LandAcquisition/1.0',
+          'User-Agent': 'BhoomiDarpan-LandAcquisition/1.0',
         },
         body: JSON.stringify(payload),
         signal: controller.signal,

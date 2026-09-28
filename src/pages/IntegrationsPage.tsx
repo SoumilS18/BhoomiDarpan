@@ -682,7 +682,7 @@ export const IntegrationsPage: React.FC = () => {
           <span>Statutory Data Provenance Governance</span>
         </h3>
         <p className="text-slate-600 leading-relaxed">
-          Every field, parcel boundary, and statutory notice in BhoomiSetu carries an unforgeable origin classification to maintain judicial integrity under RFCTLARR 2013.
+          Every field, parcel boundary, and statutory notice in BhoomiDarpan carries an unforgeable origin classification to maintain judicial integrity under RFCTLARR 2013.
         </p>
         <div className="flex flex-wrap gap-3 pt-2">
           <ProvenanceBadge type="USER_ENTERED" />

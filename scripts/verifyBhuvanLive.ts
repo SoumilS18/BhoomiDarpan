@@ -1,5 +1,5 @@
 /**
- * BhoomiSetu - Controlled Live ISRO Bhuvan Geospatial Services Verification
+ * BhoomiDarpan - Controlled Live ISRO Bhuvan Geospatial Services Verification
  * 
  * Performs focused live verification pass across all Indian administrative jurisdictions
  * strictly testing:
@@ -50,7 +50,7 @@ async function verifyTileRequest(layerName: string, workspace: string): Promise<
 }> {
   const url = `https://bhuvan-vec2.nrsc.gov.in/bhuvan/${workspace}/wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=${encodeURIComponent(layerName)}&STYLES=&SRS=EPSG:4326&BBOX=77.0,20.0,77.1,20.1&WIDTH=64&HEIGHT=64&FORMAT=image/png&TRANSPARENT=TRUE`;
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'BhoomiSetu-LiveVerifier/1.0' }, signal: AbortSignal.timeout(8000) });
+    const res = await fetch(url, { headers: { 'User-Agent': 'BhoomiDarpan-LiveVerifier/1.0' }, signal: AbortSignal.timeout(8000) });
     const contentType = res.headers.get('content-type') || '';
     const buf = await res.arrayBuffer();
     const bytes = new Uint8Array(buf);
@@ -82,7 +82,7 @@ async function verifyTileRequest(layerName: string, workspace: string): Promise<
 
 async function runLiveVerification() {
   console.log('================================================================================');
-  console.log('BhoomiSetu Live ISRO Bhuvan OGC WMS Verification & Coverage Audit');
+  console.log('BhoomiDarpan Live ISRO Bhuvan OGC WMS Verification & Coverage Audit');
   console.log('================================================================================\n');
 
   console.log('1. Configuration & Security Baseline:');

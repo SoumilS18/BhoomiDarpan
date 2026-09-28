@@ -35,7 +35,7 @@ export const TermsPage: React.FC = () => {
       <PageHero
         metaKey="terms"
         eyebrow="Terms of Use"
-        lead="Conditions that apply when accessing and using the BhoomiSetu platform."
+        lead="Conditions that apply when accessing and using the BhoomiDarpan platform."
       />
 
       <PublicProseContainer>
@@ -55,7 +55,7 @@ export const TermsPage: React.FC = () => {
             <div>
               <h2 className="text-sm font-semibold">Decision-support disclaimer</h2>
               <p className="mt-1.5 text-sm leading-relaxed">
-                BhoomiSetu is a decision-support system. Its predictions, risk assessments,
+                BhoomiDarpan is a decision-support system. Its predictions, risk assessments,
                 bottleneck analyses, root-cause classifications and recommendations are{' '}
                 <strong>estimates and proposals generated from the data available to it</strong>.
                 They do not automatically replace authorised human, legal or administrative
@@ -68,7 +68,7 @@ export const TermsPage: React.FC = () => {
 
         <LegalSection index={1} heading="Acceptable use">
           <P>
-            You may use BhoomiSetu only for lawful work related to land acquisition, revenue,
+            You may use BhoomiDarpan only for lawful work related to land acquisition, revenue,
             project management, legal review or the administration of the platform itself.
           </P>
           <LegalUl
@@ -107,7 +107,7 @@ export const TermsPage: React.FC = () => {
 
         <LegalSection index={4} heading="Data accuracy">
           <P>
-            BhoomiSetu records and analyses the information entered into it. It does not independently
+            BhoomiDarpan records and analyses the information entered into it. It does not independently
             verify that an entered measurement, date, name or boundary is factually correct.
           </P>
           <LegalUl
@@ -227,7 +227,7 @@ export const TermsPage: React.FC = () => {
 
         <LegalSection index={14} heading="Intellectual property">
           <P>
-            The BhoomiSetu application, its interface and its source are software owned by the
+            The BhoomiDarpan application, its interface and its source are software owned by the
             project and its contributors. Institutional case data, documents and spatial records
             entered into the platform remain the property of the deploying organisation.
           </P>

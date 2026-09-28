@@ -118,14 +118,14 @@ export async function executeMigrationsViaPg(connectionString: string): Promise<
 
     // Ensure migration history table exists
     await client.query(`
-      CREATE TABLE IF NOT EXISTS _bhoomisetu_migrations (
+      CREATE TABLE IF NOT EXISTS _bhoomidarpan_migrations (
         id SERIAL PRIMARY KEY,
         filename TEXT NOT NULL UNIQUE,
         applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
 
-    const { rows: appliedRows } = await client.query('SELECT filename FROM _bhoomisetu_migrations;');
+    const { rows: appliedRows } = await client.query('SELECT filename FROM _bhoomidarpan_migrations;');
     const alreadyApplied = new Set(appliedRows.map((r: any) => r.filename));
 
     const files = getMigrationFiles();
@@ -142,7 +142,7 @@ export async function executeMigrationsViaPg(connectionString: string): Promise<
       await client.query('BEGIN');
       try {
         await client.query(sql);
-        await client.query('INSERT INTO _bhoomisetu_migrations (filename) VALUES ($1);', [file.filename]);
+        await client.query('INSERT INTO _bhoomidarpan_migrations (filename) VALUES ($1);', [file.filename]);
         await client.query('COMMIT');
         applied.push(file.filename);
         console.log(`  ✅ Successfully applied: ${file.filename}`);
@@ -163,7 +163,7 @@ export async function executeMigrationsViaPg(connectionString: string): Promise<
 
 async function main() {
   console.log('===========================================================');
-  console.log('  BhoomiSetu Canonical Database Migration & Schema Tool');
+  console.log('  BhoomiDarpan Canonical Database Migration & Schema Tool');
   console.log('===========================================================\n');
 
   const files = getMigrationFiles();

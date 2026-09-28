@@ -1,5 +1,5 @@
 -- ============================================================================
--- BHOOMISETU MIGRATION: 20260920000004_day4_portfolio_operations.sql
+-- BHOOMIDARPAN MIGRATION: 20260920000004_day4_portfolio_operations.sql
 -- Day 4: Portfolio Operations, Attention Queue, and Bottleneck Aggregations
 -- ============================================================================
 

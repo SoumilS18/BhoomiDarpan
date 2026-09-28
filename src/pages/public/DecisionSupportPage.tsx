@@ -90,7 +90,7 @@ export const DecisionSupportPage: React.FC = () => (
   <PublicPageLayout metaKey="decisionSupport">
     <PageHero
       metaKey="decisionSupport"
-      lead="BhoomiSetu produces estimates, classifications and proposals. It does not make decisions. This page describes exactly what each output is, what it rests on, and where it stops."
+      lead="BhoomiDarpan produces estimates, classifications and proposals. It does not make decisions. This page describes exactly what each output is, what it rests on, and where it stops."
     />
 
     <PublicSection eyebrow="Standing notice" title="What this platform is for" tone="white">

@@ -137,7 +137,7 @@ function loadCredentials(): CredentialsFile {
 function saveCredentials(file: CredentialsFile): void {
   file.generated_at = new Date().toISOString();
   file.note =
-    'Local-only demonstration credentials for BhoomiSetu. Git-ignored — do not commit or share. ' +
+    'Local-only demonstration credentials for BhoomiDarpan. Git-ignored — do not commit or share. ' +
     'These are non-deliverable @example.org addresses for a demonstration environment.';
   writeFileSync(CREDENTIALS_PATH, `${JSON.stringify(file, null, 2)}\n`, { mode: 0o600 });
   try {

@@ -459,7 +459,7 @@ async function seedProjectsAndCases(
 }
 
 async function seed() {
-  console.log('BhoomiSetu demonstration seed');
+  console.log('BhoomiDarpan demonstration seed');
 
   const { rfctlarrId } = await seedWorkflows();
   await seedStages(rfctlarrId);

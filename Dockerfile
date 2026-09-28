@@ -1,5 +1,5 @@
 # ==============================================================================
-# BhoomiSetu Production Container (Bun + Alpine)
+# BhoomiDarpan Production Container (Bun + Alpine)
 # ==============================================================================
 FROM oven/bun:1-alpine AS base
 WORKDIR /app

@@ -28,7 +28,7 @@ export const ActivateAccountPage: React.FC = () => {
   return (
     <AuthShell
       title="Activate account"
-      subtitle="Verify the account issued to you so you can sign in to BhoomiSetu."
+      subtitle="Verify the account issued to you so you can sign in to BhoomiDarpan."
       banner={
         ACTIVATION_AVAILABLE ? null : (
           <NoticeBox tone="warning" title="Activation service not available">

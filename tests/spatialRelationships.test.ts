@@ -407,7 +407,7 @@ describe('Spatial & Cadastral Relationship Detection and Warning Engine', () => 
 
       const adminUser: AuthenticatedUser = {
         id: 'admin-1',
-        email: 'admin@bhoomisetu.gov.in',
+        email: 'admin@bhoomidarpan.gov.in',
         name: 'System Admin',
         role: 'admin',
       };
@@ -461,7 +461,7 @@ describe('Spatial & Cadastral Relationship Detection and Warning Engine', () => 
       // User restricted to Lucknow district should not see Varanasi relationships
       const restrictedUser: AuthenticatedUser = {
         id: 'ri-lucknow',
-        email: 'ri.lucknow@bhoomisetu.gov.in',
+        email: 'ri.lucknow@bhoomidarpan.gov.in',
         name: 'Lucknow Revenue Inspector',
         role: 'revenue_inspector',
         jurisdiction_district: 'Lucknow',

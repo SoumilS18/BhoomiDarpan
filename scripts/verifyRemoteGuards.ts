@@ -16,7 +16,7 @@ const anonClient = createClient(supabaseUrl, anonKey);
 
 async function runGuardsVerification() {
   console.log('\n===============================================================');
-  console.log('  BHOOMISETU: REMOTE DATABASE GUARDS & SECURITY VERIFICATION');
+  console.log('  BHOOMIDARPAN: REMOTE DATABASE GUARDS & SECURITY VERIFICATION');
   console.log('===============================================================\n');
 
   let passed = 0;

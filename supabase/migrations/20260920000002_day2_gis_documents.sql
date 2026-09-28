@@ -1,5 +1,5 @@
 -- ============================================================================
--- BhoomiSetu - Migration 000002: Day 2 GIS & Document Intelligence Extensions
+-- BhoomiDarpan - Migration 000002: Day 2 GIS & Document Intelligence Extensions
 -- ============================================================================
 
 -- 1. Expand document_status enum values safely

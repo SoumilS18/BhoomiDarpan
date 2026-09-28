@@ -78,7 +78,7 @@ export const LandingHero: React.FC<{
     <PublicContainer className="relative py-16 sm:py-20 lg:py-28">
       <div className="max-w-3xl">
         <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-amber-300">
-          {PUBLIC_CONFIG.nativeName} · BhoomiSetu
+          {PUBLIC_CONFIG.nativeName} · BhoomiDarpan
         </p>
         <h1 className="mt-5 text-3xl font-bold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
           {PUBLIC_CONFIG.descriptor}
@@ -126,7 +126,7 @@ export const PageHero: React.FC<{
       <div className="h-1 bg-gov-saffron" aria-hidden="true" />
       <PublicContainer className="py-12 sm:py-14">
         <p className="text-[11px] font-bold uppercase tracking-wider text-gov-navy">
-          {eyebrow ?? 'BhoomiSetu'}
+          {eyebrow ?? 'BhoomiDarpan'}
         </p>
         <h1 className="mt-2 text-2xl font-bold tracking-tight text-gov-slate sm:text-3xl">
           {meta.title}

@@ -128,7 +128,7 @@ export const HowItWorksPage: React.FC = () => (
   <PublicPageLayout metaKey="howItWorks">
     <PageHero
       metaKey="howItWorks"
-      lead="BhoomiSetu maintains one continuous chain from the case itself to portfolio-level intelligence. Each step below is a real stage of the platform's processing — not a conceptual diagram."
+      lead="BhoomiDarpan maintains one continuous chain from the case itself to portfolio-level intelligence. Each step below is a real stage of the platform's processing — not a conceptual diagram."
     />
 
     <PublicSection

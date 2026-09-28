@@ -1,5 +1,5 @@
 // =======================================================
-// BhoomiSetu - Core Domain Types & Data Models
+// BhoomiDarpan - Core Domain Types & Data Models
 // =======================================================
 
 export type UserRole = 

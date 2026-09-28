@@ -1,5 +1,5 @@
 -- ============================================================================
--- BHOOMISETU MIGRATION: 20260924000011_functional_gaps_closure.sql
+-- BHOOMIDARPAN MIGRATION: 20260924000011_functional_gaps_closure.sql
 -- Functional Gaps Closure: Structured Objections / Disputes Register Expansion,
 -- Document View Alias, and Recommendation Lifecycle Alignment
 -- ============================================================================

@@ -59,7 +59,7 @@ async function main(): Promise<void> {
       : ALL_TIERS;
 
   console.log('================================================================');
-  console.log('BhoomiSetu temporary reference mirror ingestion');
+  console.log('BhoomiDarpan temporary reference mirror ingestion');
   console.log('================================================================');
   console.log(`Active source : ${source.id}`);
   console.log(`Label         : ${source.label}`);

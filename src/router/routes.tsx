@@ -1,5 +1,5 @@
 // ============================================================================
-// BhoomiSetu - Frontend Route Registry (SINGLE SOURCE OF TRUTH)
+// BhoomiDarpan - Frontend Route Registry (SINGLE SOURCE OF TRUTH)
 // ----------------------------------------------------------------------------
 // Every navigable surface in the application is declared exactly once here.
 // The registry owns: the URL pattern, the module grouping used by the sidebar,
@@ -9,7 +9,7 @@
 // The registry covers three experience areas (RouteDef.area):
 //   'public' - the public marketing / informational website (world-readable)
 //   'auth'   - sign-in and account-access surfaces (no fabricated sessions)
-//   'app'    - the authenticated BhoomiSetu application (default)
+//   'app'    - the authenticated BhoomiDarpan application (default)
 //
 // AUTHORISATION NOTE (deliberate):
 //   `roles` below governs NAVIGATION VISIBILITY ONLY. It is not, and must
@@ -242,7 +242,7 @@ export const ROUTES: RouteDef[] = [
     module: null,
     title: 'Home',
     breadcrumb: 'Home',
-    description: 'BhoomiSetu — National Land Acquisition Intelligence & Decision-Support',
+    description: 'BhoomiDarpan — National Land Acquisition Intelligence & Decision-Support',
     iconKey: 'dashboard',
     roles: ALL_ROLES,
     nav: false,
@@ -257,7 +257,7 @@ export const ROUTES: RouteDef[] = [
     module: null,
     title: 'About',
     breadcrumb: 'About',
-    description: 'What BhoomiSetu is and the problem it addresses',
+    description: 'What BhoomiDarpan is and the problem it addresses',
     iconKey: 'governance',
     roles: ALL_ROLES,
     nav: false,
@@ -360,7 +360,7 @@ export const ROUTES: RouteDef[] = [
     module: null,
     title: 'Privacy Policy',
     breadcrumb: 'Privacy',
-    description: 'How BhoomiSetu handles personal data',
+    description: 'How BhoomiDarpan handles personal data',
     iconKey: 'governance',
     roles: ALL_ROLES,
     nav: false,
@@ -374,7 +374,7 @@ export const ROUTES: RouteDef[] = [
     module: null,
     title: 'Terms of Use',
     breadcrumb: 'Terms',
-    description: 'Conditions for using BhoomiSetu',
+    description: 'Conditions for using BhoomiDarpan',
     iconKey: 'governance',
     roles: ALL_ROLES,
     nav: false,
@@ -408,7 +408,7 @@ export const ROUTES: RouteDef[] = [
     module: null,
     title: 'Sign In',
     breadcrumb: 'Sign In',
-    description: 'Sign in to the BhoomiSetu application',
+    description: 'Sign in to the BhoomiDarpan application',
     iconKey: 'admin',
     roles: ALL_ROLES,
     nav: false,
@@ -450,7 +450,7 @@ export const ROUTES: RouteDef[] = [
     module: null,
     title: 'Activate Account',
     breadcrumb: 'Activate Account',
-    description: 'Activate a provisioned BhoomiSetu account',
+    description: 'Activate a provisioned BhoomiDarpan account',
     iconKey: 'admin',
     roles: ALL_ROLES,
     nav: false,
@@ -464,7 +464,7 @@ export const ROUTES: RouteDef[] = [
     module: null,
     title: 'Request Access',
     breadcrumb: 'Request Access',
-    description: 'Request a BhoomiSetu account for your department',
+    description: 'Request a BhoomiDarpan account for your department',
     iconKey: 'admin',
     roles: ALL_ROLES,
     nav: false,

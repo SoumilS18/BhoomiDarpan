@@ -99,7 +99,7 @@ export function formatRelativeAge(isoDateStr?: string | null): string {
 
 /**
  * Evaluates the precise freshness state of an external observation.
- * Evaluates both the observation time (when the data occurred) and retrieval time (when BhoomiSetu fetched it).
+ * Evaluates both the observation time (when the data occurred) and retrieval time (when BhoomiDarpan fetched it).
  */
 export function evaluateFreshness(
   observedAt: string,

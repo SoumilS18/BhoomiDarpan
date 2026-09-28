@@ -94,10 +94,10 @@ export const Header: React.FC<HeaderProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xl font-bold tracking-tight text-mocha-900 font-sans">
-                  BhoomiSetu
+                  BhoomiDarpan
                 </span>
                 <span className="text-[10px] font-semibold text-terra-800 bg-sand-100 px-2 py-0.5 rounded border border-sand-300/80 shadow-2xs">
-                  भूमिसेतु
+                  भूमिदर्पण
                 </span>
               </div>
               <p className="text-[11px] text-mocha-500 hidden md:block font-medium">

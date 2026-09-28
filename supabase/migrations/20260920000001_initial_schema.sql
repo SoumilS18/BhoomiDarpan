@@ -1,5 +1,5 @@
 -- ============================================================================
--- BhoomiSetu - Initial Database Schema Migration
+-- BhoomiDarpan - Initial Database Schema Migration
 -- Designed for PostgreSQL / Supabase
 -- ============================================================================
 

@@ -27,7 +27,7 @@ const REQUESTABLE_ROLES = ROLE_ORDER.filter((role) => role !== 'admin' && role !
  *
  * OPTION SOURCES
  *   * State / District — real LGD administrative units returned by the
- *     BhoomiSetu server (authoritative LGD hierarchy). Never a hardcoded list,
+ *     BhoomiDarpan server (authoritative LGD hierarchy). Never a hardcoded list,
  *     and never fetched from data.gov.in by the browser.
  *   * Role requested — the backend `UserRole` enum via `ROLE_LABELS`, minus the
  *     privileged roles, so the value the applicant picks is exactly a value the
@@ -241,7 +241,7 @@ export const RequestAccessPage: React.FC = () => {
   return (
     <AuthShell
       title="Request access"
-      subtitle="Ask for a BhoomiSetu account for your department. Requests are reviewed by an administrator — no access is granted automatically."
+      subtitle="Ask for a BhoomiDarpan account for your department. Requests are reviewed by an administrator — no access is granted automatically."
       banner={
         availability === 'unknown' ? (
           <NoticeBox tone="warning" title="Checking submission workflow">
@@ -437,7 +437,7 @@ export const RequestAccessPage: React.FC = () => {
           label="Reason for access"
           required
           error={field('reason')}
-          hint="Describe the work you need to perform in BhoomiSetu."
+          hint="Describe the work you need to perform in BhoomiDarpan."
         >
           <textarea
             id="ra-reason"

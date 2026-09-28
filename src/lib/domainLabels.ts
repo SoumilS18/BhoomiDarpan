@@ -11,7 +11,7 @@ import type {
 } from '../../shared/types';
 
 // ============================================================================
-// BhoomiSetu - Centralised domain labels
+// BhoomiDarpan - Centralised domain labels
 // ----------------------------------------------------------------------------
 // Single source of truth for rendering backend enum values as human text.
 //

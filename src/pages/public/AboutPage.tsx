@@ -59,7 +59,7 @@ export const AboutPage: React.FC = () => (
   <PublicPageLayout metaKey="about">
     <PageHero
       metaKey="about"
-      lead="BhoomiSetu is decision-support software for land acquisition casework. It exists to make the state of every case, the reason for that state, and the evidence behind it visible to the people responsible for moving it forward."
+      lead="BhoomiDarpan is decision-support software for land acquisition casework. It exists to make the state of every case, the reason for that state, and the evidence behind it visible to the people responsible for moving it forward."
     />
 
     <PublicSection eyebrow="The problem" title="Acquisition work is hard to see as a whole" tone="white">
@@ -73,9 +73,9 @@ export const AboutPage: React.FC = () => (
     </PublicSection>
 
     <PublicSection
-      eyebrow="What BhoomiSetu is"
+      eyebrow="What BhoomiDarpan is"
       title="A single operational record with its reasoning attached"
-      lead="BhoomiSetu keeps the case, its workflow position, its documents, its disputes, its geography and its evidence together — and then applies consistent analysis across that record."
+      lead="BhoomiDarpan keeps the case, its workflow position, its documents, its disputes, its geography and its evidence together — and then applies consistent analysis across that record."
     >
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-gov">

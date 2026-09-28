@@ -211,7 +211,7 @@ export async function executeLgdQuery<T = any>(
       const response = await fetch(url.toString(), {
         signal: controller.signal,
         headers: {
-          'User-Agent': 'BhoomiSetu-LGD-Client/1.0',
+          'User-Agent': 'BhoomiDarpan-LGD-Client/1.0',
           Accept: 'application/json',
         },
       });

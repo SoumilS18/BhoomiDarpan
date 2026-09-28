@@ -1,5 +1,5 @@
 -- ============================================================================
--- BHOOMISETU MIGRATION: 20260922000008_day5_operational_governance.sql
+-- BHOOMIDARPAN MIGRATION: 20260922000008_day5_operational_governance.sql
 -- Day 5: Operational Governance, Notification Lifecycle & Automated Escalation
 -- ============================================================================
 

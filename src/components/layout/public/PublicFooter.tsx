@@ -99,9 +99,9 @@ export const PublicFooter: React.FC = () => {
                 </svg>
               </div>
               <div>
-                <p className="text-lg font-bold text-white">BhoomiSetu</p>
+                <p className="text-lg font-bold text-white">BhoomiDarpan</p>
                 <p className="text-[10px] text-gov-navy bg-white/10 px-2 py-0.5 rounded border border-white/20 inline-block mt-0.5">
-                  भूमिसेतु
+                  भूमिदर्पण
                 </p>
               </div>
             </div>
@@ -123,7 +123,7 @@ export const PublicFooter: React.FC = () => {
 
         <div className="mt-10 border-t border-white/10 pt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <p className="text-xs text-slate-500">
-            © {new Date().getFullYear()} BhoomiSetu. Internal platform for authorized officers.
+            © {new Date().getFullYear()} BhoomiDarpan. Internal platform for authorized officers.
           </p>
           <p className="text-xs text-slate-500">
             Not an official Government of India website. Access is restricted to authorized personnel.

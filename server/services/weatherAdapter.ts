@@ -140,7 +140,7 @@ export async function getLiveWeatherObservation(
 
     const response = await fetch(endpoint, {
       headers: {
-        'User-Agent': 'BhoomiSetu-Government-Land-Platform/2.0 (contact: tech@bhoomisetu.gov.in)',
+        'User-Agent': 'BhoomiDarpan-Government-Land-Platform/2.0 (contact: tech@bhoomidarpan.gov.in)',
       },
       signal: controller.signal,
     });

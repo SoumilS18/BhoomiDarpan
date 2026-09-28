@@ -125,10 +125,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="truncate text-sm font-bold tracking-tight text-sand-50">
-                  BhoomiSetu
+                  BhoomiDarpan
                 </span>
                 <span className="rounded border border-gold-400/30 bg-gold-500/15 px-1.5 py-px text-[9px] font-semibold text-gold-200">
-                  भूमिसेतु
+                  भूमिदर्पण
                 </span>
               </div>
               <p className="truncate text-[10px] text-sand-300/80">

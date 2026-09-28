@@ -58,7 +58,7 @@ export class OsrmRoutingProvider implements IRoutingProvider {
     try {
       const res = await fetch(url, {
         headers: {
-          'User-Agent': 'BhoomiSetu-LandAcquisition/1.0 (contact: admin@bhoomisetu.gov.in)',
+          'User-Agent': 'BhoomiDarpan-LandAcquisition/1.0 (contact: admin@bhoomidarpan.gov.in)',
           'Accept': 'application/json',
         },
         signal: controller.signal,

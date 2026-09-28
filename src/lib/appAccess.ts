@@ -1,5 +1,5 @@
 // ============================================================================
-// BhoomiSetu - Application-area access rule
+// BhoomiDarpan - Application-area access rule
 // ----------------------------------------------------------------------------
 // The route registry declares three experience areas ('public' | 'auth' |
 // 'app'). This module decides whether the current browser may render an

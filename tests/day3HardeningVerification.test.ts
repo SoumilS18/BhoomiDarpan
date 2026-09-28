@@ -21,7 +21,7 @@ import {
   getRecommendationPolicySync,
 } from '../server/services/policyEngine';
 
-describe('BhoomiSetu Day 3 Final Hardening & Verification Pass', () => {
+describe('BhoomiDarpan Day 3 Final Hardening & Verification Pass', () => {
   const mockCase: AcquisitionCase = {
     id: 'case-harden-001',
     project_id: 'proj-harden-001',

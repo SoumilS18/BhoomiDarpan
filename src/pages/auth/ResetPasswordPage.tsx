@@ -146,7 +146,7 @@ export const ResetPasswordPage: React.FC = () => {
   return (
     <AuthShell
       title="Reset password"
-      subtitle="Choose a new password for your BhoomiSetu account."
+      subtitle="Choose a new password for your BhoomiDarpan account."
       banner={
         status === 'unavailable' ? (
           <NoticeBox tone="warning" title="Password reset not configured">

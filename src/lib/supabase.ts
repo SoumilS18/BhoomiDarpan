@@ -5,7 +5,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 // available at build time (which is the standard Render Docker deployment flow).
 declare global {
   interface Window {
-    __BHOOMISETU__?: {
+    __BHOOMIDARPAN__?: {
       SUPABASE_URL?: string;
       SUPABASE_ANON_KEY?: string;
       MAPTILER_API_KEY?: string;
@@ -13,7 +13,7 @@ declare global {
   }
 }
 
-const runtimeCfg = typeof window !== 'undefined' ? (window.__BHOOMISETU__ ?? {}) : {};
+const runtimeCfg = typeof window !== 'undefined' ? (window.__BHOOMIDARPAN__ ?? {}) : {};
 
 const supabaseUrl =
   (import.meta.env.VITE_SUPABASE_URL as string) ||

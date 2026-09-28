@@ -1,5 +1,5 @@
 /**
- * BhoomiSetu - Authoritative Data-Driven ISRO Bhuvan Layer Catalogue & Resolver
+ * BhoomiDarpan - Authoritative Data-Driven ISRO Bhuvan Layer Catalogue & Resolver
  * 
  * Strict Architectural Principles:
  * 1. ZERO HARDCODING: No application conditionals like `if (state === "Bihar")`.

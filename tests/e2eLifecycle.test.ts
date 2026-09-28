@@ -92,7 +92,7 @@ import {
 } from '../shared/types';
 import { AuthenticatedUser } from '../server/middleware/auth.middleware';
 
-describe('BhoomiSetu Real End-to-End National Lifecycle Verification Suite', () => {
+describe('BhoomiDarpan Real End-to-End National Lifecycle Verification Suite', () => {
   const dynamicTag = `e2e-${Date.now()}`;
 
   beforeEach(() => {
@@ -235,7 +235,7 @@ describe('BhoomiSetu Real End-to-End National Lifecycle Verification Suite', () 
     // Step A: Officer Authentication & Scoping
     const laoOfficer: AuthenticatedUser = {
       id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a99',
-      email: `lao.${dynamicTag}@bhoomisetu.gov.in`,
+      email: `lao.${dynamicTag}@bhoomidarpan.gov.in`,
       role: 'lao',
       name: 'District Land Acquisition Officer',
       department: 'Revenue & Land Reforms Division',
@@ -639,7 +639,7 @@ describe('BhoomiSetu Real End-to-End National Lifecycle Verification Suite', () 
       title: 'Gazette Preliminary Notification',
       document_type: 'sec_11_notification',
       status: 'uploaded',
-      file_url: 'https://storage.bhoomisetu.gov.in/vault/sec11.pdf',
+      file_url: 'https://storage.bhoomidarpan.gov.in/vault/sec11.pdf',
       file_size_bytes: 245000,
       mime_type: 'application/pdf',
       uploaded_at: new Date().toISOString(),
@@ -1010,14 +1010,14 @@ describe('BhoomiSetu Real End-to-End National Lifecycle Verification Suite', () 
   test('3. Enforces strict server-side RBAC and blocks cross-project and cross-district tampering', async () => {
     const adminUser: AuthenticatedUser = {
       id: 'usr-admin-1',
-      email: 'admin@bhoomisetu.gov.in',
+      email: 'admin@bhoomidarpan.gov.in',
       role: 'admin',
       name: 'National System Administrator',
     };
 
     const projectOfficer: AuthenticatedUser = {
       id: 'usr-po-42',
-      email: 'po.pune@bhoomisetu.gov.in',
+      email: 'po.pune@bhoomidarpan.gov.in',
       role: 'project_officer',
       name: 'Project Officer Pune',
       department: 'project:prj-allowed-101',
@@ -1025,7 +1025,7 @@ describe('BhoomiSetu Real End-to-End National Lifecycle Verification Suite', () 
 
     const revenueInspector: AuthenticatedUser = {
       id: 'usr-ri-12',
-      email: 'ri.pune@bhoomisetu.gov.in',
+      email: 'ri.pune@bhoomidarpan.gov.in',
       role: 'revenue_inspector',
       name: 'Revenue Inspector Haveli',
       department: 'district:Pune',

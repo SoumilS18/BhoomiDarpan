@@ -3,7 +3,7 @@
 -- ============================================================================
 
 -- ============================================================================
--- BhoomiSetu - Initial Database Schema Migration
+-- BhoomiDarpan - Initial Database Schema Migration
 -- Designed for PostgreSQL / Supabase
 -- ============================================================================
 
@@ -492,7 +492,7 @@ END $$;
 -- ============================================================================
 
 -- ============================================================================
--- BhoomiSetu - Migration 000002: Day 2 GIS & Document Intelligence Extensions
+-- BhoomiDarpan - Migration 000002: Day 2 GIS & Document Intelligence Extensions
 -- ============================================================================
 
 -- 1. Expand document_status enum values safely
@@ -538,7 +538,7 @@ CREATE INDEX IF NOT EXISTS idx_parcels_status ON parcels(acquisition_status);
 -- ============================================================================
 
 -- ============================================================================
--- BHOOMISETU MIGRATION: 20260920000003_day3_intelligence.sql
+-- BHOOMIDARPAN MIGRATION: 20260920000003_day3_intelligence.sql
 -- Day 3: Core Intelligence, Bottlenecks, and Action Recommendations
 -- ============================================================================
 
@@ -592,7 +592,7 @@ CREATE POLICY "Allow authenticated update recommendations"
 -- ============================================================================
 
 -- ============================================================================
--- BHOOMISETU MIGRATION: 20260920000004_day4_portfolio_operations.sql
+-- BHOOMIDARPAN MIGRATION: 20260920000004_day4_portfolio_operations.sql
 -- Day 4: Portfolio Operations, Attention Queue, and Bottleneck Aggregations
 -- ============================================================================
 
@@ -622,7 +622,7 @@ CREATE INDEX IF NOT EXISTS idx_bottlenecks_stage_title ON case_bottlenecks(stage
 -- ============================================================================
 
 -- ============================================================================
--- BHOOMISETU MIGRATION: 20260920000005_day5_policy_notifications.sql
+-- BHOOMIDARPAN MIGRATION: 20260920000005_day5_policy_notifications.sql
 -- Day 5: Configurable System Policies, Notifications/Escalations & Audit Expansion
 -- ============================================================================
 
@@ -791,7 +791,7 @@ CREATE POLICY "Allow update notifications for all authenticated"
 -- ============================================================================
 
 -- ============================================================================
--- BHOOMISETU MIGRATION: 20260920000006_day1_data_foundation.sql
+-- BHOOMIDARPAN MIGRATION: 20260920000006_day1_data_foundation.sql
 -- Day 1: Real Data Integration Foundation, Data Source Registry,
 -- Provenance Ledger, Administrative Geography & Import Pipeline
 -- ============================================================================

@@ -1,5 +1,5 @@
 -- ============================================================================
--- BHOOMISETU MIGRATION: 20260920000005_day5_policy_notifications.sql
+-- BHOOMIDARPAN MIGRATION: 20260920000005_day5_policy_notifications.sql
 -- Day 5: Configurable System Policies, Notifications/Escalations & Audit Expansion
 -- ============================================================================
 

@@ -1,5 +1,5 @@
 -- ============================================================================
--- BhoomiSetu Migration: LGD Reference Mirror Source Registration
+-- BhoomiDarpan Migration: LGD Reference Mirror Source Registration
 -- Migration: 20260927000001_lgd_reference_mirror_source.sql
 -- ============================================================================
 

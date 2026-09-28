@@ -1,5 +1,5 @@
 -- ============================================================================
--- BHOOMISETU MIGRATION: 20260923000009_day6_gis_spatial_intelligence.sql
+-- BHOOMIDARPAN MIGRATION: 20260923000009_day6_gis_spatial_intelligence.sql
 -- Day 6: GIS & Spatial Intelligence Layer Extensions
 -- ============================================================================
 

@@ -9,7 +9,7 @@ async function runLiveVerification() {
   console.log('User Profiles in Supabase:', profiles?.length || 0);
 
   // Let's create an authorized test user or session if needed
-  const testEmail = `verification_officer_${Date.now()}@bhoomisetu.gov.in`;
+  const testEmail = `verification_officer_${Date.now()}@bhoomidarpan.gov.in`;
   const testPassword = 'TestPassword#12345';
 
   const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({

@@ -1,5 +1,5 @@
 -- ============================================================================
--- BHOOMISETU MIGRATION: 20260923000010_day7_disputes_and_outcomes.sql
+-- BHOOMIDARPAN MIGRATION: 20260923000010_day7_disputes_and_outcomes.sql
 -- Day 7: Objections & Disputes Register, Recommendation Outcome Feedback
 -- ============================================================================
 

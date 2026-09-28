@@ -1,5 +1,5 @@
 // ============================================================================
-// BhoomiSetu - Browser history store & routing hooks
+// BhoomiDarpan - Browser history store & routing hooks
 // ----------------------------------------------------------------------------
 // A deliberately small store built on the native History API. There is no
 // provider component and no context: subscriber notification is handled by

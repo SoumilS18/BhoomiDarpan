@@ -1,4 +1,4 @@
-# BhoomiSetu Frontend: Multi-Page + Multi-Tab Architecture Proposal
+# BhoomiDarpan Frontend: Multi-Page + Multi-Tab Architecture Proposal
 
 > Status: **Proposal for review** (no source files changed yet)
 > Scope: `src/` only. Server (`server/`), schema (`supabase/`), and `shared/types` are already
@@ -158,7 +158,7 @@ export interface WorkspaceState {
 | 7 | Context menu: *Pin/Unpin · Duplicate · Open in new tab · Copy link · Refresh data · Close · Close others · Close to the right · Close all*. | Full workspace control. |
 | 8 | Closing a tab with **unsaved work** (e.g. `StageAdvanceModal` open with a draft, or an un-submitted policy JSON edit) prompts a confirm before close. | Avoids silent data loss — important for statutory actions. |
 | 9 | Switching officer role **closes tabs the new role is not authorised for**, with a toast listing what was closed. | Prevents rendering data through a stale authorisation view. Server-side `requireRole` remains the real gate. |
-| 10 | Tab set persists in `localStorage` under a **versioned key** `bhoomisetu.workspace.v1`; a schema-version mismatch discards it rather than crashing. | Deterministic reload behaviour. |
+| 10 | Tab set persists in `localStorage` under a **versioned key** `bhoomidarpan.workspace.v1`; a schema-version mismatch discards it rather than crashing. | Deterministic reload behaviour. |
 | 11 | Two browser windows stay coherent via the `storage` event (last-writer-wins per tab id). | Prevents confusing divergence. |
 | 12 | Keyboard shortcuts: `Ctrl+T` (new tab on current module), `Ctrl+W` (close), `Ctrl+Tab` / `Ctrl+Shift+Tab` (cycle), `Ctrl+1…9` (jump), `Alt+←/→` (history), `Ctrl+K` (command palette). | Demo-visible polish. |
 

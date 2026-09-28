@@ -210,7 +210,7 @@ export const DocumentReviewModal: React.FC<DocumentReviewModalProps> = ({
                 'The server-side extraction encountered an error or the Gemini API is not configured. The original uploaded file is safely preserved in storage.'}
             </p>
             <p className="text-slate-600 text-[11px]">
-              Per BhoomiSetu zero-hardcoding policy, no synthetic fake facts are generated. You may retry extraction or proceed with manual statutory review.
+              Per BhoomiDarpan zero-hardcoding policy, no synthetic fake facts are generated. You may retry extraction or proceed with manual statutory review.
             </p>
           </div>
         )}

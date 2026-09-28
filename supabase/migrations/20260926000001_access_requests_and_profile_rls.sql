@@ -1,5 +1,5 @@
 -- ============================================================================
--- BhoomiSetu - Access requests + hardening of user_profiles row-level security
+-- BhoomiDarpan - Access requests + hardening of user_profiles row-level security
 -- ----------------------------------------------------------------------------
 -- WHY THIS MIGRATION EXISTS
 --

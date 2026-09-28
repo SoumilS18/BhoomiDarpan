@@ -150,11 +150,11 @@ export const LandingPage: React.FC = () => {
         }
       />
 
-      {/* 2 — What BhoomiSetu does */}
+      {/* 2 — What BhoomiDarpan does */}
       <PublicSection
         eyebrow="What it does"
         title="One operational record for every acquisition case"
-        lead="Land acquisition work is normally spread across registers, spreadsheets, file movements and disconnected maps. BhoomiSetu keeps the case, its workflow, its documents, its geography and its evidence in one place — and keeps the reasoning auditable."
+        lead="Land acquisition work is normally spread across registers, spreadsheets, file movements and disconnected maps. BhoomiDarpan keeps the case, its workflow, its documents, its geography and its evidence in one place — and keeps the reasoning auditable."
         tone="white"
       >
         <div className="grid gap-6 lg:grid-cols-3">
@@ -231,7 +231,7 @@ export const LandingPage: React.FC = () => {
         id="how-it-works"
         eyebrow="How the system works"
         title="The evidence loop"
-        lead="BhoomiSetu maintains one continuous chain from the case itself to portfolio-level intelligence."
+        lead="BhoomiDarpan maintains one continuous chain from the case itself to portfolio-level intelligence."
         tone="white"
       >
         <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

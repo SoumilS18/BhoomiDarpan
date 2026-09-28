@@ -1,5 +1,5 @@
 -- ============================================================================
--- BHOOMISETU MIGRATION: 20260920000006_day1_data_foundation.sql
+-- BHOOMIDARPAN MIGRATION: 20260920000006_day1_data_foundation.sql
 -- Day 1: Real Data Integration Foundation, Data Source Registry,
 -- Provenance Ledger, Administrative Geography & Import Pipeline
 -- ============================================================================

@@ -41,13 +41,13 @@ export const AccessibilityPage: React.FC = () => {
       <PageHero
         metaKey="accessibility"
         eyebrow="Accessibility"
-        lead="The approach applied to the BhoomiSetu interface, and what is and is not claimed about it."
+        lead="The approach applied to the BhoomiDarpan interface, and what is and is not claimed about it."
       />
 
       <PublicSection eyebrow="Status" title="No conformance claim is made" tone="white">
         <NoticeBox tone="warning" title="We do not claim WCAG conformance">
           This page has not been assessed against WCAG 2.1 AA by an independent evaluator, so
-          BhoomiSetu does not claim conformance with any accessibility standard. The statements
+          BhoomiDarpan does not claim conformance with any accessibility standard. The statements
           below describe deliberate implementation choices, not a certified result. A conformance
           audit should be commissioned before any compliance claim is published.
         </NoticeBox>
@@ -141,7 +141,7 @@ export const AccessibilityPage: React.FC = () => {
       <PublicSection eyebrow="Feedback" title="Tell us where this page is wrong" tone="white">
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-gov">
           <p className="text-sm leading-relaxed text-slate-600">
-            If a part of BhoomiSetu prevented you from completing a task, report it to your
+            If a part of BhoomiDarpan prevented you from completing a task, report it to your
             deployment's administrator, describing the page, what you were trying to do and what
             happened.
           </p>

@@ -585,7 +585,7 @@ export const AccessRequestsManager: React.FC = () => {
                       size="sm"
                       onClick={() =>
                         copyToClipboard(
-                          `BhoomiSetu Account Credentials:\nEmail: ${approvalResult.email}\nTemporary Password: ${approvalResult.temporaryPassword}\nAssigned Role: ${approvalResult.role}`
+                          `BhoomiDarpan Account Credentials:\nEmail: ${approvalResult.email}\nTemporary Password: ${approvalResult.temporaryPassword}\nAssigned Role: ${approvalResult.role}`
                         )
                       }
                       className="text-[11px] h-7 flex items-center gap-1"

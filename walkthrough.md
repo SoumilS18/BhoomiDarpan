@@ -1,11 +1,11 @@
-# BhoomiSetu: Implementation & Verification Walkthrough
+# BhoomiDarpan: Implementation & Verification Walkthrough
 
 ---
 
 ## Day 1 Final Live Integration Verification & Diagnostics Report
 
 ### 1. Executive Summary
-A comprehensive live integration audit and test suite execution was performed against the real local environment (`BhoomiSetu/.env`), the remote Supabase project (`https://prtooirzrpntpkzivxje.supabase.co`), and the Google Gemini API.
+A comprehensive live integration audit and test suite execution was performed against the real local environment (`BhoomiDarpan/.env`), the remote Supabase project (`https://prtooirzrpntpkzivxje.supabase.co`), and the Google Gemini API.
 
 ### 2. Live Verification Matrix
 
@@ -66,7 +66,7 @@ PostgreSQL DDL (`CREATE TABLE`, `CREATE INDEX`, `ALTER TABLE`) cannot be execute
 In strict compliance with the Day 5 operational requirements, zero-hardcoding mandates, and institutional design standards:
 
 1. **Database Schema & Indexing (Migration 000005)**:
-   - Migration: [`supabase/migrations/20260920000005_day5_policy_notifications.sql`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/supabase/migrations/20260920000005_day5_policy_notifications.sql)
+   - Migration: [`supabase/migrations/20260920000005_day5_policy_notifications.sql`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/supabase/migrations/20260920000005_day5_policy_notifications.sql)
    - Created `system_policies` table with initial institutional seed configuration records (`risk_scoring_weights`, `risk_bands`, `bottleneck_thresholds`, `attention_queue_criteria`, `escalation_rules`).
    - Created `case_notifications` table with composite indexes `(case_id, created_at DESC)` and `(status, recipient_role)`.
    - Relaxed `case_events` table (nullable `case_id`, added `project_id`) to support project-level and policy-level audit logging.
@@ -74,26 +74,26 @@ In strict compliance with the Day 5 operational requirements, zero-hardcoding ma
    - Maintained strict RLS and security boundaries.
 
 2. **Domain Types & Data Contracts**:
-   - Expanded [`shared/types/index.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/shared/types/index.ts):
+   - Expanded [`shared/types/index.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/shared/types/index.ts):
      - `RiskScoringPolicy`, `RiskBandsPolicy`, `BottleneckThresholdsPolicy`, `AttentionQueuePolicy`, `EscalationRulesPolicy`, `SystemPolicy`.
      - `CaseNotification`, `NotificationSeverity`, `NotificationEventType`, `NotificationStatus`.
      - `IntegrationDiagnostics` for transparent health diagnostics across Supabase, Database, Auth, Storage, and Gemini.
 
 3. **Configurable Policy Engine & Business Rules**:
-   - [`server/services/policyEngine.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/server/services/policyEngine.ts):
+   - [`server/services/policyEngine.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/server/services/policyEngine.ts):
      - Decouples all magic numbers (risk factor weights, risk category bands, bottleneck duration SLAs, attention queue delay thresholds, escalation rules) into a persistent, configurable engine.
      - In-memory cache + persistent fallback defaults + DB sync + audit-logged policy mutations.
-   - [`server/routes/policy.routes.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/server/routes/policy.routes.ts):
+   - [`server/routes/policy.routes.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/server/routes/policy.routes.ts):
      - `GET /api/policies`: Lists all institutional system policies.
      - `GET /api/policies/:key`: Retrieves single policy configuration.
      - `PUT /api/policies/:key`: Updates policy configuration with admin-only authorization check (`requireRole(['admin'])`) and audit logging.
    - Refactored core intelligence and analytics calculation services to read directly from `policyEngine`:
-     - [`server/services/riskAssessment.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/server/services/riskAssessment.ts) uses `getRiskWeightsSync()` and `getRiskBandsSync()`.
-     - [`server/services/bottleneckDetector.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/server/services/bottleneckDetector.ts) uses `getBottleneckThresholdsSync()`.
-     - [`server/services/portfolioAnalyzer.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/server/services/portfolioAnalyzer.ts) uses `getAttentionQueueCriteriaSync()`.
+     - [`server/services/riskAssessment.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/server/services/riskAssessment.ts) uses `getRiskWeightsSync()` and `getRiskBandsSync()`.
+     - [`server/services/bottleneckDetector.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/server/services/bottleneckDetector.ts) uses `getBottleneckThresholdsSync()`.
+     - [`server/services/portfolioAnalyzer.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/server/services/portfolioAnalyzer.ts) uses `getAttentionQueueCriteriaSync()`.
 
 4. **Authentication & Authorization Middleware**:
-   - [`server/middleware/auth.middleware.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/server/middleware/auth.middleware.ts):
+   - [`server/middleware/auth.middleware.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/server/middleware/auth.middleware.ts):
      - Cryptographic Supabase JWT verification (`supabase.auth.getUser(token)`).
      - Test environment support with evaluation persona headers (`x-eval-role`, `x-eval-user-name`, `x-eval-user-id`).
      - Rejection of missing credentials with HTTP 401 Unauthorized.
@@ -102,28 +102,28 @@ In strict compliance with the Day 5 operational requirements, zero-hardcoding ma
      - Protected mutation endpoints across `projects.routes.ts`, `cases.routes.ts`, `documents.routes.ts`, `gis.routes.ts`, `intelligence.routes.ts`, and `policy.routes.ts`.
 
 5. **In-App Notification & Escalation Foundation**:
-   - [`server/services/notificationService.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/server/services/notificationService.ts):
+   - [`server/services/notificationService.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/server/services/notificationService.ts):
      - Policy-driven alert detection: `stage_overdue`, `critical_risk`, `blocked_dependency`, `document_awaiting_verification`, `cadastral_dispute`.
      - Smart deduplication to prevent duplicate unread alerts.
      - Acknowledgment and resolution workflows with audit logging.
-   - [`server/routes/notifications.routes.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/server/routes/notifications.routes.ts):
+   - [`server/routes/notifications.routes.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/server/routes/notifications.routes.ts):
      - `GET /api/notifications`: Filter by case, role, status.
      - `POST /api/notifications/generate/:caseId`: Trigger dynamic scan.
      - `PATCH /api/notifications/:id/acknowledge`: Mark alert acknowledged.
      - `PATCH /api/notifications/:id/resolve`: Mark alert resolved.
    - Frontend Integration:
-     - [`src/components/layout/NotificationBell.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/layout/NotificationBell.tsx) mounted in [`Header.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/layout/Header.tsx) with unread counter badge, dropdown popover, and acknowledgment actions.
+     - [`src/components/layout/NotificationBell.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/components/layout/NotificationBell.tsx) mounted in [`Header.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/components/layout/Header.tsx) with unread counter badge, dropdown popover, and acknowledgment actions.
 
 6. **Audit Trail Completeness**:
-   - [`server/services/auditLogger.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/server/services/auditLogger.ts):
+   - [`server/services/auditLogger.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/server/services/auditLogger.ts):
      - Comprehensive tracking of WHO, WHAT, WHEN, WHICH RECORD, WHAT CHANGED across project creation, case mutations, stage advances, document validation, parcel mutations, policy changes, and scenario simulations.
      - In-memory offline buffer resilience to ensure audit events are never lost when the database is unavailable.
 
 7. **External Integration Hardening & Transparent Diagnostics**:
-   - [`server/services/documentExtractor.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/server/services/documentExtractor.ts):
+   - [`server/services/documentExtractor.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/server/services/documentExtractor.ts):
      - Hardened Gemini service: 60,000 character limit on text content, 15MB file buffer cap, 25-second timeout safeguard (`Promise.race`), resilient JSON markdown fence stripping.
      - **Strict Zero Fabrication**: When `GEMINI_API_KEY` is not configured or fails, marks extraction as failed with diagnostic error; never fabricates survey numbers, dates, compensation, or landowners.
-   - [`server/config/supabase.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/server/config/supabase.ts) & `server/index.ts`:
+   - [`server/config/supabase.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/server/config/supabase.ts) & `server/index.ts`:
      - `GET /api/diagnostics` and `GET /api/health`: Provides honest, real-time diagnostic reporting on Supabase, Database reachability, Auth, Storage bucket, and Gemini.
 
 ---
@@ -345,7 +345,7 @@ Day 2 delivers high-integrity live external data integration, multi-source discr
 - **Remote Supabase Database Tables**: **23/23 canonical tables verified live** (`scripts/migrate.ts --verify` returned exit code 0).
   - Both Day 2 tables (`external_observations`, `data_discrepancies`) verified remotely with RLS, indexes, constraints, and live CRUD persistence.
 - **Configurable Policy Engine Refactoring**:
-  - Moved freshness SLAs, quality weights, spatial discrepancy thresholds, and weather delay rules into `system_policies` via [`policyEngine.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/server/services/policyEngine.ts). Zero buried business logic constants.
+  - Moved freshness SLAs, quality weights, spatial discrepancy thresholds, and weather delay rules into `system_policies` via [`policyEngine.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/server/services/policyEngine.ts). Zero buried business logic constants.
 - **Automated Tests**: **86/86 passed across all 11 files with 449 assertions**.
 - **TypeScript Typecheck (`tsc --noEmit`)**: **0 errors**.
 - **Production Build (`vite build`)**: Clean production bundle built in 5.45s.
@@ -357,7 +357,7 @@ Day 2 delivers high-integrity live external data integration, multi-source discr
 ## Day 3: Predictive Decision Intelligence & Explainability Engine
 
 ### 1. Architectural Overview & Deliverables
-Day 3 strengthens BhoomiSetu's intelligence layer into a genuine, explainable, data-driven predictive decision-support system without destabilizing Day 1 or Day 2 foundations:
+Day 3 strengthens BhoomiDarpan's intelligence layer into a genuine, explainable, data-driven predictive decision-support system without destabilizing Day 1 or Day 2 foundations:
 
 - **Policy-Driven Institutional Configuration (`policyEngine.ts`)**:
   - `predictive_delay_policy` (`category: 'sla'`): Configurable velocity min/max caps (`[0.5, 3.0]`), overdue stage acceleration penalty factor (`1.25x`), unverified document clearance buffer (`7 days`), disputed parcel Section 64 tribunal buffer (`45 days`), and meteorological freshness thresholds (`STALE_HOURS_CUTOFF: 24h`, `MIN_DATA_QUALITY_SCORE: 0.60`).
@@ -408,12 +408,12 @@ Day 3 strengthens BhoomiSetu's intelligence layer into a genuine, explainable, d
   - Returns baseline vs simulated comparison with net days saved, new completion dates, and explicit lists of `assumptions_applied` and `evidence_used`.
 
 - **User Interface Extensions**:
-  - [`CaseDetailPage.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/pages/CaseDetailPage.tsx): Orchestrates the per-case intelligence workspace (risk, bottlenecks, downstream impact, recommendations, simulator) with active refresh.
-  - [`RiskOverviewCard.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/intelligence/RiskOverviewCard.tsx): Displays predictive delay forecasts, empirical velocity, factor explainability table, and excluded evidence logs.
-  - [`RootCausePanel.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/intelligence/RootCausePanel.tsx): Renders color-coded badges for all 5 cause classifications and handles `insufficient_evidence` states.
-  - [`DownstreamImpactView.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/intelligence/DownstreamImpactView.tsx): Distinguishes direct vs propagated delay and visualizes schedule slack days.
-  - [`RecommendationsList.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/intelligence/RecommendationsList.tsx): Displays actionable recommendations with statutory policy tags and human decision actions.
-  - [`WhatIfSimulator.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/intelligence/WhatIfSimulator.tsx): Interactive sandbox for running all 6 interventions with assumption callouts.
+  - [`CaseDetailPage.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/pages/CaseDetailPage.tsx): Orchestrates the per-case intelligence workspace (risk, bottlenecks, downstream impact, recommendations, simulator) with active refresh.
+  - [`RiskOverviewCard.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/components/intelligence/RiskOverviewCard.tsx): Displays predictive delay forecasts, empirical velocity, factor explainability table, and excluded evidence logs.
+  - [`RootCausePanel.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/components/intelligence/RootCausePanel.tsx): Renders color-coded badges for all 5 cause classifications and handles `insufficient_evidence` states.
+  - [`DownstreamImpactView.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/components/intelligence/DownstreamImpactView.tsx): Distinguishes direct vs propagated delay and visualizes schedule slack days.
+  - [`RecommendationsList.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/components/intelligence/RecommendationsList.tsx): Displays actionable recommendations with statutory policy tags and human decision actions.
+  - [`WhatIfSimulator.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/components/intelligence/WhatIfSimulator.tsx): Interactive sandbox for running all 6 interventions with assumption callouts.
 
 ---
 
@@ -434,7 +434,7 @@ Day 3 strengthens BhoomiSetu's intelligence layer into a genuine, explainable, d
 ## Day 4: Portfolio & National Intelligence Layer
 
 ### 1. Executive Summary
-The Portfolio & National Intelligence layer extends BhoomiSetu's intelligence chain from isolated single-case analysis to portfolio-wide and national operational intelligence:
+The Portfolio & National Intelligence layer extends BhoomiDarpan's intelligence chain from isolated single-case analysis to portfolio-wide and national operational intelligence:
 
 $$\text{Portfolio} \longrightarrow \text{Administrative Area} \longrightarrow \text{Project} \longrightarrow \text{Case} \longrightarrow \text{Workflow} \longrightarrow \text{Stage} \longrightarrow \text{Evidence}$$
 
@@ -490,10 +490,10 @@ Decision-makers can answer high-stakes institutional questions in real time:
 
 - **Frontend Client & Dashboard Views**:
   - Updated `src/lib/api.ts` with typed fetchers passing `getAuthHeaders()`.
-  - Created [`PortfolioTrendsView.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/dashboard/PortfolioTrendsView.tsx): Displays period-over-period comparisons, direction badges, and honest insufficient history banners.
-  - Created [`InterventionOutcomesView.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/dashboard/InterventionOutcomesView.tsx): Visualizes the 5-stage separation pipeline and compares projected vs realized savings.
-  - Created [`GeographicDrilldownView.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/dashboard/GeographicDrilldownView.tsx): Interactive tree allowing progressive drill-down to individual cases with LGD status badges.
-  - Updated [`DashboardPage.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/pages/DashboardPage.tsx): Added tabs for Trends, Administrative Hierarchy, and Intervention Outcomes.
+  - Created [`PortfolioTrendsView.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/components/dashboard/PortfolioTrendsView.tsx): Displays period-over-period comparisons, direction badges, and honest insufficient history banners.
+  - Created [`InterventionOutcomesView.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/components/dashboard/InterventionOutcomesView.tsx): Visualizes the 5-stage separation pipeline and compares projected vs realized savings.
+  - Created [`GeographicDrilldownView.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/components/dashboard/GeographicDrilldownView.tsx): Interactive tree allowing progressive drill-down to individual cases with LGD status badges.
+  - Updated [`DashboardPage.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/pages/DashboardPage.tsx): Added tabs for Trends, Administrative Hierarchy, and Intervention Outcomes.
 
 ### 3. Day 4 Verification Matrix
 
@@ -517,7 +517,7 @@ Decision-makers can answer high-stakes institutional questions in real time:
 ## Day 5: Policy, Notifications & Operational Governance Layer
 
 ### 1. Executive Summary & Objective
-Day 5 delivers the complete **Operational Governance Layer** for BhoomiSetu (SIH26016). It connects the intelligence engines built across Days 1–4 into an authoritative operational decision workflow:
+Day 5 delivers the complete **Operational Governance Layer** for BhoomiDarpan (SIH26016). It connects the intelligence engines built across Days 1–4 into an authoritative operational decision workflow:
 
 ```text
 Observed Data
@@ -539,13 +539,13 @@ Institutional Audit Trail
 Operational Outcome
 ```
 
-Every operational alert generated by BhoomiSetu is grounded in an authentic data source, carries explainable statutory evidence, deduplicates active vs recurring conditions, enforces role-based territorial boundaries, transitions through a formal finite state machine, and logs immutable audit trails to `case_events`.
+Every operational alert generated by BhoomiDarpan is grounded in an authentic data source, carries explainable statutory evidence, deduplicates active vs recurring conditions, enforces role-based territorial boundaries, transitions through a formal finite state machine, and logs immutable audit trails to `case_events`.
 
 ---
 
 ### 2. Database Schema & Migration (Migration 20260922000008)
 
-Migration [`supabase/migrations/20260922000008_day5_operational_governance.sql`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/supabase/migrations/20260922000008_day5_operational_governance.sql) applied the minimal, justified extensions to the existing `case_notifications` and `system_policies` tables:
+Migration [`supabase/migrations/20260922000008_day5_operational_governance.sql`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/supabase/migrations/20260922000008_day5_operational_governance.sql) applied the minimal, justified extensions to the existing `case_notifications` and `system_policies` tables:
 
 | Column / Constraint | Justification & Architectural Role |
 | :--- | :--- |
@@ -651,14 +651,14 @@ Server-side data scoping is strictly enforced via `getAuthorizedScopeFilter` in 
 
 ### 9. Frontend Governance UI Components
 
-1. [`NotificationBell.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/layout/NotificationBell.tsx): Header widget with live unread badge, urgent pulsating animation, realtime Supabase subscription, and click trigger.
-2. [`NotificationCenterModal.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/governance/NotificationCenterModal.tsx): Comprehensive operational modal featuring:
+1. [`NotificationBell.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/components/layout/NotificationBell.tsx): Header widget with live unread badge, urgent pulsating animation, realtime Supabase subscription, and click trigger.
+2. [`NotificationCenterModal.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/components/governance/NotificationCenterModal.tsx): Comprehensive operational modal featuring:
    - KPI Ribbon: Unread, Acknowledged, Escalated, Urgent, and Critical tallies.
    - Multi-Dimensional Filter Bar: Search, status tabs, severity filter, category filter.
    - Explainable Evidence Accordion: Shows statutory evidence items with classification, data source, and confidence score.
    - Action Dialogs: Single-click Acknowledge, Resolve modal with action taken notes, Dismiss modal with mandatory justification, and Escalate button with supervisory role routing.
-3. [`GovernancePage.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/pages/GovernancePage.tsx): Dedicated page displaying active operational alerts and configurable system policies (`notification_policy`, `escalation_policy`, `operational_attention_policy`, `risk_bands`, `bottleneck_thresholds`).
-4. Navigation: Added `'governance'` tab to [`Sidebar.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/layout/Sidebar.tsx) and view routing in [`App.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/App.tsx).
+3. [`GovernancePage.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/pages/GovernancePage.tsx): Dedicated page displaying active operational alerts and configurable system policies (`notification_policy`, `escalation_policy`, `operational_attention_policy`, `risk_bands`, `bottleneck_thresholds`).
+4. Navigation: Added `'governance'` tab to [`Sidebar.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/components/layout/Sidebar.tsx) and view routing in [`App.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/App.tsx).
 
 ---
 
@@ -697,7 +697,7 @@ Server-side data scoping is strictly enforced via `getAuthorizedScopeFilter` in 
 ## Day 6 GIS & Spatial Intelligence Layer Verification & Documentation
 
 ### 1. Executive Summary
-The **GIS & Spatial Intelligence Layer** of BhoomiSetu has been fully implemented, verified, and integrated into the national land acquisition decision-support pipeline. The system replaces static visualization with real spatial decision intelligence: geodetic math (Haversine distance, Green's Theorem polygon centroid, ray-casting point-in-polygon containment), proximity friction clustering, dynamic spatial policies, role-aware territorial scoping, and an interactive multi-layer GIS workspace.
+The **GIS & Spatial Intelligence Layer** of BhoomiDarpan has been fully implemented, verified, and integrated into the national land acquisition decision-support pipeline. The system replaces static visualization with real spatial decision intelligence: geodetic math (Haversine distance, Green's Theorem polygon centroid, ray-casting point-in-polygon containment), proximity friction clustering, dynamic spatial policies, role-aware territorial scoping, and an interactive multi-layer GIS workspace.
 
 ---
 
@@ -752,14 +752,14 @@ The **GIS & Spatial Intelligence Layer** of BhoomiSetu has been fully implemente
 
 ### 3. Key Components Implemented
 
-1. **Geodetic Mathematics & Geometry Engine** ([`spatialIntelligenceService.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/server/services/spatialIntelligenceService.ts)):
+1. **Geodetic Mathematics & Geometry Engine** ([`spatialIntelligenceService.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/server/services/spatialIntelligenceService.ts)):
    - `calculateHaversineDistance(lat1, lon1, lat2, lon2)`: Computes great-circle distances in kilometers with millimeter/meter numerical stability based on standard WGS-84 radius ($R=6371.0\text{ km}$).
    - `computeAccurateCentroid(geojson)`: Implements Green’s Theorem area-weighted polygon centroid calculation with fallback to bounding box center for degenerate polygons. Resolves Point, LineString, Polygon, and MultiPolygon geometries.
    - `calculateBoundingBox(geojson)`: Generates statutory 4-tuple bounding box `[minLng, minLat, maxLng, maxLat]`.
    - `isPointInPolygon(point, ring)`: Standard ray-casting containment algorithm.
    - `evaluateGeometryStatus(boundaryGeoJSON, parcels)`: Evaluates geometry completeness and produces honest statuses: `mapped`, `partially_mapped`, `unmapped`, `invalid_geometry`.
 
-2. **Decoupled Dynamic Spatial Policy** ([`policyEngine.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/server/services/policyEngine.ts)):
+2. **Decoupled Dynamic Spatial Policy** ([`policyEngine.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/server/services/policyEngine.ts)):
    - Canonical `spatial_policy` registered with `nearby_search_radius_km: 25`, `max_search_radius_km: 100`, `spatial_cluster_distance_km: 15`, `spatial_concentration_min_cases: 3`, `spatial_freshness_window_hours: 72`, `geographic_attention_threshold_delay_days: 15`, `coordinate_precision_decimals: 6`.
    - Modifiable at runtime via `/api/policies` with immediate reflection and immutable audit logging.
 
@@ -767,20 +767,20 @@ The **GIS & Spatial Intelligence Layer** of BhoomiSetu has been fully implemente
    - `findNearbyEntities(lat, lng, requestedRadiusKm, user)`: Identifies nearby cases and projects within radius, clamped to policy maximum.
    - `detectSpatialClusters(cases, clusterDistanceKm)`: Discovers geographical concentration clusters using graph-connected neighbor traversal. Reports cluster centroid, aggregate area, risk concentration, status concentration, and explicit sample size limitations note.
 
-4. **Security & Role-Based Territorial Scoping** ([`gis.routes.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/server/routes/gis.routes.ts)):
+4. **Security & Role-Based Territorial Scoping** ([`gis.routes.ts`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/server/routes/gis.routes.ts)):
    - `admin` and `lao`: Full unrestricted national portfolio scope.
    - `project_officer`: Strictly confined to assigned project boundary. Malicious query parameter tampering (`?project_id=...`) is rejected.
    - `revenue_inspector`: Strictly confined to assigned state/district jurisdiction.
    - `viewer`: Public overview only; detailed cadastral landowner parcels are blocked.
 
-5. **Interactive Frontend GIS Workspace** ([`GISSpatialIntelligencePage.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/pages/GISSpatialIntelligencePage.tsx)):
+5. **Interactive Frontend GIS Workspace** ([`GISSpatialIntelligencePage.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/pages/GISSpatialIntelligencePage.tsx)):
    - Base Map Switcher: MapTiler Streets / Topo / Satellite, OpenStreetMap Standard.
    - Spatial Layer Control: Cases, Projects, Proximity Clusters, Cadastral Parcels, LGD Admin Boundaries.
    - Metric Badges: Total Cases, Mapped Geometries, Projects with Alignment, Friction Clusters, LGD Status.
    - Spatial Context Drawer: Deep drilldown inspecting case details, outer corridor boundary, parcel survey distribution, proximity cases, administrative hierarchy, and data provenance.
    - Honest Empty States: Zero fabricated pins or mock coordinates; displays genuine empty state when geometry or LGD is unmapped.
 
-6. **Navigation Integration**: Added `'gis'` tab to [`Sidebar.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/components/layout/Sidebar.tsx) and view routing in [`App.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiSetu/BhoomiSetu/src/App.tsx).
+6. **Navigation Integration**: Added `'gis'` tab to [`Sidebar.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/components/layout/Sidebar.tsx) and view routing in [`App.tsx`](file:///c:/Users/soumi/OneDrive/Desktop/Soumil/College/hackathons/SIH/BhoomiDarpan/BhoomiDarpan/src/App.tsx).
 
 ---
 

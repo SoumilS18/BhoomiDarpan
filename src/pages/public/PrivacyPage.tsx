@@ -37,7 +37,7 @@ export const PrivacyPage: React.FC = () => {
       <PageHero
         metaKey="privacy"
         eyebrow="Privacy Policy"
-        lead="This policy explains what information the BhoomiSetu application collects, why it is used, who can see it, and how long it is kept."
+        lead="This policy explains what information the BhoomiDarpan application collects, why it is used, who can see it, and how long it is kept."
       />
 
       <PublicProseContainer>
@@ -52,7 +52,7 @@ export const PrivacyPage: React.FC = () => {
 
         <LegalSection index={1} heading="Scope and status">
           <P>
-            This policy applies to information processed by the BhoomiSetu application in the course
+            This policy applies to information processed by the BhoomiDarpan application in the course
             of its function as a land acquisition intelligence and decision-support system. It
             covers the public website, the account pages, and the authenticated application.
           </P>
@@ -60,7 +60,7 @@ export const PrivacyPage: React.FC = () => {
         </LegalSection>
 
         <LegalSection index={2} heading="Information the application collects">
-          <P>BhoomiSetu stores the following categories of information:</P>
+          <P>BhoomiDarpan stores the following categories of information:</P>
           <LegalUl
             items={[
               <span>
@@ -146,7 +146,7 @@ export const PrivacyPage: React.FC = () => {
 
         <LegalSection index={5} heading="External and third-party services">
           <P>
-            BhoomiSetu integrates with external services for specific functions. Where a service is
+            BhoomiDarpan integrates with external services for specific functions. Where a service is
             used, the corresponding data is transmitted to that provider by the server:
           </P>
           <LegalUl
@@ -255,7 +255,7 @@ export const PrivacyPage: React.FC = () => {
 
         <LegalSection index={11} heading="Children">
           <P>
-            BhoomiSetu is an operational system for authorised adult professionals. It is not
+            BhoomiDarpan is an operational system for authorised adult professionals. It is not
             directed at children and is not intended to be used by them.
           </P>
         </LegalSection>

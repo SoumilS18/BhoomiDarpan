@@ -36,7 +36,7 @@ async function throttleNominatim(): Promise<void> {
  */
 export class NominatimProvider implements IGeocodingProvider {
   name = 'OpenStreetMap Nominatim';
-  private userAgent = 'BhoomiSetu-LandAcquisition/1.0 (contact: admin@bhoomisetu.gov.in)';
+  private userAgent = 'BhoomiDarpan-LandAcquisition/1.0 (contact: admin@bhoomidarpan.gov.in)';
   private baseUrl = 'https://nominatim.openstreetmap.org';
   private timeoutMs = 5000;
 

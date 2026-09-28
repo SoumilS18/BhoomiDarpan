@@ -33,7 +33,7 @@ export const PublicHeader: React.FC = () => {
           <Link
             to={getRouteById('public.landing').path}
             className="flex items-center gap-3 shrink-0"
-            aria-label="BhoomiSetu home"
+            aria-label="BhoomiDarpan home"
           >
             <div className="flex shrink-0 items-center justify-center" title="Government of India - State Emblem">
               <NationalEmblem size={50} className="filter drop-shadow-xs hover:scale-105 transition-transform" />
@@ -41,10 +41,10 @@ export const PublicHeader: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xl font-bold tracking-tight text-mocha-900 font-sans">
-                  BhoomiSetu
+                  BhoomiDarpan
                 </span>
                 <span className="text-[10px] font-semibold text-terra-800 bg-sand-100 px-2 py-0.5 rounded border border-sand-300/80 shadow-2xs">
-                  भूमिसेतु
+                  भूमिदर्पण
                 </span>
               </div>
               <p className="text-[11px] text-mocha-500 hidden md:block font-medium">

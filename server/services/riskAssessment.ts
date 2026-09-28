@@ -479,7 +479,7 @@ export function calculateDeterministicRiskAssessment(params: {
     observed_facts: observedFacts,
     ai_inferences: aiInferences,
     evidence_ledger: evidenceLedger,
-    model_version: 'bhoomisetu-risk-v3.0-predictive-explainable',
+    model_version: 'bhoomidarpan-risk-v3.0-predictive-explainable',
     generated_at: new Date().toISOString(),
   };
 }

@@ -1,5 +1,5 @@
 -- ============================================================================
--- BhoomiSetu Migration: LGD Authoritative Administrative Geography
+-- BhoomiDarpan Migration: LGD Authoritative Administrative Geography
 -- Migration: 20260925000012_lgd_administrative_geography.sql
 -- ============================================================================
 

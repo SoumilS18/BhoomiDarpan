@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "bhoomisetu",
+      "name": "bhoomidarpan",
       "dependencies": {
         "@google/generative-ai": "^0.24.0",
         "@supabase/supabase-js": "^2.49.1",

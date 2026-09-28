@@ -1,5 +1,5 @@
 /**
- * BhoomiSetu - Universal Map Provider Adapter & Basemap Cartography Abstraction
+ * BhoomiDarpan - Universal Map Provider Adapter & Basemap Cartography Abstraction
  * 
  * Strict architectural flow:
  *   Integration Policy -> Selected Map Provider -> Map Provider Adapter -> Leaflet Tile Layer

@@ -102,7 +102,7 @@ export function createApiApp() {
     };
     res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.send(`window.__BHOOMISETU__ = ${JSON.stringify(runtimeConfig)};`);
+    res.send(`window.__BHOOMIDARPAN__ = ${JSON.stringify(runtimeConfig)};`);
   });
 
   // Serve built frontend assets in production (index: false ensures SPA fallback handles HTML with injection)
@@ -128,13 +128,13 @@ export function createApiApp() {
     }
     try {
       let html = fs.readFileSync(indexPath, 'utf-8');
-      // Inject runtime public config that the frontend reads via window.__BHOOMISETU__
+      // Inject runtime public config that the frontend reads via window.__BHOOMIDARPAN__
       const runtimeConfig = {
         SUPABASE_URL: process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '',
         SUPABASE_ANON_KEY: process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
         MAPTILER_API_KEY: process.env.VITE_MAPTILER_API_KEY || process.env.MAPTILER_API_KEY || '',
       };
-      const injection = `<script>window.__BHOOMISETU__ = ${JSON.stringify(runtimeConfig)};</script>`;
+      const injection = `<script>window.__BHOOMIDARPAN__ = ${JSON.stringify(runtimeConfig)};</script>`;
       html = html.replace('</head>', `${injection}\n</head>`);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -165,7 +165,7 @@ if (import.meta.main) {
   try {
     server = app.listen(PORT, () => {
       console.log(`\n======================================================`);
-      console.log(`  BhoomiSetu API Server running on http://localhost:${PORT}`);
+      console.log(`  BhoomiDarpan API Server running on http://localhost:${PORT}`);
       console.log(`  Supabase configured: ${isSupabaseConfigured ? 'YES' : 'PENDING CREDENTIALS'}`);
       console.log(`======================================================\n`);
 

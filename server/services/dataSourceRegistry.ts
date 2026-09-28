@@ -556,7 +556,7 @@ async function runConnectivityProbe(id: string, source?: DataSource): Promise<Da
       const timeoutId = setTimeout(() => controller.abort(), 2000);
       const res = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=India&limit=1', {
         headers: {
-          'User-Agent': 'BhoomiSetu-Platform/1.0 (contact: admin@bhoomisetu.gov.in)',
+          'User-Agent': 'BhoomiDarpan-Platform/1.0 (contact: admin@bhoomidarpan.gov.in)',
         },
         signal: controller.signal,
       });
@@ -679,7 +679,7 @@ async function runConnectivityProbe(id: string, source?: DataSource): Promise<Da
       const probeUrl = `${registrySource?.endpoint_ref || 'https://api.open-meteo.com/v1/forecast'}?latitude=0&longitude=0&current=temperature_2m`;
       const res = await fetch(probeUrl, {
         headers: {
-          'User-Agent': 'BhoomiSetu-Platform/2.0 (contact: tech@bhoomisetu.gov.in)',
+          'User-Agent': 'BhoomiDarpan-Platform/2.0 (contact: tech@bhoomidarpan.gov.in)',
         },
         signal: controller.signal,
       });
@@ -722,7 +722,7 @@ async function runConnectivityProbe(id: string, source?: DataSource): Promise<Da
       const timeoutId = setTimeout(() => controller.abort(), 2000);
       const probeUrl = 'https://router.project-osrm.org/route/v1/driving/77.2090,28.6139;77.2190,28.6239?overview=false';
       const res = await fetch(probeUrl, {
-        headers: { 'User-Agent': 'BhoomiSetu-Platform/2.0' },
+        headers: { 'User-Agent': 'BhoomiDarpan-Platform/2.0' },
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
@@ -874,7 +874,7 @@ async function runConnectivityProbe(id: string, source?: DataSource): Promise<Da
       // Handshake test with standard 0/0/0 basic tile
       const probeUrl = `https://api.maptiler.com/maps/basic-v2/0/0/0.png?key=${encodeURIComponent(apiKey.trim())}`;
       const res = await fetch(probeUrl, {
-        headers: { 'User-Agent': 'BhoomiSetu-Platform/2.0' },
+        headers: { 'User-Agent': 'BhoomiDarpan-Platform/2.0' },
         signal: controller.signal,
       });
       clearTimeout(timeoutId);

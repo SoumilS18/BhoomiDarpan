@@ -31,7 +31,7 @@ export const ContactPage: React.FC = () => {
     <PublicPageLayout metaKey="contact">
       <PageHero
         metaKey="contact"
-        lead="How to reach the administrator of this BhoomiSetu deployment, and how to ask for an account."
+        lead="How to reach the administrator of this BhoomiDarpan deployment, and how to ask for an account."
       />
 
       <PublicSection eyebrow="Contact information" title="Configured for this deployment" tone="white">

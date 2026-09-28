@@ -485,7 +485,7 @@ export const AdministrationPage: React.FC<AdministrationPageProps> = ({
                       <p><strong>Department:</strong> {userToRevoke.department || 'N/A'}</p>
                     </div>
                     <p className="text-[10px] text-rose-700 pt-1">
-                      This will delete the officer's authentication credentials and terminate their permissions across BhoomiSetu immediately.
+                      This will delete the officer's authentication credentials and terminate their permissions across BhoomiDarpan immediately.
                     </p>
                   </div>
 

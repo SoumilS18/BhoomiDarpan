@@ -1,5 +1,5 @@
 /**
- * BhoomiSetu - ISRO Bhuvan Geospatial Services Provider
+ * BhoomiDarpan - ISRO Bhuvan Geospatial Services Provider
  * 
  * Implements:
  * 1. OGC WMS 1.1.1 Thematic Layer Abstraction

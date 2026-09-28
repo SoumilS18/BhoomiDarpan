@@ -62,7 +62,7 @@ export class OfflinePassthroughProvider implements ITranslationProvider {
       translation_type: 'untranslated_passthrough',
       disclaimer: 'Untranslated text returned. Translation engine is not active or unconfigured.',
       message: 'Translation engine is unavailable or unconfigured. Original text returned without modification.',
-      attribution: 'BhoomiSetu Core (Zero external translation)',
+      attribution: 'BhoomiDarpan Core (Zero external translation)',
       timestamp: new Date().toISOString(),
     };
   }
@@ -223,7 +223,7 @@ export class GeminiTranslationProvider implements ITranslationProvider {
       ? 'Ensure strict fidelity to statutory land acquisition terms under the RFCTLARR Act 2013, cadastral survey identifiers, Khasra numbers, and monetary compensation figures.'
       : 'Maintain statutory clarity and objective official tone.';
 
-    const prompt = `You are an expert bilingual Indian land acquisition legal linguist for BhoomiSetu.
+    const prompt = `You are an expert bilingual Indian land acquisition legal linguist for BhoomiDarpan.
 Translate the following statutory text from ${sourceName} to ${targetName}.
 ${domainNote}
 

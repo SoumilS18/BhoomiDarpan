@@ -1,5 +1,5 @@
 /**
- * BhoomiSetu - Bhuvan / ISRO Geospatial Integration Verification Suite
+ * BhoomiDarpan - Bhuvan / ISRO Geospatial Integration Verification Suite
  * 
  * Strict Verification Requirements (Per User Specification):
  * 1. Every active catalogue entry must have verification metadata (capabilitiesVerified, getMapVerified, lastVerifiedAt).

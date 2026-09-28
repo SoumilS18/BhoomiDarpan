@@ -61,7 +61,7 @@ export const GisIntelligencePage: React.FC = () => (
   <PublicPageLayout metaKey="gisIntelligence">
     <PageHero
       metaKey="gisIntelligence"
-      lead="BhoomiSetu's GIS workspace puts acquisition geography, parcels and administrative context in the same view as the case record — with filters that actually change what is queried."
+      lead="BhoomiDarpan's GIS workspace puts acquisition geography, parcels and administrative context in the same view as the case record — with filters that actually change what is queried."
     />
 
     <PublicSection eyebrow="Layers" title="What you see on the map" tone="white">
@@ -150,7 +150,7 @@ export const GisIntelligencePage: React.FC = () => (
     <PublicSection eyebrow="Integrity" title="How spatial data is treated" tone="white">
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-6">
         <NoticeBox tone="warning" title="Thematic overlays are context, not measurement">
-          Overlays from external mapping services are visual reference. BhoomiSetu does not convert
+          Overlays from external mapping services are visual reference. BhoomiDarpan does not convert
           a coloured thematic layer into numeric measurements of area, hazard or land use, and it
           does not present an overlay as a result derived from the case record.
         </NoticeBox>

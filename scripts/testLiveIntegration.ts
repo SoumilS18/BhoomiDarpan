@@ -29,7 +29,7 @@ function record(section: string, name: string, status: 'PASSED' | 'FAILED' | 'SK
 
 async function runLiveVerification() {
   console.log('\n===============================================================');
-  console.log('  BHOOMISETU DAY 1: LIVE INTEGRATION & ENVIRONMENT VERIFICATION');
+  console.log('  BHOOMIDARPAN DAY 1: LIVE INTEGRATION & ENVIRONMENT VERIFICATION');
   console.log('===============================================================\n');
 
   // --------------------------------------------------------------------------
@@ -128,7 +128,7 @@ async function runLiveVerification() {
   // --------------------------------------------------------------------------
   console.log('\n--- 4. SUPABASE STORAGE VERIFICATION ---');
   const testFileName = `test-verify-${Date.now()}.txt`;
-  const testContent = Buffer.from('BhoomiSetu Day 1 Live Storage Integration Test File');
+  const testContent = Buffer.from('BhoomiDarpan Day 1 Live Storage Integration Test File');
   try {
     // List buckets or check 'documents' bucket
     const { data: buckets, error: bucketErr } = await supabase.storage.listBuckets();
@@ -165,7 +165,7 @@ async function runLiveVerification() {
         record('STORAGE', 'File Retrieval', 'FAILED', downloadErr?.message || 'Empty response');
       } else {
         const text = await downloadData.text();
-        const matches = text === 'BhoomiSetu Day 1 Live Storage Integration Test File';
+        const matches = text === 'BhoomiDarpan Day 1 Live Storage Integration Test File';
         record('STORAGE', 'File Retrieval & Integrity', matches ? 'PASSED' : 'FAILED', `Read back ${text.length} bytes, integrity verified`);
       }
 

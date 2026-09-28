@@ -1,5 +1,5 @@
 // ============================================================================
-// BhoomiSetu - Minimal dependency-free route matching & URL helpers
+// BhoomiDarpan - Minimal dependency-free route matching & URL helpers
 // ----------------------------------------------------------------------------
 // This module is deliberately PURE: it touches no DOM, no React and no
 // application state, so it can be unit-tested directly under `bun test`

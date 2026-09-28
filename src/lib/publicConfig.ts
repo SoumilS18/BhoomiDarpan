@@ -1,5 +1,5 @@
 // ============================================================================
-// BhoomiSetu - Public website content configuration
+// BhoomiDarpan - Public website content configuration
 // ----------------------------------------------------------------------------
 // Single, data-driven source for the marketing / informational copy shown on
 // the public website and the account pages.
@@ -74,15 +74,15 @@ export interface PublicConfig {
 }
 
 export const PUBLIC_CONFIG: PublicConfig = {
-  name: 'BhoomiSetu',
-  nativeName: 'भूमिसेतु',
+  name: 'BhoomiDarpan',
+  nativeName: 'भूमिदर्पण',
   descriptor: 'National Land Acquisition Intelligence & Decision-Support System',
   tagline: 'Monitor → Predict → Decide → Act',
   operatingModel: ['Monitor', 'Predict', 'Decide', 'Act'],
   decisionSupportNotice:
-    'BhoomiSetu is a decision-support system. Predictions, risk assessments and recommendations are estimates produced from the data available to the platform. They assist — but do not replace — authorised human, legal and administrative decisions.',
+    'BhoomiDarpan is a decision-support system. Predictions, risk assessments and recommendations are estimates produced from the data available to the platform. They assist — but do not replace — authorised human, legal and administrative decisions.',
   deploymentStatement:
-    'BhoomiSetu is software for authorised acquisition, revenue, project and legal officers. It is not an official Government of India website, and access is restricted to personnel issued an account.',
+    'BhoomiDarpan is software for authorised acquisition, revenue, project and legal officers. It is not an official Government of India website, and access is restricted to personnel issued an account.',
   contact: {
     email: null,
     postalAddress: null,
@@ -104,48 +104,48 @@ export const NOT_CONFIGURED_TEXT = 'Not configured for this deployment';
  */
 export const PUBLIC_PAGE_META: Record<string, { title: string; description: string }> = {
   landing: {
-    title: 'BhoomiSetu — Land Acquisition Intelligence & Decision-Support',
+    title: 'BhoomiDarpan — Land Acquisition Intelligence & Decision-Support',
     description:
       'Case, workflow, GIS and predictive intelligence for land acquisition — one operational view from initiation to observed outcome.',
   },
   about: {
-    title: 'About BhoomiSetu',
-    description: 'What BhoomiSetu is, the fragmentation it addresses, and how it is designed to be audited.',
+    title: 'About BhoomiDarpan',
+    description: 'What BhoomiDarpan is, the fragmentation it addresses, and how it is designed to be audited.',
   },
   features: {
-    title: 'Features — BhoomiSetu',
+    title: 'Features — BhoomiDarpan',
     description: 'Capability overview across case, workflow, document, GIS, intelligence and analytics modules.',
   },
   howItWorks: {
-    title: 'How BhoomiSetu Works',
+    title: 'How BhoomiDarpan Works',
     description: 'From case initiation to portfolio intelligence: the evidence loop the platform maintains.',
   },
   gisIntelligence: {
-    title: 'GIS & Spatial Intelligence — BhoomiSetu',
+    title: 'GIS & Spatial Intelligence — BhoomiDarpan',
     description: 'Project geography, acquisition corridors, parcels, administrative boundaries and thematic overlays.',
   },
   decisionSupport: {
-    title: 'Decision Support — BhoomiSetu',
+    title: 'Decision Support — BhoomiDarpan',
     description: 'How risk, delay, bottleneck and recommendation outputs are produced — and where human judgement remains.',
   },
   security: {
-    title: 'Security & Governance — BhoomiSetu',
+    title: 'Security & Governance — BhoomiDarpan',
     description: 'Authentication, role-based access, row-level security, audit trail and server-side credential handling.',
   },
   contact: {
-    title: 'Contact — BhoomiSetu',
+    title: 'Contact — BhoomiDarpan',
     description: 'Contact and access channels for this deployment.',
   },
   privacy: {
-    title: 'Privacy Policy — BhoomiSetu',
-    description: 'How BhoomiSetu collects, uses, secures and retains information.',
+    title: 'Privacy Policy — BhoomiDarpan',
+    description: 'How BhoomiDarpan collects, uses, secures and retains information.',
   },
   terms: {
-    title: 'Terms of Use — BhoomiSetu',
-    description: 'Conditions for accessing and using the BhoomiSetu platform.',
+    title: 'Terms of Use — BhoomiDarpan',
+    description: 'Conditions for accessing and using the BhoomiDarpan platform.',
   },
   accessibility: {
-    title: 'Accessibility — BhoomiSetu',
-    description: 'The accessibility approach applied to the BhoomiSetu interface.',
+    title: 'Accessibility — BhoomiDarpan',
+    description: 'The accessibility approach applied to the BhoomiDarpan interface.',
   },
 };

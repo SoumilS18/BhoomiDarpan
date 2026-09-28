@@ -1050,7 +1050,7 @@ export async function ingestReferenceTier(
       const period = parseArchivePeriod(entry.name, TIER_COMPONENT[tier]);
       if (!period) throw new Error(`Could not read the dataset period from "${entry.name}".`);
 
-      tempDir = await mkdtemp(join(tmpdir(), 'bhoomisetu-lgd-'));
+      tempDir = await mkdtemp(join(tmpdir(), 'bhoomidarpan-lgd-'));
       const archivePath = join(tempDir, entry.name);
       await downloadArchive(entry, archivePath);
 

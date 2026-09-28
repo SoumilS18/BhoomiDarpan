@@ -73,7 +73,7 @@ export const SecurityPage: React.FC = () => (
   <PublicPageLayout metaKey="security">
     <PageHero
       metaKey="security"
-      lead="This page describes the access control, credential handling and audit mechanisms that are actually implemented in BhoomiSetu. It makes no certification or compliance claim."
+      lead="This page describes the access control, credential handling and audit mechanisms that are actually implemented in BhoomiDarpan. It makes no certification or compliance claim."
     />
 
     <PublicSection eyebrow="Controls" title="What is in place" tone="white">
@@ -89,7 +89,7 @@ export const SecurityPage: React.FC = () => (
     <PublicSection
       eyebrow="Credentials"
       title="What never reaches the browser"
-      lead="Secrets stay server-side by construction: the browser can only call BhoomiSetu's own API, and the server holds the credentials for everything behind it."
+      lead="Secrets stay server-side by construction: the browser can only call BhoomiDarpan's own API, and the server holds the credentials for everything behind it."
     >
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-gov">
@@ -186,7 +186,7 @@ export const SecurityPage: React.FC = () => (
 
       <div className="mt-6">
         <NoticeBox tone="warning" title="What this page does not claim">
-          BhoomiSetu does not claim any external security certification, audit attestation, government
+          BhoomiDarpan does not claim any external security certification, audit attestation, government
           approval or statutory compliance status. This page is a description of implemented
           technical controls only, not an assurance report.
         </NoticeBox>

@@ -1,5 +1,5 @@
 -- ============================================================================
--- BHOOMISETU ISOLATED DAY 2 MIGRATION (COPY & PASTE INTO SUPABASE SQL EDITOR)
+-- BHOOMIDARPAN ISOLATED DAY 2 MIGRATION (COPY & PASTE INTO SUPABASE SQL EDITOR)
 -- Project: https://supabase.com/dashboard/project/prtooirzrpntpkzivxje/sql/new
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS external_observations (

@@ -89,7 +89,7 @@ export const App: React.FC = () => {
             </div>
             <div className="flex items-center gap-2 text-[11px]">
               <span className="font-mono bg-amber-100 px-2 py-0.5 rounded">
-                Edit BhoomiSetu/.env with your Supabase keys
+                Edit BhoomiDarpan/.env with your Supabase keys
               </span>
             </div>
           </div>

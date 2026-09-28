@@ -166,7 +166,7 @@ export const PortfolioTrendsView: React.FC<PortfolioTrendsViewProps> = () => {
                   </strong>
                   <p className="text-amber-700 leading-relaxed">
                     {trendData.reason ||
-                      'To avoid statistical bias, BhoomiSetu requires an observation span of at least 14 days and at least 3 cases before declaring an operational trend.'}
+                      'To avoid statistical bias, BhoomiDarpan requires an observation span of at least 14 days and at least 3 cases before declaring an operational trend.'}
                   </p>
                   <p className="text-[11px] text-amber-600">
                     Current observation window:{' '}

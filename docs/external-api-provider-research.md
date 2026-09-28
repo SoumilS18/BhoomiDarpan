@@ -1,4 +1,4 @@
-# BhoomiSetu — External API & Data Provider Research Audit
+# BhoomiDarpan — External API & Data Provider Research Audit
 **Problem Statement SIH26016: Real-Time National Land Acquisition & Management System**  
 **Audit & Governance Milestone: External Integrations & Provider-Agnostic Architecture**  
 *Document Version: 1.1.0 — Grounded in Live Provider Terms, Pricing & Quotas (September 2026)*
@@ -7,9 +7,9 @@
 
 ## Executive Summary
 
-BhoomiSetu requires trustworthy external data to transform land acquisition from a fragmented administrative process into a predictive, continuously monitored decision system. However, **adding external APIs merely to increase API counts creates fragile operational dependencies, licensing liabilities, security risks, and cost escalations**.
+BhoomiDarpan requires trustworthy external data to transform land acquisition from a fragmented administrative process into a predictive, continuously monitored decision system. However, **adding external APIs merely to increase API counts creates fragile operational dependencies, licensing liabilities, security risks, and cost escalations**.
 
-Every external integration in BhoomiSetu is governed by two strict tests:
+Every external integration in BhoomiDarpan is governed by two strict tests:
 1. **Capability Test**: *What concrete, non-redundant capability does this unlock for land acquisition officers, surveyors, project directors, or affected citizens?*
 2. **Decision-Loop Test**: *Where in the decision loop is this data consumed?*
    $$\text{External Observation} \longrightarrow \text{Case Association} \longrightarrow \text{Evidence / Provenance} \longrightarrow \text{Risk / Bottleneck / Impact} \longrightarrow \text{Advisory Recommendation / Workflow Guard}$$
@@ -148,7 +148,7 @@ This audit establishes a **provider-agnostic architecture** where all external c
 | **Security / Privacy** | Indian data sovereignty; hosted on Indian servers | Google Cloud compliance | Standard AI Studio terms |
 | **Integration Complexity** | Medium (ULCA Pipeline Config API call + compute call) | Low (Single REST endpoint) | Zero additional complexity (same Gemini engine) |
 | **Recommended Provider** | **Bhashini ULCA Adapter (Primary National Standard)** | Backup commercial provider | **Gemini (In-context multilingual translation fallback)** |
-| **Reason** | **Bhashini is the official Government of India National Language Translation Mission standard.** Integrates seamlessly with BhoomiSetu's national public mandate and ensures domestic data residency. **Explicit translation state**: If no translation provider is available, text is returned as `translation_status: 'unavailable', original_text: ...` and NEVER labeled as translated. | Paid beyond 500k chars; commercial reliance. | Available today without additional external network dependencies. |
+| **Reason** | **Bhashini is the official Government of India National Language Translation Mission standard.** Integrates seamlessly with BhoomiDarpan's national public mandate and ensures domestic data residency. **Explicit translation state**: If no translation provider is available, text is returned as `translation_status: 'unavailable', original_text: ...` and NEVER labeled as translated. | Paid beyond 500k chars; commercial reliance. | Available today without additional external network dependencies. |
 | **Current Status** | **REQUIRES_CREDENTIALS (`BHASHINI_API_KEY`, `BHASHINI_USER_ID`)** | **BACKUP** | **OPERATIONAL (Via Gemini Adapter)** |
 
 ---
@@ -167,7 +167,7 @@ This audit establishes a **provider-agnostic architecture** where all external c
 | **Security / Privacy** | Strictly regulated land ownership data | Public open datasets | Cadastral identifier without citizen PII |
 | **Integration Complexity** | High (Requires state department MoU & API Setu gateway registration) | Low (Simple REST API on data.gov.in) | Zero (Normalized string format standard) |
 | **Recommended Provider** | **DILRMP / API Setu Gateway Interface (Provider-Agnostic Adapter)** | **data.gov.in Circle Rate & Infrastructure Adapter** | **ULPIN Identifier Standard (Native System Model)** |
-| **Reason** | **Honest Engineering Reality:** There is no universal, unauthenticated public API for live cadastral land ownership across all 28 states. Land is a State subject. The proper architecture is a standardized adapter interface that connects to state APIs when credentials/gateways exist, while cleanly supporting manual shapefile/GeoJSON import in offline or unintegrated states. | Useful for validating district circle rate benchmarks. | ULPIN is already natively supported in BhoomiSetu schemas. |
+| **Reason** | **Honest Engineering Reality:** There is no universal, unauthenticated public API for live cadastral land ownership across all 28 states. Land is a State subject. The proper architecture is a standardized adapter interface that connects to state APIs when credentials/gateways exist, while cleanly supporting manual shapefile/GeoJSON import in offline or unintegrated states. | Useful for validating district circle rate benchmarks. | ULPIN is already natively supported in BhoomiDarpan schemas. |
 | **Current Status** | **NOT_CONFIGURED (Requires Institutional Gateway Credentials)** | **AVAILABLE** | **OPERATIONAL (Native Model)** |
 
 ---
@@ -200,7 +200,7 @@ Rather than ad-hoc `if (key) ... else ...` checks scattered in UI or business lo
 
 ## 3. Decision-Loop Mapping: Why Each Integration Belongs
 
-Every external integration must actively participate in BhoomiSetu's decision loop. We deliberately reject "dashboard ornament" APIs.
+Every external integration must actively participate in BhoomiDarpan's decision loop. We deliberately reject "dashboard ornament" APIs.
 
 ```mermaid
 flowchart TD
@@ -252,11 +252,11 @@ flowchart TD
 
 ## 4. Environment & Secrets Specification
 
-The following environment variables govern BhoomiSetu's external integrations. **The application functions completely and reliably even when all optional commercial keys are absent:**
+The following environment variables govern BhoomiDarpan's external integrations. **The application functions completely and reliably even when all optional commercial keys are absent:**
 
 ```bash
 # ==============================================================================
-# BHOOMISETU EXTERNAL INTEGRATIONS CONFIGURATION
+# BHOOMIDARPAN EXTERNAL INTEGRATIONS CONFIGURATION
 # ==============================================================================
 
 # 1. Primary Statutory Database & Storage (Mandatory in production)
@@ -308,7 +308,7 @@ COPERNICUS_CDSE_CLIENT_SECRET=
    - Dynamic map instances include `internalUsageAttributionIds={["gmp_git_agentskills_v1"]}`.
    - The system strictly adheres to the rule that Google Maps tiles and satellite images **must not be scraped, cached, or permanently stored** in PostgreSQL.
 2. **OpenStreetMap Nominatim & Tile Usage Policies**:
-   - `NominatimProvider` strictly throttles requests to **1 request per second** and includes a descriptive `User-Agent: BhoomiSetu-LandAcquisition/1.0 (contact: admin@bhoomisetu.gov.in)`.
+   - `NominatimProvider` strictly throttles requests to **1 request per second** and includes a descriptive `User-Agent: BhoomiDarpan-LandAcquisition/1.0 (contact: admin@bhoomidarpan.gov.in)`.
    - Results are cached in-memory with a 24-hour TTL to prevent redundant upstream queries.
    - Attribution is permanently displayed on map surfaces: `© OpenStreetMap contributors`.
 3. **Open-Meteo CC-BY 4.0 Compliance**:
@@ -352,12 +352,12 @@ COPERNICUS_CDSE_CLIENT_SECRET=
    - Admin Workspace Endpoint: `https://bhuvan-vec2.nrsc.gov.in/bhuvan/admin/wms`
 2. **Zero Credentials Required**:
    - The OGC WMS standard services on `bhuvan-vec2.nrsc.gov.in` are publicly accessible without an API key, bearer token, or username/password.
-   - **Strict Rule Enforced**: BhoomiSetu contains zero Bhuvan secrets, no `BHUVAN_API_KEY` or `VITE_BHUVAN_API_KEY` environment variables, and zero credential-prompting dialogs.
+   - **Strict Rule Enforced**: BhoomiDarpan contains zero Bhuvan secrets, no `BHUVAN_API_KEY` or `VITE_BHUVAN_API_KEY` environment variables, and zero credential-prompting dialogs.
 3. **WMS vs. REST Separation**:
    - Ephemeral REST endpoints (`https://bhuvan-app1.nrsc.gov.in/api/`) that require 24-hour expiring user session tokens remain marked `requires_credentials` in the external integration registry. The core application functions completely without them.
 
 ### 7.2 Authoritative Layer Catalogue & Zero Hardcoding Architecture
-BhoomiSetu maintains a centralized, single-source-of-truth layer catalogue (`server/services/bhuvanCatalogue.ts`) with strictly zero hardcoded state branching:
+BhoomiDarpan maintains a centralized, single-source-of-truth layer catalogue (`server/services/bhuvanCatalogue.ts`) with strictly zero hardcoded state branching:
 - **State-Partitioned LULC 1:50,000 Overlays**:
   - Contains verified state layers spanning all Indian States and Union Territories (e.g. `lulc:MH_LULC50K_1516` for Maharashtra, `lulc:BR_LULC50K_1112` for Bihar, `lulc:UP_LULC50K_1516` for Uttar Pradesh, `lulc:KA_LULC50K_1516` for Karnataka, `lulc:GJ_LULC50K_1516` for Gujarat, etc.).
   - Coverage resolution is governed purely by ISO 3166-2:IN / LGD state codes and canonical naming normalization (`normalizeJurisdictionToStateCode()`).
@@ -374,7 +374,7 @@ BhoomiSetu maintains a centralized, single-source-of-truth layer catalogue (`ser
 - For any project or case, jurisdiction context (`state_names`, `state_codes`, or GeoJSON coordinates) is resolved dynamically through `resolveBhuvanLayers()`:
   - **Single Jurisdiction**: Resolves exact state-specific verified layers.
   - **Multi-State Corridors**: If a transmission or highway corridor traverses multiple states (e.g., Maharashtra and Karnataka), the resolver returns verified layers for all intersecting states alongside applicable national layers.
-  - **Unsupported Jurisdictions**: If Bhuvan does not publish a verified layer for a given territory, BhoomiSetu reports an honest `unsupported_jurisdictions` list and displays a clean UI disclaimer without fabricating layer names.
+  - **Unsupported Jurisdictions**: If Bhuvan does not publish a verified layer for a given territory, BhoomiDarpan reports an honest `unsupported_jurisdictions` list and displays a clean UI disclaimer without fabricating layer names.
 
 ### 7.4 Map Hierarchy: Basemap vs. Thematic Overlays
 - **Basemap Hierarchy Preserved**:
@@ -416,4 +416,4 @@ BhoomiSetu maintains a centralized, single-source-of-truth layer catalogue (`ser
 
 ---
 
-**Conclusion:** BhoomiSetu's external integration layer is architecturally decoupled, resilient, and honest about its configured states. The application is completely functional out of the box and fully prepared to ingest commercial or institutional credentials as they become available.
+**Conclusion:** BhoomiDarpan's external integration layer is architecturally decoupled, resilient, and honest about its configured states. The application is completely functional out of the box and fully prepared to ingest commercial or institutional credentials as they become available.

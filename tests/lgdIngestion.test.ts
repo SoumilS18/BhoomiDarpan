@@ -427,7 +427,7 @@ describe('LGD Authoritative Administrative Geography Ingestion & Integration Sui
     it('allows Admin unrestricted national portfolio visibility across all LGD jurisdictions', () => {
       const adminUser: UserProfile = {
         id: 'usr-admin-1',
-        email: 'admin@bhoomisetu.gov.in',
+        email: 'admin@bhoomidarpan.gov.in',
         full_name: 'National Administrator',
         role: 'admin',
         department: 'Ministry of Land Resources',
