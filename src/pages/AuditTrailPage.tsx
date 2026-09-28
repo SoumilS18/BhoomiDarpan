@@ -208,7 +208,7 @@ export const AuditTrailPage: React.FC = () => {
             const sevMeta = SEVERITY_BADGES[ev.severity] || SEVERITY_BADGES.info;
 
             return (
-              <Card key={ev.id} className="p-4.5 hover:border-terra-300 hover:shadow-md transition-all border-sand-200 bg-[#FFFDF9]/95">
+              <Card key={ev.id} className="p-5 hover:border-terra-300 hover:shadow-md transition-all border-sand-200 bg-[#FFFDF9]/95">
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                   <div className="space-y-2 flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -278,15 +278,15 @@ export const AuditTrailPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="text-right shrink-0 min-w-[145px] sm:min-w-[160px] pl-4 sm:border-l sm:border-sand-200/80 flex flex-col justify-center items-end">
-                    <div className="text-xs font-bold text-mocha-950 whitespace-nowrap">
+                  <div className="text-right shrink-0 min-w-[125px] pl-3 sm:border-l sm:border-sand-200/70 flex flex-col justify-center items-end self-start pt-0.5 pr-1">
+                    <div className="text-[11px] font-bold text-mocha-900 whitespace-nowrap tracking-tight">
                       {new Date(ev.timestamp).toLocaleDateString('en-IN', {
                         day: '2-digit',
                         month: 'short',
                         year: 'numeric',
                       })}
                     </div>
-                    <div className="text-[10px] text-mocha-500 font-mono mt-0.5 whitespace-nowrap font-medium">
+                    <div className="text-[9px] text-mocha-500 font-mono mt-0.5 whitespace-nowrap font-medium tracking-tight">
                       {new Date(ev.timestamp).toLocaleTimeString('en-IN', {
                         hour: '2-digit',
                         minute: '2-digit',
