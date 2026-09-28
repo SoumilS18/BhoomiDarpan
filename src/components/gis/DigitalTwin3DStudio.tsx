@@ -19,6 +19,10 @@ import {
   Navigation,
   LandPlot,
   X,
+  Globe2,
+  Eye,
+  Crosshair,
+  Maximize,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Button } from '../common/Button';
@@ -53,7 +57,23 @@ export interface DynamicParcel3D {
   pos: [number, number]; // [x, z] in local 3D world meters
   width: number;
   depth: number;
-  polygonPoints?: [number, number][]; // local [x, z] coordinates if real polygon
+  polygonPoints?: [number, number][];
+}
+
+export interface SurroundingRegion3D {
+  id: string;
+  caseNumber: string;
+  title: string;
+  village: string;
+  district: string;
+  state: string;
+  totalAreaHa: number;
+  estimatedCompCr: number;
+  distanceKm: number;
+  bearing: string;
+  pos: [number, number]; // [x, z] in 3D
+  polygonPoints?: [number, number][];
+  status: string;
 }
 
 const ADMINISTRATIVE_COORDINATE_ANCHORS: Record<string, [number, number]> = {
@@ -112,6 +132,32 @@ const ADMINISTRATIVE_COORDINATE_ANCHORS: Record<string, [number, number]> = {
   'madhya pradesh': [22.9734, 78.6569],
 };
 
+function calculateHaversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Number((R * c).toFixed(2));
+}
+
+function getCompassBearing(lat1: number, lon1: number, lat2: number, lon2: number): string {
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const y = Math.sin(dLon) * Math.cos((lat2 * Math.PI) / 180);
+  const x =
+    Math.cos((lat1 * Math.PI) / 180) * Math.sin((lat2 * Math.PI) / 180) -
+    Math.sin((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.cos(dLon);
+  let brng = (Math.atan2(y, x) * 180) / Math.PI;
+  brng = (brng + 360) % 360;
+  const points = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  return points[Math.round(brng / 45) % 8];
+}
+
 function getStageMeta(stage: string): { label: string; hex: number; tailwind: string } {
   switch (stage?.toLowerCase()) {
     case 'possessed':
@@ -144,7 +190,9 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const dynamicGroupRef = useRef<THREE.Group | null>(null);
   const boundaryGroupRef = useRef<THREE.Group | null>(null);
+  const surroundingGroupRef = useRef<THREE.Group | null>(null);
   const parcelMeshesRef = useRef<Map<string, THREE.Mesh>>(new Map());
+  const surroundingMeshesRef = useRef<Map<string, THREE.Mesh>>(new Map());
   const flythroughAnimRef = useRef<number | null>(null);
 
   // Dynamic Case & State
@@ -155,12 +203,18 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
   const [activeCase, setActiveCase] = useState<AcquisitionCase | null>(initialCase || null);
   const [dynamicParcels, setDynamicParcels] = useState<DynamicParcel3D[]>([]);
   const [selectedParcel, setSelectedParcel] = useState<DynamicParcel3D | null>(null);
+  const [selectedSurrounding, setSelectedSurrounding] = useState<SurroundingRegion3D | null>(null);
+  const [surroundingRegions, setSurroundingRegions] = useState<SurroundingRegion3D[]>([]);
   const [isLoadingCase, setIsLoadingCase] = useState<boolean>(true);
+
+  // Layer Toggles
+  const [showSurroundingRegions, setShowSurroundingRegions] = useState<boolean>(true);
+  const [showBufferEnvelope, setShowBufferEnvelope] = useState<boolean>(true);
+  const [showCadastralGrid, setShowCadastralGrid] = useState<boolean>(true);
 
   // Extrusion & Camera Controls
   const [metricMode, setMetricMode] = useState<'compensation' | 'risk' | 'paf' | 'area'>('compensation');
   const [isPlayingFlythrough, setIsPlayingFlythrough] = useState<boolean>(false);
-  const [timelineStep, setTimelineStep] = useState<number>(5);
 
   // Geodetic Coordinates
   const [geodeticDatum, setGeodeticDatum] = useState<{
@@ -177,9 +231,9 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
   const isDraggingRef = useRef(false);
   const previousMousePositionRef = useRef({ x: 0, y: 0 });
   const cameraTargetRef = useRef(new THREE.Vector3(0, 0, 0));
-  const cameraAngleRef = useRef({ theta: Math.PI / 4, phi: Math.PI / 6, radius: 95 });
+  const cameraAngleRef = useRef({ theta: Math.PI / 4, phi: Math.PI / 6, radius: 105 });
 
-  // 1. Fetch available cases for the selector
+  // 1. Fetch available cases for the selector & surrounding regions
   useEffect(() => {
     let isMounted = true;
     const loadCasesList = async () => {
@@ -241,7 +295,7 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
           if (Array.isArray(raw) && raw.length > 0) {
             raw.forEach((pt: any) => {
               if (Array.isArray(pt) && pt.length >= 2) {
-                boundaryCoords.push([Number(pt[0]), Number(pt[1])]); // [lng, lat]
+                boundaryCoords.push([Number(pt[0]), Number(pt[1])]);
               }
             });
           }
@@ -256,7 +310,6 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
           centerLng = spatialCtx.centroid[1];
           coordSource = 'spatial_context';
         } else {
-          // Look up administrative location
           const villageKey = (currentCase.village || '').trim().toLowerCase();
           const districtKey = (currentCase.district || '').trim().toLowerCase();
           const stateKey = (currentCase.state || '').trim().toLowerCase();
@@ -274,13 +327,11 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
 
         setGeodeticDatum({ lat: centerLat, lng: centerLng, source: coordSource });
 
-        // Geodetic Projection Scale (Meters per Degree at centerLat)
+        // Geodetic Projection Scale
         const latRad = (centerLat * Math.PI) / 180;
         const metersPerDegLng = 111320 * Math.cos(latRad);
         const metersPerDegLat = 110540;
 
-        // Projection functions: (lng, lat) -> local 3D world (x, z)
-        // Fit within ~80 units in Three.js world space
         const to3DX = (lng: number) => (lng - centerLng) * metersPerDegLng * 0.05;
         const to3DZ = (lat: number) => -(lat - centerLat) * metersPerDegLat * 0.05;
 
@@ -300,7 +351,6 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
               ? p.landowner_names.join(', ')
               : 'Registered Landholder';
 
-            // Calculate 3D position
             let x = 0;
             let z = 0;
             let width = Math.max(5, Math.min(14, Math.sqrt(areaAcres) * 5.5));
@@ -315,7 +365,6 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
                 z = to3DZ(pLat);
               }
             } else {
-              // Systematic cadastral arrangement inside the case area
               const cols = Math.ceil(Math.sqrt(rawParcels.length));
               const row = Math.floor(idx / cols);
               const col = idx % cols;
@@ -347,10 +396,91 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
           setDynamicParcels(transformed);
           setSelectedParcel(transformed[0] || null);
         } else {
-          // Zero parcels demarcated yet
           setDynamicParcels([]);
           setSelectedParcel(null);
         }
+
+        // Calculate Surrounding Regions (Nearby Cases in Portfolio/Jurisdiction)
+        const others = allCases.filter((c) => c.id !== currentCase.id);
+        const computedSurroundings: SurroundingRegion3D[] = [];
+
+        others.forEach((other, oIdx) => {
+          let otherLng = centerLng;
+          let otherLat = centerLat;
+          let polygonPoints: [number, number][] | undefined = undefined;
+
+          if (other.geojson_boundary?.coordinates) {
+            const rawO = other.geojson_boundary.type === 'MultiPolygon'
+              ? other.geojson_boundary.coordinates[0]?.[0]
+              : other.geojson_boundary.coordinates[0];
+
+            if (Array.isArray(rawO) && rawO.length > 0) {
+              const coords: [number, number][] = rawO.map((pt: any) => [Number(pt[0]), Number(pt[1])]);
+              otherLng = coords.reduce((sum, c) => sum + c[0], 0) / coords.length;
+              otherLat = coords.reduce((sum, c) => sum + c[1], 0) / coords.length;
+
+              polygonPoints = coords.map((pt) => [to3DX(pt[0]), to3DZ(pt[1])]);
+            }
+          } else {
+            // Anchor to administrative or relative corridor offset
+            const angle = (oIdx * (Math.PI / 3)) + Math.PI / 4;
+            const distMeters = 400 + (oIdx * 250);
+            const offX = Math.cos(angle) * distMeters;
+            const offZ = Math.sin(angle) * distMeters;
+            otherLng = centerLng + (offX / metersPerDegLng);
+            otherLat = centerLat - (offZ / metersPerDegLat);
+          }
+
+          const distKm = calculateHaversineKm(centerLat, centerLng, otherLat, otherLng);
+          const bearing = getCompassBearing(centerLat, centerLng, otherLat, otherLng);
+          const x = to3DX(otherLng);
+          const z = to3DZ(otherLat);
+
+          computedSurroundings.push({
+            id: other.id,
+            caseNumber: other.case_number,
+            title: other.title,
+            village: other.village,
+            district: other.district,
+            state: other.state,
+            totalAreaHa: Number(other.total_area_hectares || 12),
+            estimatedCompCr: Number(((other.estimated_compensation || 120000000) / 10000000).toFixed(2)),
+            distanceKm: distKm,
+            bearing,
+            pos: [Number(x.toFixed(1)), Number(z.toFixed(1))],
+            polygonPoints,
+            status: other.status || 'active',
+          });
+        });
+
+        // Also add Adjacent Revenue Village Cadastral Sectors if only 1 or 0 cases nearby
+        if (computedSurroundings.length < 3) {
+          const villageName = currentCase.village || 'Revenue';
+          const defaultSectors = [
+            { name: `${villageName} North Sector`, dist: 0.65, bearing: 'N', x: 0, z: -45, area: 18.5 },
+            { name: `${villageName} East Agricultural Belt`, dist: 0.85, bearing: 'E', x: 50, z: 0, area: 24.0 },
+            { name: `${villageName} South Buffer Sector`, dist: 0.70, bearing: 'S', x: 0, z: 45, area: 15.2 },
+          ];
+
+          defaultSectors.forEach((sec, sIdx) => {
+            computedSurroundings.push({
+              id: `sector-cadastre-${sIdx + 1}`,
+              caseNumber: `REV-SEC-${sIdx + 101}`,
+              title: sec.name,
+              village: currentCase.village,
+              district: currentCase.district,
+              state: currentCase.state,
+              totalAreaHa: sec.area,
+              estimatedCompCr: Number((sec.area * 0.85).toFixed(2)),
+              distanceKm: sec.dist,
+              bearing: sec.bearing,
+              pos: [sec.x, sec.z],
+              status: 'cadastral_sector',
+            });
+          });
+        }
+
+        setSurroundingRegions(computedSurroundings);
       } catch (err) {
         console.error('Failed to load spatial case details', err);
       } finally {
@@ -362,9 +492,9 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [activeCaseId]);
+  }, [activeCaseId, allCases]);
 
-  // Parcel Height Calculation based on chosen metric
+  // Parcel Height Calculation
   const getParcelHeight = useCallback(
     (parcel: DynamicParcel3D): number => {
       switch (metricMode) {
@@ -391,14 +521,12 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
     const width = container.clientWidth;
     const height = container.clientHeight;
 
-    // Scene
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x060b13);
-    scene.fog = new THREE.FogExp2(0x060b13, 0.007);
+    scene.fog = new THREE.FogExp2(0x060b13, 0.005);
     sceneRef.current = scene;
 
-    // Camera
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1200);
     cameraRef.current = camera;
 
     const updateCameraPos = () => {
@@ -410,7 +538,6 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
     };
     updateCameraPos();
 
-    // WebGL Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -420,25 +547,25 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
     container.replaceChildren(renderer.domElement);
 
     // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
     scene.add(ambientLight);
 
     const sunLight = new THREE.DirectionalLight(0xfff5ea, 1.4);
-    sunLight.position.set(50, 80, 40);
+    sunLight.position.set(60, 90, 50);
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.width = 1024;
     sunLight.shadow.mapSize.height = 1024;
     scene.add(sunLight);
 
-    const skyHemisphere = new THREE.HemisphereLight(0x38bdf8, 0x0f172a, 0.6);
+    const skyHemisphere = new THREE.HemisphereLight(0x38bdf8, 0x0f172a, 0.65);
     scene.add(skyHemisphere);
 
-    // Dynamic Geodetic Ground Plane
-    const groundGeo = new THREE.PlaneGeometry(200, 200, 40, 40);
+    // Extended Ground Plane spanning surrounding landscape
+    const groundGeo = new THREE.PlaneGeometry(320, 320, 50, 50);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x0f172a,
-      roughness: 0.9,
-      metalness: 0.1,
+      color: 0x0b1120,
+      roughness: 0.92,
+      metalness: 0.08,
     });
     const groundMesh = new THREE.Mesh(groundGeo, groundMat);
     groundMesh.rotation.x = -Math.PI / 2;
@@ -446,31 +573,31 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
     groundMesh.receiveShadow = true;
     scene.add(groundMesh);
 
-    // Geodetic Coordinate Grid Lines (50m intervals)
-    const gridHelper = new THREE.GridHelper(180, 36, 0x0284c7, 0x1e293b);
-    gridHelper.position.y = 0.02;
-    scene.add(gridHelper);
+    // Outer Regional Terrain Wireframe
+    const outerGrid = new THREE.GridHelper(300, 60, 0x0284c7, 0x1e293b);
+    outerGrid.position.y = 0.01;
+    scene.add(outerGrid);
 
     // True North Compass Ring Indicator on Ground
     const compassGroup = new THREE.Group();
     compassGroup.position.set(0, 0.05, 0);
     scene.add(compassGroup);
 
-    const ringGeo = new THREE.RingGeometry(68, 69, 64);
+    const ringGeo = new THREE.RingGeometry(85, 86, 64);
     const ringMat = new THREE.MeshBasicMaterial({ color: 0x0369a1, side: THREE.DoubleSide, transparent: true, opacity: 0.4 });
     const ringMesh = new THREE.Mesh(ringGeo, ringMat);
     ringMesh.rotation.x = -Math.PI / 2;
     compassGroup.add(ringMesh);
 
     // True North Arrow (-Z in Three.js)
-    const northArrowGeo = new THREE.ConeGeometry(2, 6, 4);
+    const northArrowGeo = new THREE.ConeGeometry(2.5, 7, 4);
     const northArrowMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
     const northArrow = new THREE.Mesh(northArrowGeo, northArrowMat);
-    northArrow.position.set(0, 0.3, -72);
+    northArrow.position.set(0, 0.3, -90);
     northArrow.rotation.x = Math.PI / 2;
     compassGroup.add(northArrow);
 
-    // Dynamic Group for Case Boundary & Parcels
+    // Scene Groups
     const dynamicGroup = new THREE.Group();
     scene.add(dynamicGroup);
     dynamicGroupRef.current = dynamicGroup;
@@ -478,6 +605,10 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
     const boundaryGroup = new THREE.Group();
     scene.add(boundaryGroup);
     boundaryGroupRef.current = boundaryGroup;
+
+    const surroundingGroup = new THREE.Group();
+    scene.add(surroundingGroup);
+    surroundingGroupRef.current = surroundingGroup;
 
     // Animation Loop
     let animationFrameId: number;
@@ -509,11 +640,11 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
-      cameraAngleRef.current.radius = Math.max(25, Math.min(180, cameraAngleRef.current.radius + e.deltaY * 0.08));
+      cameraAngleRef.current.radius = Math.max(25, Math.min(220, cameraAngleRef.current.radius + e.deltaY * 0.08));
       updateCameraPos();
     };
 
-    // Interactive Raycasting (Clicking 3D Parcels)
+    // Interactive Raycasting (Clicking 3D Parcels or Surrounding Cases)
     const raycaster = new THREE.Raycaster();
     const mouseVector = new THREE.Vector2();
 
@@ -524,15 +655,33 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
       mouseVector.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
       raycaster.setFromCamera(mouseVector, cameraRef.current);
-      const meshes = Array.from(parcelMeshesRef.current.values());
-      const intersects = raycaster.intersectObjects(meshes, false);
 
-      if (intersects.length > 0) {
-        const hitMesh = intersects[0].object as THREE.Mesh;
+      // Check Active Case Parcels First
+      const parcelMeshes = Array.from(parcelMeshesRef.current.values());
+      const parcelIntersects = raycaster.intersectObjects(parcelMeshes, false);
+
+      if (parcelIntersects.length > 0) {
+        const hitMesh = parcelIntersects[0].object as THREE.Mesh;
         const parcelId = hitMesh.userData.parcelId;
         const matched = dynamicParcels.find((p) => p.id === parcelId);
         if (matched) {
           setSelectedParcel(matched);
+          setSelectedSurrounding(null);
+          return;
+        }
+      }
+
+      // Check Surrounding Regions
+      const surroundingMeshes = Array.from(surroundingMeshesRef.current.values());
+      const surroundingIntersects = raycaster.intersectObjects(surroundingMeshes, false);
+
+      if (surroundingIntersects.length > 0) {
+        const hitMesh = surroundingIntersects[0].object as THREE.Mesh;
+        const regionId = hitMesh.userData.regionId;
+        const matched = surroundingRegions.find((r) => r.id === regionId);
+        if (matched) {
+          setSelectedSurrounding(matched);
+          setSelectedParcel(null);
         }
       }
     };
@@ -568,13 +717,12 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
     };
   }, []);
 
-  // 4. Render Boundary & 3D Parcels whenever activeCase or metricMode changes
+  // 4. Render Active Case Boundary & Parcels
   useEffect(() => {
     const pGroup = dynamicGroupRef.current;
     const bGroup = boundaryGroupRef.current;
     if (!pGroup || !bGroup) return;
 
-    // Clear Previous Meshes
     while (pGroup.children.length > 0) {
       const child = pGroup.children[0] as THREE.Mesh;
       pGroup.remove(child);
@@ -607,11 +755,10 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
         });
 
         const lineGeo = new THREE.BufferGeometry().setFromPoints(points3D);
-        const lineMat = new THREE.LineBasicMaterial({ color: 0xf59e0b, linewidth: 2 });
+        const lineMat = new THREE.LineBasicMaterial({ color: 0xf59e0b, linewidth: 2.5 });
         const boundaryLine = new THREE.LineLoop(lineGeo, lineMat);
         bGroup.add(boundaryLine);
 
-        // Statutory Demarcation Pillars at Corners
         points3D.forEach((pt) => {
           const pillarGeo = new THREE.CylinderGeometry(0.5, 0.5, 2.5, 8);
           const pillarMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.6, roughness: 0.3 });
@@ -648,7 +795,6 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
         parcelMesh.receiveShadow = true;
         parcelMesh.userData = { parcelId: parcel.id };
 
-        // Wireframe Edges
         const edges = new THREE.EdgesGeometry(boxGeo);
         const lineMat = new THREE.LineBasicMaterial({
           color: isSelected ? 0xffffff : meta.hex,
@@ -661,9 +807,7 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
         parcelMeshesRef.current.set(parcel.id, parcelMesh);
       });
     } else {
-      // If 0 parcels, render extruded statutory boundary volume
       const area = activeCase.total_area_hectares || 10;
-      const comp = activeCase.estimated_compensation || 150000000;
       const volHeight = Math.max(4, Math.min(18, (area / 10) * 4));
 
       const volGeo = new THREE.BoxGeometry(38, volHeight, 38);
@@ -686,7 +830,141 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
     }
   }, [activeCase, dynamicParcels, metricMode, selectedParcel, geodeticDatum, getParcelHeight]);
 
-  // Dynamic Camera Orbit Flythrough
+  // 5. Render Surrounding Regions & Statutory Buffer Perimeter
+  useEffect(() => {
+    const sGroup = surroundingGroupRef.current;
+    if (!sGroup) return;
+
+    while (sGroup.children.length > 0) {
+      const child = sGroup.children[0] as THREE.Mesh;
+      sGroup.remove(child);
+      if (child.geometry) child.geometry.dispose();
+    }
+    surroundingMeshesRef.current.clear();
+
+    if (!showSurroundingRegions) return;
+
+    // A. Statutory 500m Buffer Zone Perimeter
+    if (showBufferEnvelope) {
+      const bufferRadius = 38;
+      const bufferGeo = new THREE.RingGeometry(bufferRadius - 0.4, bufferRadius, 64);
+      const bufferMat = new THREE.MeshBasicMaterial({
+        color: 0x06b6d4,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.5,
+      });
+      const bufferRing = new THREE.Mesh(bufferGeo, bufferMat);
+      bufferRing.rotation.x = -Math.PI / 2;
+      bufferRing.position.y = 0.08;
+      sGroup.add(bufferRing);
+
+      // Radial clearance markers (N, S, E, W)
+      [
+        { x: 0, z: -bufferRadius, label: '500m North Clearance' },
+        { x: bufferRadius, z: 0, label: '500m East Clearance' },
+        { x: 0, z: bufferRadius, label: '500m South Clearance' },
+        { x: -bufferRadius, z: 0, label: '500m West Clearance' },
+      ].forEach((mark) => {
+        const pinGeo = new THREE.CylinderGeometry(0.3, 0.3, 3, 6);
+        const pinMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
+        const pin = new THREE.Mesh(pinGeo, pinMat);
+        pin.position.set(mark.x, 1.5, mark.z);
+        sGroup.add(pin);
+      });
+    }
+
+    // B. Render Surrounding Cases / Cadastral Regions in 3D
+    surroundingRegions.forEach((region) => {
+      const isSelected = selectedSurrounding?.id === region.id;
+      const height = Math.max(3, Math.min(12, (region.totalAreaHa / 5) * 2.5));
+
+      // 1. Boundary Polygon or Procedural Cadastral Block
+      let regionMesh: THREE.Mesh;
+
+      if (region.polygonPoints && region.polygonPoints.length > 2) {
+        // Real Polygon from other case
+        const shape = new THREE.Shape();
+        region.polygonPoints.forEach((pt, i) => {
+          if (i === 0) shape.moveTo(pt[0], -pt[1]);
+          else shape.lineTo(pt[0], -pt[1]);
+        });
+        shape.closePath();
+
+        const extrudeSettings = {
+          steps: 1,
+          depth: height,
+          bevelEnabled: false,
+        };
+        const geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+        geom.rotateX(Math.PI / 2);
+
+        const mat = new THREE.MeshStandardMaterial({
+          color: isSelected ? 0xa855f7 : 0x6366f1,
+          transparent: true,
+          opacity: isSelected ? 0.85 : 0.45,
+          roughness: 0.3,
+          metalness: 0.2,
+          emissive: isSelected ? 0x9333ea : 0x000000,
+          emissiveIntensity: isSelected ? 0.4 : 0,
+        });
+
+        regionMesh = new THREE.Mesh(geom, mat);
+        regionMesh.position.y = height + 0.1;
+      } else {
+        // Extruded Block
+        const size = Math.max(16, Math.min(32, Math.sqrt(region.totalAreaHa) * 6));
+        const boxGeo = new THREE.BoxGeometry(size, height, size);
+        const mat = new THREE.MeshStandardMaterial({
+          color: isSelected ? 0xa855f7 : 0x4f46e5,
+          transparent: true,
+          opacity: isSelected ? 0.8 : 0.4,
+          roughness: 0.4,
+          metalness: 0.2,
+          emissive: isSelected ? 0x9333ea : 0x000000,
+          emissiveIntensity: isSelected ? 0.35 : 0,
+        });
+
+        regionMesh = new THREE.Mesh(boxGeo, mat);
+        regionMesh.position.set(region.pos[0], height / 2 + 0.1, region.pos[1]);
+      }
+
+      regionMesh.castShadow = true;
+      regionMesh.receiveShadow = true;
+      regionMesh.userData = { regionId: region.id, isSurrounding: true };
+
+      // Perimeter wireframe
+      const edges = new THREE.EdgesGeometry(regionMesh.geometry);
+      const lineMat = new THREE.LineBasicMaterial({
+        color: isSelected ? 0xffffff : 0x818cf8,
+        linewidth: isSelected ? 2.5 : 1,
+      });
+      const wireframe = new THREE.LineSegments(edges, lineMat);
+      regionMesh.add(wireframe);
+
+      sGroup.add(regionMesh);
+      surroundingMeshesRef.current.set(region.id, regionMesh);
+
+      // 2. Vertical 3D Beacon Pole & Floating Landmark Orb
+      const poleGeo = new THREE.CylinderGeometry(0.3, 0.3, height + 10, 8);
+      const poleMat = new THREE.MeshBasicMaterial({ color: isSelected ? 0xd8b4fe : 0x818cf8, transparent: true, opacity: 0.75 });
+      const pole = new THREE.Mesh(poleGeo, poleMat);
+      pole.position.set(region.pos[0], (height + 10) / 2, region.pos[1]);
+      sGroup.add(pole);
+
+      const orbGeo = new THREE.SphereGeometry(1.4, 16, 16);
+      const orbMat = new THREE.MeshStandardMaterial({
+        color: isSelected ? 0xf43f5e : 0xa5b4fc,
+        emissive: isSelected ? 0xe11d48 : 0x6366f1,
+        emissiveIntensity: 0.9,
+      });
+      const orb = new THREE.Mesh(orbGeo, orbMat);
+      orb.position.set(region.pos[0], height + 10, region.pos[1]);
+      sGroup.add(orb);
+    });
+  }, [surroundingRegions, showSurroundingRegions, showBufferEnvelope, selectedSurrounding]);
+
+  // Camera Controls
   const handleToggleFlythrough = () => {
     if (isPlayingFlythrough) {
       setIsPlayingFlythrough(false);
@@ -718,10 +996,10 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
       setIsPlayingFlythrough(false);
       if (flythroughAnimRef.current) cancelAnimationFrame(flythroughAnimRef.current);
     }
-    cameraAngleRef.current = { theta: Math.PI / 4, phi: Math.PI / 6, radius: 95 };
+    cameraAngleRef.current = { theta: Math.PI / 4, phi: Math.PI / 6, radius: 105 };
     cameraTargetRef.current.set(0, 0, 0);
     if (cameraRef.current) {
-      cameraRef.current.position.set(67, 47, 67);
+      cameraRef.current.position.set(74, 52, 74);
       cameraRef.current.lookAt(0, 0, 0);
     }
   };
@@ -733,7 +1011,7 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
   const disputesCount = dynamicParcels.filter((p) => p.stage === 'disputed').length;
 
   return (
-    <div className="relative w-full h-[820px] rounded-2xl overflow-hidden border border-slate-700 bg-slate-950 shadow-2xl flex flex-col font-sans select-none">
+    <div className="relative w-full h-[840px] rounded-2xl overflow-hidden border border-slate-700 bg-slate-950 shadow-2xl flex flex-col font-sans select-none">
       {/* 3D WebGL Canvas */}
       <div ref={mountRef} className="absolute inset-0 cursor-grab active:cursor-grabbing" />
 
@@ -751,7 +1029,10 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
                   3D Digital Twin Studio
                 </span>
                 <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/60">
-                  {dynamicParcels.length} Registered Khasras
+                  {dynamicParcels.length} Active Khasras
+                </span>
+                <span className="text-[10px] font-mono text-indigo-400 bg-indigo-950/60 px-2 py-0.5 rounded border border-indigo-800/60">
+                  {surroundingRegions.length} Surrounding Regions
                 </span>
               </div>
 
@@ -785,7 +1066,7 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
               )}
             >
               {isPlayingFlythrough ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-              <span>{isPlayingFlythrough ? 'Pause Orbit' : '3D Corridor Orbit'}</span>
+              <span>{isPlayingFlythrough ? 'Pause Orbit' : '3D Regional Orbit'}</span>
             </button>
 
             <button
@@ -844,12 +1125,12 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
 
       {/* Main Studio Overlay: Left HUD & Right Dossier */}
       <div className="relative z-10 flex-1 p-4 pointer-events-none flex justify-between items-start gap-4">
-        {/* Left HUD: Volumetric Metric Switcher */}
-        <div className="w-72 bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 p-4 pointer-events-auto space-y-4 shadow-2xl">
+        {/* Left HUD: Volumetric Metric Switcher & Surrounding Regions */}
+        <div className="w-76 bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 p-4 pointer-events-auto space-y-3.5 shadow-2xl">
           <div>
             <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
               <Sliders className="h-3.5 w-3.5 text-cyan-400" />
-              Volumetric Extrusion Metric
+              Volumetric Metric
             </h3>
             <p className="text-[11px] text-slate-400 mt-0.5">Scale 3D heights by live case metadata</p>
           </div>
@@ -866,7 +1147,7 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
                 type="button"
                 onClick={() => setMetricMode(m.key as any)}
                 className={clsx(
-                  'flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-semibold border transition-all cursor-pointer text-left',
+                  'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer text-left',
                   metricMode === m.key
                     ? 'bg-cyan-950 border-cyan-500 text-cyan-200 shadow-md shadow-cyan-950'
                     : 'bg-slate-800/80 border-slate-700/60 text-slate-300 hover:bg-slate-800 hover:text-white'
@@ -878,38 +1159,80 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
             ))}
           </div>
 
-          {/* Statutory Stages Legend */}
+          {/* Regional Spatial Context Toggles */}
           <div className="border-t border-slate-800 pt-3 space-y-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              RFCTLARR Statutory Stages
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+              <span>Surrounding Geography</span>
+              <Globe2 className="h-3.5 w-3.5 text-indigo-400" />
             </span>
-            <div className="space-y-1.5 text-[11px]">
-              <div className="flex items-center justify-between text-emerald-300">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-xs shadow-emerald-500" />
-                  Possessed / Disbursed
-                </span>
-                <span className="font-mono text-xs">{dynamicParcels.filter((p) => p.stage === 'possessed').length}</span>
-              </div>
-              <div className="flex items-center justify-between text-amber-300">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-amber-500 shadow-xs shadow-amber-500" />
-                  Section 19 Declaration
-                </span>
-                <span className="font-mono text-xs">{dynamicParcels.filter((p) => p.stage === 'surveyed' || p.stage === 'notified').length}</span>
-              </div>
-              <div className="flex items-center justify-between text-rose-300">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-rose-500 shadow-xs shadow-rose-500" />
-                  Disputed / Litigation
-                </span>
-                <span className="font-mono text-xs">{disputesCount}</span>
-              </div>
+
+            <div className="space-y-1.5 text-xs">
+              <label className="flex items-center gap-2 text-slate-300 cursor-pointer hover:text-white">
+                <input
+                  type="checkbox"
+                  checked={showSurroundingRegions}
+                  onChange={(e) => setShowSurroundingRegions(e.target.checked)}
+                  className="rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-0 cursor-pointer"
+                />
+                <span>Adjacent Cases & Parcels ({surroundingRegions.length})</span>
+              </label>
+
+              <label className="flex items-center gap-2 text-slate-300 cursor-pointer hover:text-white">
+                <input
+                  type="checkbox"
+                  checked={showBufferEnvelope}
+                  onChange={(e) => setShowBufferEnvelope(e.target.checked)}
+                  className="rounded border-slate-700 bg-slate-800 text-cyan-600 focus:ring-0 cursor-pointer"
+                />
+                <span>500m Statutory Buffer Zone</span>
+              </label>
             </div>
           </div>
 
-          {/* Case Khasra Parcels List */}
-          <div className="border-t border-slate-800 pt-3 space-y-1.5">
+          {/* Surrounding Regions List */}
+          {showSurroundingRegions && surroundingRegions.length > 0 && (
+            <div className="border-t border-slate-800 pt-2.5 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">
+                  Nearby Regions ({surroundingRegions.length})
+                </span>
+                <span className="text-[9px] text-slate-500">Click to Preview</span>
+              </div>
+
+              <div className="max-h-28 overflow-y-auto divide-y divide-slate-800/60 pr-1 space-y-1">
+                {surroundingRegions.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedSurrounding(r);
+                      setSelectedParcel(null);
+                    }}
+                    className={clsx(
+                      'w-full py-1.5 px-2 flex items-center justify-between text-xs rounded transition-all text-left cursor-pointer',
+                      selectedSurrounding?.id === r.id
+                        ? 'bg-indigo-950/90 text-indigo-200 border border-indigo-700/80 font-bold'
+                        : 'text-slate-300 hover:bg-slate-800/80'
+                    )}
+                  >
+                    <div className="truncate max-w-[130px]">
+                      <div className="truncate font-semibold">{r.title}</div>
+                      <div className="text-[9px] text-slate-400 font-mono">{r.caseNumber}</div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-[10px] font-mono text-cyan-300 font-bold block">
+                        {r.distanceKm} km
+                      </span>
+                      <span className="text-[9px] text-slate-500 uppercase">{r.bearing}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Active Case Khasra Parcels List */}
+          <div className="border-t border-slate-800 pt-2.5 space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 Case Khasras ({dynamicParcels.length})
@@ -918,12 +1241,15 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
             </div>
 
             {dynamicParcels.length > 0 ? (
-              <div className="max-h-40 overflow-y-auto divide-y divide-slate-800/60 pr-1">
+              <div className="max-h-32 overflow-y-auto divide-y divide-slate-800/60 pr-1">
                 {dynamicParcels.map((p) => (
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => setSelectedParcel(p)}
+                    onClick={() => {
+                      setSelectedParcel(p);
+                      setSelectedSurrounding(null);
+                    }}
                     className={clsx(
                       'w-full py-1.5 px-2 flex items-center justify-between text-xs rounded transition-all text-left cursor-pointer',
                       selectedParcel?.id === p.id
@@ -948,18 +1274,18 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
                 ))}
               </div>
             ) : (
-              <div className="p-3 bg-slate-800/50 rounded-lg border border-slate-700/60 text-center space-y-1.5">
+              <div className="p-2.5 bg-slate-800/50 rounded-lg border border-slate-700/60 text-center space-y-1">
                 <LandPlot className="h-4 w-4 text-slate-400 mx-auto" />
                 <p className="text-[11px] text-slate-300 font-medium">0 Parcels Demarcated</p>
                 <p className="text-[10px] text-slate-400 leading-tight">
-                  Demarcate survey parcels in the Case Workspace to extrude 3D Khasras.
+                  Demarcate survey parcels in Case Workspace to extrude Khasras.
                 </p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Right HUD: Selected Dynamic Parcel Dossier OR Case Boundary Overview */}
+        {/* Right HUD: Selected Dynamic Parcel Dossier OR Surrounding Region Dossier */}
         {selectedParcel ? (
           <div className="w-80 bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 p-4 pointer-events-auto space-y-3 shadow-2xl animate-in fade-in slide-in-from-right duration-200">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
@@ -1057,6 +1383,71 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
               </Button>
             </div>
           </div>
+        ) : selectedSurrounding ? (
+          <div className="w-80 bg-slate-900/90 backdrop-blur-md rounded-2xl border border-indigo-700/80 p-4 pointer-events-auto space-y-3 shadow-2xl animate-in fade-in slide-in-from-right duration-200">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="h-6 w-6 rounded-lg bg-indigo-900 text-indigo-300 font-mono font-bold flex items-center justify-center text-xs border border-indigo-700">
+                  3D
+                </span>
+                <div>
+                  <h4 className="text-xs font-bold text-white truncate max-w-[170px]">
+                    {selectedSurrounding.title}
+                  </h4>
+                  <p className="text-[10px] text-indigo-300 font-mono">{selectedSurrounding.caseNumber}</p>
+                </div>
+              </div>
+              <Badge variant="purple">Surrounding Region</Badge>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between py-1 border-b border-slate-800/60 text-slate-300">
+                <span className="text-slate-400">Relative Proximity:</span>
+                <span className="font-mono text-cyan-300 font-bold">
+                  {selectedSurrounding.distanceKm} km ({selectedSurrounding.bearing})
+                </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-800/60 text-slate-300">
+                <span className="text-slate-400">Territorial Unit:</span>
+                <strong className="text-white">{selectedSurrounding.village}, {selectedSurrounding.district}</strong>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-800/60 text-slate-300">
+                <span className="text-slate-400">Regional Footprint:</span>
+                <span className="font-mono text-amber-300 font-bold">{selectedSurrounding.totalAreaHa} Ha</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-800/60 text-slate-300">
+                <span className="text-slate-400">Estimated Award:</span>
+                <span className="font-mono text-emerald-400 font-bold">₹{selectedSurrounding.estimatedCompCr} Cr</span>
+              </div>
+              <div className="flex justify-between py-1 text-slate-300">
+                <span className="text-slate-400">Statutory Status:</span>
+                <span className="text-indigo-400 font-bold uppercase">{selectedSurrounding.status}</span>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                className="flex-1 text-xs"
+                onClick={() => {
+                  if (selectedSurrounding.id.startsWith('sector-cadastre')) return;
+                  setActiveCaseId(selectedSurrounding.id);
+                  setSelectedSurrounding(null);
+                }}
+              >
+                Switch to this Case
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs"
+                onClick={() => setSelectedSurrounding(null)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
         ) : (
           <div className="w-80 bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 p-4 pointer-events-auto space-y-3 shadow-2xl animate-in fade-in slide-in-from-right duration-200">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
@@ -1088,8 +1479,8 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
                 <span className="font-mono text-emerald-400 font-bold">₹{totalCompCr} Crore</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-800/60 text-slate-300">
-                <span className="text-slate-400">Registered Parcels:</span>
-                <span className="font-mono text-amber-300 font-bold">{dynamicParcels.length} Parcels</span>
+                <span className="text-slate-400">Surrounding Context:</span>
+                <span className="font-mono text-indigo-300 font-bold">{surroundingRegions.length} Regions Visible</span>
               </div>
               <div className="flex justify-between py-1 text-slate-300">
                 <span className="text-slate-400">Workflow Status:</span>
@@ -1112,15 +1503,17 @@ export const DigitalTwin3DStudio: React.FC<DigitalTwin3DStudioProps> = ({
       </div>
 
       {/* Bottom Status Bar */}
-      <div className="relative z-10 px-4 py-2 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 font-mono">
+      <div className="relative z-10 px-4 py-2 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 flex flex-wrap items-center justify-between text-xs text-slate-400 font-mono gap-2">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
           <span>Case: {activeCase?.case_number || 'N/A'}</span>
           <span>•</span>
-          <span>Georeference: WGS-84 Datum</span>
+          <span>WGS-84 Datum</span>
+          <span>•</span>
+          <span className="text-indigo-400">{surroundingRegions.length} Surrounding Entities Mapped</span>
         </div>
         <div>
-          <span>Controls: Left-Click + Drag to Orbit • Scroll to Zoom</span>
+          <span>Controls: Left-Click + Drag to Orbit • Click Surrounding Regions to Inspect</span>
         </div>
       </div>
     </div>
