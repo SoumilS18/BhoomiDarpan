@@ -1857,39 +1857,116 @@ export function generateCasesGeoJSON(cases: AcquisitionCase[]): any {
   };
 }
 
+export function generateCorridorGeoJSON(
+  start: { latitude: number; longitude: number },
+  end: { latitude: number; longitude: number },
+  waypoints: Array<{ latitude: number; longitude: number }> = [],
+  rowWidthMeters = 80
+) {
+  const points = [start, ...waypoints, end];
+  const bufferDegrees = (rowWidthMeters / 2) / 111320;
+  
+  const leftPoints: number[][] = [];
+  const rightPoints: number[][] = [];
+  
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    let dx = 0;
+    let dy = 0;
+    
+    if (i < points.length - 1) {
+      const next = points[i + 1];
+      dx = next.longitude - p.longitude;
+      dy = next.latitude - p.latitude;
+    } else if (i > 0) {
+      const prev = points[i - 1];
+      dx = p.longitude - prev.longitude;
+      dy = p.latitude - prev.latitude;
+    }
+    
+    const len = Math.sqrt(dx * dx + dy * dy) || 1;
+    const nx = -dy / len;
+    const ny = dx / len;
+    
+    leftPoints.push([Number((p.longitude + nx * bufferDegrees).toFixed(6)), Number((p.latitude + ny * bufferDegrees).toFixed(6))]);
+    rightPoints.unshift([Number((p.longitude - nx * bufferDegrees).toFixed(6)), Number((p.latitude - ny * bufferDegrees).toFixed(6))]);
+  }
+  
+  const polygonRing = [...leftPoints, ...rightPoints, leftPoints[0]];
+  
+  return {
+    type: 'Polygon',
+    coordinates: [polygonRing],
+  };
+}
+
 /**
  * Builds GeoJSON FeatureCollection of projects (corridors or polygons).
+ * Resiliently generates Right-of-Way (RoW) corridor geometries from linked cases
+ * or geodetic anchors if explicit geojson_boundary is not pre-assigned.
  */
-export function generateProjectsGeoJSON(projects: Project[]): any {
+export function generateProjectsGeoJSON(projects: Project[], cases?: AcquisitionCase[]): any {
   const features: any[] = [];
 
   for (const p of projects) {
+    let geom: any = null;
+
     if (p.geojson_boundary) {
-      const geom =
+      geom =
         p.geojson_boundary.type === 'Feature'
           ? p.geojson_boundary.geometry
           : p.geojson_boundary.type === 'FeatureCollection'
           ? p.geojson_boundary.features[0]?.geometry
           : p.geojson_boundary;
+    }
 
-      if (geom) {
-        features.push({
-          type: 'Feature',
-          id: `project-${p.id}`,
-          properties: {
-            layer_type: 'project',
-            project_id: p.id,
-            code: p.code,
-            name: p.name,
-            project_type: p.project_type,
-            sponsoring_agency: p.sponsoring_agency,
-            status: p.status,
-            state: p.state,
-            district: p.district,
-          },
-          geometry: geom,
-        });
+    // Dynamic corridor synthesis fallback if no boundary is saved on the project
+    if (!geom && cases && cases.length > 0) {
+      const linkedCases = cases.filter((c) => c.project_id === p.id && c.geojson_boundary);
+      if (linkedCases.length > 0) {
+        const waypoints: Array<{ latitude: number; longitude: number }> = [];
+        for (const c of linkedCases) {
+          const centroid = computeAccurateCentroid(c.geojson_boundary);
+          if (centroid) {
+            waypoints.push({ latitude: centroid[0], longitude: centroid[1] });
+          }
+        }
+
+        if (waypoints.length === 1) {
+          const c = waypoints[0];
+          geom = generateCorridorGeoJSON(
+            { latitude: c.latitude - 0.02, longitude: c.longitude - 0.02 },
+            { latitude: c.latitude + 0.02, longitude: c.longitude + 0.02 },
+            [],
+            80
+          );
+        } else if (waypoints.length > 1) {
+          waypoints.sort((a, b) => a.longitude - b.longitude);
+          const start = waypoints[0];
+          const end = waypoints[waypoints.length - 1];
+          const intermediates = waypoints.slice(1, -1);
+          geom = generateCorridorGeoJSON(start, end, intermediates, 80);
+        }
       }
+    }
+
+    if (geom) {
+      features.push({
+        type: 'Feature',
+        id: `project-${p.id}`,
+        properties: {
+          layer_type: 'project',
+          project_id: p.id,
+          code: p.code,
+          name: p.name,
+          project_type: p.project_type,
+          sponsoring_agency: p.sponsoring_agency,
+          status: p.status,
+          state: p.state,
+          district: p.district,
+        },
+        geometry: geom,
+      });
     }
   }
 

@@ -105,7 +105,8 @@ router.get('/gis/cases', requireAuth, handleCases);
 const handleProjects = async (req: Request, res: Response) => {
   try {
     const projects = await getScopedProjects(req.user);
-    const featureCollection = generateProjectsGeoJSON(projects);
+    const cases = await getScopedCases(req.user);
+    const featureCollection = generateProjectsGeoJSON(projects, cases);
     res.json(featureCollection);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -308,6 +309,18 @@ router.get(['/cases/:id/corridor', '/gis/cases/:id/corridor'], requireAuth, asyn
     }
 
     // Default corridor metadata derived from case and project
+    const caseCentroid = computeAccurateCentroid(caseItem.geojson_boundary) || [18.5204, 73.8567];
+    const defaultStart = {
+      latitude: Number((caseCentroid[0] - 0.015).toFixed(6)),
+      longitude: Number((caseCentroid[1] - 0.015).toFixed(6)),
+      landmark: `Origin: Village ${caseItem.village || 'Sector 1'}`,
+    };
+    const defaultEnd = {
+      latitude: Number((caseCentroid[0] + 0.015).toFixed(6)),
+      longitude: Number((caseCentroid[1] + 0.015).toFixed(6)),
+      landmark: `Terminus: District ${caseItem.district || 'Bypass'} Arterial`,
+    };
+
     const defaultCorridor = {
       case_id: caseId,
       project_id: caseItem.project_id,
@@ -317,18 +330,10 @@ router.get(['/cases/:id/corridor', '/gis/cases/:id/corridor'], requireAuth, asyn
       corridor_type: 'highway',
       total_length_km: Math.max(5, Math.round((caseItem.total_area_hectares || 10) * 1.5)),
       right_of_way_width_meters: 60,
-      start_point: {
-        latitude: 18.5204,
-        longitude: 73.8567,
-        landmark: `Origin: Village ${caseItem.village} Sector 1`,
-      },
-      end_point: {
-        latitude: 18.5913,
-        longitude: 73.7389,
-        landmark: `Terminus: District ${caseItem.district} Peripheral Arterial`,
-      },
+      start_point: defaultStart,
+      end_point: defaultEnd,
       intermediate_waypoints: [],
-      geojson_corridor: caseItem.geojson_boundary,
+      geojson_corridor: caseItem.geojson_boundary || generateCorridorGeoJSON(defaultStart, defaultEnd, [], 60),
       status: 'active_alignment',
       updated_at: new Date().toISOString(),
     };

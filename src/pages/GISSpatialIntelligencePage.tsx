@@ -448,23 +448,81 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
       }
     };
 
+    const getCorridorStyle = (projectType?: string, isHovered = false) => {
+      const t = (projectType || '').toLowerCase();
+      let stroke = '#4f46e5'; // indigo-600
+      let fill = '#6366f1';   // indigo-500
+
+      if (t.includes('rail') || t.includes('metro') || t.includes('dfc') || t.includes('rrts')) {
+        stroke = '#0284c7'; // sky-600
+        fill = '#38bdf8';   // sky-400
+      } else if (t.includes('ind') || t.includes('cargo') || t.includes('logistic')) {
+        stroke = '#059669'; // emerald-600
+        fill = '#10b981';   // emerald-500
+      } else if (t.includes('solar') || t.includes('energy')) {
+        stroke = '#d97706'; // amber-600
+        fill = '#f59e0b';   // amber-500
+      } else if (t.includes('port') || t.includes('water') || t.includes('irr')) {
+        stroke = '#0891b2'; // cyan-600
+        fill = '#06b6d4';   // cyan-500
+      } else if (t.includes('air') || t.includes('def')) {
+        stroke = '#7c3aed'; // violet-600
+        fill = '#a855f7';   // violet-500
+      }
+
+      return {
+        color: stroke,
+        weight: isHovered ? 4.5 : 3,
+        dashArray: '8, 6',
+        fillColor: fill,
+        fillOpacity: isHovered ? 0.35 : 0.22,
+        opacity: 0.95,
+      };
+    };
+
     // A. Render Projects Corridors
     if (showProjects && projectsData?.features && projectsLayerGroupRef.current) {
       projectsData.features.forEach((pFeat: any) => {
         try {
+          const props = pFeat.properties || {};
+          // Territorial filter matching
+          const matchState =
+            stateFilter === 'all' ||
+            !props.state ||
+            props.state.toLowerCase() === stateFilter.toLowerCase();
+          const matchDist =
+            districtFilter === 'all' ||
+            !props.district ||
+            props.district.toLowerCase() === districtFilter.toLowerCase();
+          if (!matchState || !matchDist) return;
+
+          const defaultStyle = getCorridorStyle(props.project_type, false);
           const pLayer = L.geoJSON(pFeat, {
-            style: {
-              color: '#475569', // slate-600
-              weight: 2.5,
-              dashArray: '4, 4',
-              fillColor: '#64748b',
-              fillOpacity: 0.1,
-            },
+            style: defaultStyle,
             onEachFeature: (_, layer) => {
               layer.bindTooltip(
-                `<strong>Project:</strong> ${pFeat.properties.name} (${pFeat.properties.code})<br/>Agency: ${pFeat.properties.sponsoring_agency}`,
+                `<div class="p-1 max-w-xs">
+                  <div class="text-xs font-bold text-slate-900">${props.name || 'Corridor Alignment'}</div>
+                  <div class="text-[10px] text-slate-600 font-mono mt-0.5">${props.code} • ${props.sponsoring_agency || 'Requisitioning Agency'}</div>
+                  <div class="text-[10px] text-indigo-700 font-semibold mt-0.5">Corridor RoW • ${String(props.project_type || 'Infrastructure').toUpperCase()} • ${String(props.status || 'Active').toUpperCase()}</div>
+                </div>`,
                 { sticky: true }
               );
+
+              layer.on('mouseover', () => {
+                (layer as any).setStyle?.(getCorridorStyle(props.project_type, true));
+              });
+
+              layer.on('mouseout', () => {
+                (layer as any).setStyle?.(getCorridorStyle(props.project_type, false));
+              });
+
+              layer.on('click', () => {
+                const b = (layer as any).getBounds?.();
+                if (b && mapInstanceRef.current) {
+                  mapInstanceRef.current.fitBounds(b, { padding: [50, 50], maxZoom: 13 });
+                }
+              });
             },
           });
           projectsLayerGroupRef.current?.addLayer(pLayer);
@@ -1241,11 +1299,16 @@ export const GISSpatialIntelligencePage: React.FC<GISSpatialIntelligencePageProp
                   dotClassName="bg-blue-600"
                 />
                 <LayerToggleRow
-                  icon={<Building2 className="h-3.5 w-3.5" />}
+                  icon={<Navigation className="h-3.5 w-3.5 text-indigo-600" />}
                   label="Project Corridors"
                   checked={showProjects}
                   onToggle={() => setShowProjects(!showProjects)}
-                  dotClassName="bg-slate-500"
+                  dotClassName="bg-indigo-600"
+                  trailing={
+                    <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
+                      {projectsData?.features?.length || 0}
+                    </span>
+                  }
                 />
                 <LayerToggleRow
                   icon={<Compass className="h-3.5 w-3.5" />}

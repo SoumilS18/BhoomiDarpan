@@ -24,6 +24,7 @@ import {
   getSubDistricts,
   getVillages,
 } from '../server/services/administrativeGeographyService';
+import { generateCorridorGeoJSON } from '../server/services/spatialIntelligenceService';
 import type { AdministrativeUnit } from '../shared/types';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -269,12 +270,40 @@ async function main() {
 
     const { data: existing } = await supabase
       .from('projects')
-      .select('id, code')
+      .select('id, code, geojson_boundary')
       .eq('code', b.code)
       .maybeSingle();
 
+    const baseCoords = STATE_COORDINATES[chain.state.code] || [77.0, 20.0];
+    const corridorStart = {
+      latitude: Number((baseCoords[1] - 0.06).toFixed(6)),
+      longitude: Number((baseCoords[0] - 0.06).toFixed(6)),
+    };
+    const corridorEnd = {
+      latitude: Number((baseCoords[1] + 0.06).toFixed(6)),
+      longitude: Number((baseCoords[0] + 0.06).toFixed(6)),
+    };
+    const corridorWaypoints = [
+      {
+        latitude: Number((baseCoords[1] - 0.01).toFixed(6)),
+        longitude: Number((baseCoords[0] - 0.01).toFixed(6)),
+      },
+      {
+        latitude: Number((baseCoords[1] + 0.03).toFixed(6)),
+        longitude: Number((baseCoords[0] + 0.02).toFixed(6)),
+      },
+    ];
+    const corridorGeoJSON = generateCorridorGeoJSON(corridorStart, corridorEnd, corridorWaypoints, 80);
+
     if (existing) {
       projectMap.set(b.code, existing.id);
+      if (!existing.geojson_boundary) {
+        await supabase
+          .from('projects')
+          .update({ geojson_boundary: corridorGeoJSON })
+          .eq('id', existing.id);
+        console.log(`✓ Project corridor geometry updated: ${b.code}`);
+      }
       continue;
     }
 
@@ -290,6 +319,8 @@ async function main() {
         target_completion_date: b.target_date,
         status: 'in_progress',
         state: stateName,
+        district: chain.district.name,
+        geojson_boundary: corridorGeoJSON,
       })
       .select('id')
       .single();
@@ -298,7 +329,7 @@ async function main() {
       console.error(`Failed to insert project ${b.code}:`, error.message);
     } else {
       projectMap.set(b.code, created.id);
-      console.log(`✓ Project provisioned: ${b.code} — ${b.name}`);
+      console.log(`✓ Project provisioned with corridor: ${b.code} — ${b.name}`);
     }
   }
 
