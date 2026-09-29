@@ -465,19 +465,6 @@ export const LandingShowcase: React.FC<LandingShowcaseProps> = () => {
             {/* Cinematic Gradient Overlays */}
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-slate-950/40" />
 
-            {/* Top HUD Badges */}
-            <div className="pointer-events-none absolute left-4 top-4 right-4 flex items-center justify-between text-xs">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-slate-900/80 px-3 py-1 text-slate-200 backdrop-blur-md shadow-sm">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-                <span>Statutory Land Acquisition Architecture · RFCTLARR 2013</span>
-              </div>
-
-              <div className="hidden sm:inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-950/70 px-3 py-1 text-amber-200 backdrop-blur-md">
-                <Activity className="h-3.5 w-3.5 text-amber-400" />
-                <span>550m RoW Corridor Enclosure · 100% Containment</span>
-              </div>
-            </div>
-
             {/* Bottom Controls Bar */}
             <div className="absolute bottom-4 left-4 right-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/15 bg-slate-900/80 px-4 py-2.5 backdrop-blur-md transition-opacity duration-300">
               <div className="flex items-center gap-3">
