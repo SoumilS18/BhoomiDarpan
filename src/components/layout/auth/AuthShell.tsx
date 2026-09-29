@@ -25,7 +25,8 @@ export const AuthShell: React.FC<{
   children: React.ReactNode;
   /** Links rendered under the card (back to sign-in, forgot password, ...). */
   footer?: React.ReactNode;
-}> = ({ title, subtitle, banner, children, footer }) => {
+  maxWidth?: 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
+}> = ({ title, subtitle, banner, children, footer, maxWidth = 'md' }) => {
   useEffect(() => {
     document.title = `${typeof title === 'string' ? title : 'Account'} | ${PUBLIC_CONFIG.name}`;
     return () => {
@@ -119,7 +120,18 @@ export const AuthShell: React.FC<{
         </header>
 
         <main id="auth-main" className="flex flex-1 items-start justify-center px-4 py-10 sm:px-8">
-          <div className="w-full max-w-md">
+          <div
+            className={clsx(
+              'w-full transition-all duration-300',
+              maxWidth === 'md' && 'max-w-md',
+              maxWidth === 'lg' && 'max-w-lg',
+              maxWidth === 'xl' && 'max-w-xl',
+              maxWidth === '2xl' && 'max-w-2xl',
+              maxWidth === '3xl' && 'max-w-3xl',
+              maxWidth === '4xl' && 'max-w-4xl',
+              maxWidth === '5xl' && 'max-w-5xl'
+            )}
+          >
             <div className="mb-6">
               <h1 className="text-2xl font-bold tracking-tight text-gov-slate">{title}</h1>
               {subtitle && <p className="mt-2 text-sm leading-relaxed text-slate-600">{subtitle}</p>}

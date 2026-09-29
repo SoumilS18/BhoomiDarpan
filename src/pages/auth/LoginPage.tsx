@@ -5,34 +5,28 @@ import {
   LogIn,
   AlertCircle,
   KeyRound,
-  UserPlus,
   ExternalLink,
+  CheckCircle2,
+  Sparkles,
+  RotateCcw,
 } from 'lucide-react';
 import { AuthShell, AuthField } from '../../components/layout/auth/AuthShell';
 import { Button } from '../../components/common/Button';
 import { NoticeBox } from '../../components/layout/public/PublicSections';
+import { DemoRoleSelector } from '../../components/auth/DemoRoleSelector';
+import { DEMO_ACCOUNTS_MAP, type DemoRoleAccount } from '../../lib/demoAccounts';
 import { useAuth } from '../../context/AuthContext';
 import { Link, getRouteById, navigate, useRoute } from '../../router';
 import { PUBLIC_CONFIG } from '../../lib/publicConfig';
+import type { UserRole } from '../../../shared/types';
+import { clsx } from 'clsx';
 
 type FormStatus = 'idle' | 'submitting' | 'error';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * Sign-in page.
- *
- * CAPABILITY HONESTY
- *   When client-side Supabase auth is configured for this deployment the form
- *   performs a REAL password sign-in and the returned session token is used
- *   for every subsequent API call. When it is not configured the form is
- *   replaced by an explicit "authentication is not configured" state — this
- *   page never fabricates a session, never invents a successful login and
- *   never falls back to an evaluation persona.
- *
- *   Evaluation personas remain a *server-authorised non-production* mode
- *   driven by the role switcher inside the application; they are not a
- *   substitute for sign-in and are never offered here as one.
+ * Sign-in page with evaluation demo role shortcuts for hackathon judges and officers.
  */
 export const LoginPage: React.FC = () => {
   const { signInWithPassword, isRealAuthConfigured, session, sessionStatus } = useAuth();
@@ -41,20 +35,17 @@ export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
+  const [recentlyFilled, setRecentlyFilled] = useState(false);
   const [status, setStatus] = useState<FormStatus>('idle');
   const [fieldError, setFieldError] = useState<{ email?: string; password?: string }>({});
   const [formError, setFormError] = useState<string | null>(null);
 
   const dashboardPath = getRouteById('module.dashboard').path;
-  // Deep-link preservation: `/login?next=/cases/abc/gis` returns the officer
-  // to the surface they originally requested after a successful sign-in.
   const nextPath = query.next && query.next.startsWith('/') ? query.next : dashboardPath;
 
-  // Provider-returned errors (e.g. an expired or already-consumed reset link)
-  // arrive as query parameters on the redirect back to this page.
   const providerError = query.error_description || query.error || query.message || null;
 
-  // An authenticated visitor has no business on the sign-in form.
   useEffect(() => {
     if (session && sessionStatus === 'ready') {
       navigate(nextPath, { replace: true });
@@ -75,25 +66,57 @@ export const LoginPage: React.FC = () => {
     return Object.keys(errors).length === 0;
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const executeSignIn = async (targetEmail: string, targetPass: string) => {
     setFormError(null);
-    if (!validate()) return;
-
     setStatus('submitting');
-    const result = await signInWithPassword(email.trim(), password);
+    const result = await signInWithPassword(targetEmail.trim(), targetPass);
     if (result.ok) {
-      // AuthContext propagates the real session; the effect above routes out.
       setStatus('idle');
       return;
     }
     setStatus('error');
     setFormError(result.message);
     if (result.code === 'invalid-credentials') {
-      // Do not reveal which half of the credential pair was wrong.
       setFieldError({});
     }
   };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!validate()) return;
+    await executeSignIn(email, password);
+  };
+
+  /**
+   * Called when a demo role button is clicked.
+   * Auto-fills the credentials into email & password state, triggers a visual pulse,
+   * and optionally signs in directly if requested.
+   */
+  const handleSelectRole = async (account: DemoRoleAccount, autoSignIn = false) => {
+    setEmail(account.email);
+    setPassword(account.password);
+    setSelectedRole(account.role);
+    setFieldError({});
+    setFormError(null);
+
+    // Visual pulse animation on input fields
+    setRecentlyFilled(true);
+    setTimeout(() => setRecentlyFilled(false), 1600);
+
+    if (autoSignIn) {
+      await executeSignIn(account.email, account.password);
+    }
+  };
+
+  const handleClearCredentials = () => {
+    setEmail('');
+    setPassword('');
+    setSelectedRole(null);
+    setFieldError({});
+    setFormError(null);
+  };
+
+  const selectedAccount = selectedRole ? DEMO_ACCOUNTS_MAP[selectedRole] : null;
 
   const forgotPath = getRouteById('auth.forgotPassword').path;
   const activatePath = getRouteById('auth.activateAccount').path;
@@ -105,12 +128,12 @@ export const LoginPage: React.FC = () => {
     <AuthShell
       title="Sign in"
       subtitle={`Use the account issued to you for ${PUBLIC_CONFIG.name}.`}
+      maxWidth="3xl"
       banner={
         !isRealAuthConfigured ? (
           <NoticeBox tone="warning" title="Authentication not configured">
             Password sign-in is not configured for this deployment, so this form cannot establish a
-            session. No credentials are stored or simulated. Once a Supabase project is connected,
-            this page signs officers in with real sessions.
+            session. Once a Supabase project is connected, this page signs officers in with real sessions.
           </NoticeBox>
         ) : providerError ? (
           <NoticeBox tone="warning" title="Link problem">
@@ -152,11 +175,46 @@ export const LoginPage: React.FC = () => {
         </>
       }
     >
+      {/* Demo Roles Evaluation Buttons for Hackathon Judges */}
+      <DemoRoleSelector
+        selectedRole={selectedRole}
+        onSelectRole={handleSelectRole}
+        disabled={!isRealAuthConfigured || status === 'submitting'}
+      />
+
       {formError && (
         <div className="mb-4" role="alert">
           <NoticeBox tone="warning" title="Sign-in failed">
             {formError}
           </NoticeBox>
+        </div>
+      )}
+
+      {/* Selected Demo Role Confirmation Banner */}
+      {selectedAccount && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-terra-200/90 bg-terra-50/60 p-3 text-xs text-terra-950 shadow-2xs animate-fadeIn">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-terra-700 text-white">
+              <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+            </div>
+            <div className="min-w-0 truncate">
+              <p className="font-bold text-terra-900 truncate">
+                Credentials filled for {selectedAccount.roleLabel}
+              </p>
+              <p className="text-[11px] text-mocha-600 truncate">
+                ID: <span className="font-mono font-medium">{selectedAccount.email}</span> • {selectedAccount.department}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleClearCredentials}
+            className="inline-flex shrink-0 items-center gap-1 text-[11px] font-medium text-mocha-600 hover:text-terra-800 transition-colors underline cursor-pointer"
+            title="Clear prefilled credentials"
+          >
+            <RotateCcw className="h-3 w-3" aria-hidden="true" />
+            <span>Reset</span>
+          </button>
         </div>
       )}
 
@@ -166,6 +224,11 @@ export const LoginPage: React.FC = () => {
           label="Email / User ID"
           required
           error={fieldError.email}
+          hint={
+            selectedAccount
+              ? `Autofilled with verified ${selectedAccount.roleLabel} credential`
+              : 'Registered government officer email or identifier'
+          }
         >
           <div className="relative">
             <input
@@ -174,28 +237,54 @@ export const LoginPage: React.FC = () => {
               autoComplete="username"
               inputMode="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (selectedAccount && e.target.value !== selectedAccount.email) {
+                  setSelectedRole(null);
+                }
+              }}
               disabled={!isRealAuthConfigured || status === 'submitting'}
               aria-invalid={Boolean(fieldError.email)}
               aria-describedby={fieldError.email ? 'login-email-error' : undefined}
               placeholder="officer@example.org"
-              className="input"
+              className={clsx(
+                'input transition-all duration-300',
+                recentlyFilled && 'ring-2 ring-terra-500 bg-terra-50/20'
+              )}
             />
           </div>
         </AuthField>
 
-        <AuthField id="login-password" label="Password" required error={fieldError.password}>
+        <AuthField
+          id="login-password"
+          label="Password"
+          required
+          error={fieldError.password}
+          hint={
+            selectedAccount
+              ? 'Demo password filled. Click the eye icon to view if needed.'
+              : undefined
+          }
+        >
           <div className="relative">
             <input
               id="login-password"
               type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (selectedAccount && e.target.value !== selectedAccount.password) {
+                  setSelectedRole(null);
+                }
+              }}
               disabled={!isRealAuthConfigured || status === 'submitting'}
               aria-invalid={Boolean(fieldError.password)}
               aria-describedby={fieldError.password ? 'login-password-error' : undefined}
-              className="input pr-10"
+              className={clsx(
+                'input pr-10 transition-all duration-300',
+                recentlyFilled && 'ring-2 ring-terra-500 bg-terra-50/20'
+              )}
             />
             <button
               type="button"
@@ -229,7 +318,11 @@ export const LoginPage: React.FC = () => {
           disabled={!isRealAuthConfigured}
           leftIcon={<LogIn className="h-4 w-4" />}
         >
-          Sign In
+          {status === 'submitting'
+            ? 'Authenticating...'
+            : selectedAccount
+            ? `Sign In as ${selectedAccount.roleLabel}`
+            : 'Sign In'}
         </Button>
       </form>
 
