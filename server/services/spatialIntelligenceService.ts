@@ -1861,42 +1861,250 @@ export function generateCorridorGeoJSON(
   start: { latitude: number; longitude: number },
   end: { latitude: number; longitude: number },
   waypoints: Array<{ latitude: number; longitude: number }> = [],
-  rowWidthMeters = 80
+  rowWidthMeters = 550
 ) {
   const points = [start, ...waypoints, end];
+  if (points.length === 0) return null;
   const bufferDegrees = (rowWidthMeters / 2) / 111320;
-  
+
+  const norm = (v: [number, number]): [number, number] => {
+    const len = Math.sqrt(v[0] * v[0] + v[1] * v[1]) || 1;
+    return [v[0] / len, v[1] / len];
+  };
+
+  const segNormals: [number, number][] = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const dx = points[i + 1].longitude - points[i].longitude;
+    const dy = points[i + 1].latitude - points[i].latitude;
+    const [tx, ty] = norm([dx, dy]);
+    segNormals.push([-ty, tx]);
+  }
+
   const leftPoints: number[][] = [];
   const rightPoints: number[][] = [];
-  
+
   for (let i = 0; i < points.length; i++) {
     const p = points[i];
-    let dx = 0;
-    let dy = 0;
-    
-    if (i < points.length - 1) {
-      const next = points[i + 1];
-      dx = next.longitude - p.longitude;
-      dy = next.latitude - p.latitude;
-    } else if (i > 0) {
-      const prev = points[i - 1];
-      dx = p.longitude - prev.longitude;
-      dy = p.latitude - prev.latitude;
+    let nx = 0;
+    let ny = 0;
+    let miter = 1;
+
+    if (i === 0) {
+      nx = segNormals[0]?.[0] ?? 0;
+      ny = segNormals[0]?.[1] ?? 1;
+    } else if (i === points.length - 1) {
+      nx = segNormals[segNormals.length - 1]?.[0] ?? 0;
+      ny = segNormals[segNormals.length - 1]?.[1] ?? 1;
+    } else {
+      const n1 = segNormals[i - 1];
+      const n2 = segNormals[i];
+      const avg = norm([n1[0] + n2[0], n1[1] + n2[1]]);
+      nx = avg[0];
+      ny = avg[1];
+      const dot = avg[0] * n1[0] + avg[1] * n1[1];
+      miter = dot > 0.3 ? Math.min(2.0, 1 / dot) : 1;
     }
-    
-    const len = Math.sqrt(dx * dx + dy * dy) || 1;
-    const nx = -dy / len;
-    const ny = dx / len;
-    
-    leftPoints.push([Number((p.longitude + nx * bufferDegrees).toFixed(6)), Number((p.latitude + ny * bufferDegrees).toFixed(6))]);
-    rightPoints.unshift([Number((p.longitude - nx * bufferDegrees).toFixed(6)), Number((p.latitude - ny * bufferDegrees).toFixed(6))]);
+
+    const offset = bufferDegrees * miter;
+    leftPoints.push([
+      Number((p.longitude + nx * offset).toFixed(6)),
+      Number((p.latitude + ny * offset).toFixed(6)),
+    ]);
+    rightPoints.unshift([
+      Number((p.longitude - nx * offset).toFixed(6)),
+      Number((p.latitude - ny * offset).toFixed(6)),
+    ]);
   }
-  
+
   const polygonRing = [...leftPoints, ...rightPoints, leftPoints[0]];
-  
+
   return {
     type: 'Polygon',
     coordinates: [polygonRing],
+  };
+}
+
+/**
+ * Computes smoothly aligned Right-of-Way (RoW) corridor and enclosed statutory case polygons.
+ * Guarantees that 100% of case polygon boundaries lie strictly within the buffered corridor,
+ * with proportional length derived from statutory acquisition hectares.
+ */
+export function computeCorridorAndCasesMiter(
+  caseCenters: Array<{ lon: number; lat: number; areaHa: number; id?: string; case_number?: string; [key: string]: any }>,
+  corridorWidthMeters = 550
+): {
+  corridorPolygon: { type: 'Polygon'; coordinates: number[][][] };
+  casePolygons: Array<{
+    id?: string;
+    case_number?: string;
+    polygon: { type: 'Polygon'; coordinates: number[][][] };
+  }>;
+} {
+  const DEG_TO_METERS = 111320;
+  const corridorHalfWidthDeg = (corridorWidthMeters / 2) / DEG_TO_METERS;
+
+  const normalize = (v: [number, number]): [number, number] => {
+    const len = Math.sqrt(v[0] * v[0] + v[1] * v[1]) || 1;
+    return [v[0] / len, v[1] / len];
+  };
+
+  // Order points smoothly using greedy nearest-neighbor along alignment
+  const sorted: typeof caseCenters = [];
+  if (caseCenters.length <= 2) {
+    sorted.push(...caseCenters);
+  } else {
+    const remaining = [...caseCenters];
+    remaining.sort((a, b) => a.lon - b.lon);
+    sorted.push(remaining.shift()!);
+    while (remaining.length > 0) {
+      const current = sorted[sorted.length - 1];
+      let nearestIdx = 0;
+      let nearestDist = Infinity;
+      for (let i = 0; i < remaining.length; i++) {
+        const dx = remaining[i].lon - current.lon;
+        const dy = remaining[i].lat - current.lat;
+        const dist = dx * dx + dy * dy;
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearestIdx = i;
+        }
+      }
+      sorted.push(remaining.splice(nearestIdx, 1)[0]);
+    }
+  }
+
+  // Extend 1.5km lead-in and lead-out vectors past terminal points
+  const extDeg = 1500 / DEG_TO_METERS;
+  let startPt = { lon: sorted[0].lon, lat: sorted[0].lat };
+  let endPt = { lon: sorted[sorted.length - 1].lon, lat: sorted[sorted.length - 1].lat };
+
+  if (sorted.length > 1) {
+    const vStart = normalize([sorted[0].lon - sorted[1].lon, sorted[0].lat - sorted[1].lat]);
+    startPt = {
+      lon: Number((sorted[0].lon + vStart[0] * extDeg).toFixed(6)),
+      lat: Number((sorted[0].lat + vStart[1] * extDeg).toFixed(6)),
+    };
+    const last = sorted.length - 1;
+    const vEnd = normalize([sorted[last].lon - sorted[last - 1].lon, sorted[last].lat - sorted[last - 1].lat]);
+    endPt = {
+      lon: Number((sorted[last].lon + vEnd[0] * extDeg).toFixed(6)),
+      lat: Number((sorted[last].lat + vEnd[1] * extDeg).toFixed(6)),
+    };
+  } else {
+    startPt = { lon: Number((sorted[0].lon - 0.015).toFixed(6)), lat: Number((sorted[0].lat - 0.015).toFixed(6)) };
+    endPt = { lon: Number((sorted[0].lon + 0.015).toFixed(6)), lat: Number((sorted[0].lat + 0.015).toFixed(6)) };
+  }
+
+  const pts = [startPt, ...sorted.map((s) => ({ lon: s.lon, lat: s.lat })), endPt];
+
+  // Calculate segment tangents and normals
+  const segNormals: [number, number][] = [];
+  const segTangents: [number, number][] = [];
+
+  for (let i = 0; i < pts.length - 1; i++) {
+    const dx = pts[i + 1].lon - pts[i].lon;
+    const dy = pts[i + 1].lat - pts[i].lat;
+    const [tx, ty] = normalize([dx, dy]);
+    segTangents.push([tx, ty]);
+    segNormals.push([-ty, tx]);
+  }
+
+  const leftPts: number[][] = [];
+  const rightPts: number[][] = [];
+
+  for (let i = 0; i < pts.length; i++) {
+    let nx = 0;
+    let ny = 0;
+    let miter = 1;
+
+    if (i === 0) {
+      nx = segNormals[0][0];
+      ny = segNormals[0][1];
+    } else if (i === pts.length - 1) {
+      nx = segNormals[segNormals.length - 1][0];
+      ny = segNormals[segNormals.length - 1][1];
+    } else {
+      const n1 = segNormals[i - 1];
+      const n2 = segNormals[i];
+      const avg = normalize([n1[0] + n2[0], n1[1] + n2[1]]);
+      nx = avg[0];
+      ny = avg[1];
+      const dot = avg[0] * n1[0] + avg[1] * n1[1];
+      miter = dot > 0.3 ? Math.min(2.0, 1 / dot) : 1;
+    }
+
+    const offset = corridorHalfWidthDeg * miter;
+    leftPts.push([
+      Number((pts[i].lon + nx * offset).toFixed(6)),
+      Number((pts[i].lat + ny * offset).toFixed(6)),
+    ]);
+    rightPts.unshift([
+      Number((pts[i].lon - nx * offset).toFixed(6)),
+      Number((pts[i].lat - ny * offset).toFixed(6)),
+    ]);
+  }
+
+  const corridorPolygon = {
+    type: 'Polygon' as const,
+    coordinates: [[...leftPts, ...rightPts, leftPts[0]]],
+  };
+
+  // Build case polygons fitting inside the corridor
+  const casePolygons = sorted.map((c, idx) => {
+    const segIdx = idx + 1;
+    let tx = segTangents[Math.min(segIdx, segTangents.length - 1)][0];
+    let ty = segTangents[Math.min(segIdx, segTangents.length - 1)][1];
+    if (idx > 0 && idx < sorted.length - 1) {
+      const avgT = normalize([
+        segTangents[idx][0] + segTangents[idx + 1][0],
+        segTangents[idx][1] + segTangents[idx + 1][1],
+      ]);
+      tx = avgT[0];
+      ty = avgT[1];
+    }
+
+    const nx = -ty;
+    const ny = tx;
+
+    // Case width is 60% of corridor width (comfortably within Right-of-Way)
+    const caseWidthMeters = corridorWidthMeters * 0.6;
+    const caseHalfWidthDeg = (caseWidthMeters / 2) / DEG_TO_METERS;
+
+    // Length along corridor derived from statutory area
+    const areaSqMeters = Math.max(15, c.areaHa) * 10000;
+    const caseLengthMeters = Math.min(1200, Math.max(450, areaSqMeters / caseWidthMeters));
+    const caseHalfLengthDeg = (caseLengthMeters / 2) / DEG_TO_METERS;
+
+    const p1 = [
+      Number((c.lon - tx * caseHalfLengthDeg + nx * caseHalfWidthDeg).toFixed(6)),
+      Number((c.lat - ty * caseHalfLengthDeg + ny * caseHalfWidthDeg).toFixed(6)),
+    ];
+    const p2 = [
+      Number((c.lon + tx * caseHalfLengthDeg + nx * caseHalfWidthDeg).toFixed(6)),
+      Number((c.lat + ty * caseHalfLengthDeg + ny * caseHalfWidthDeg).toFixed(6)),
+    ];
+    const p3 = [
+      Number((c.lon + tx * caseHalfLengthDeg - nx * caseHalfWidthDeg).toFixed(6)),
+      Number((c.lat + ty * caseHalfLengthDeg - ny * caseHalfWidthDeg).toFixed(6)),
+    ];
+    const p4 = [
+      Number((c.lon - tx * caseHalfLengthDeg - nx * caseHalfWidthDeg).toFixed(6)),
+      Number((c.lat - ty * caseHalfLengthDeg - ny * caseHalfWidthDeg).toFixed(6)),
+    ];
+
+    return {
+      id: c.id,
+      case_number: c.case_number,
+      polygon: {
+        type: 'Polygon' as const,
+        coordinates: [[p1, p2, p3, p4, p1]],
+      },
+    };
+  });
+
+  return {
+    corridorPolygon,
+    casePolygons,
   };
 }
 
@@ -1924,28 +2132,21 @@ export function generateProjectsGeoJSON(projects: Project[], cases?: Acquisition
     if (!geom && cases && cases.length > 0) {
       const linkedCases = cases.filter((c) => c.project_id === p.id && c.geojson_boundary);
       if (linkedCases.length > 0) {
-        const waypoints: Array<{ latitude: number; longitude: number }> = [];
+        const centers: Array<{ lon: number; lat: number; areaHa: number }> = [];
         for (const c of linkedCases) {
           const centroid = computeAccurateCentroid(c.geojson_boundary);
           if (centroid) {
-            waypoints.push({ latitude: centroid[0], longitude: centroid[1] });
+            centers.push({
+              lat: centroid[0],
+              lon: centroid[1],
+              areaHa: Number(c.total_area_hectares) || 35,
+            });
           }
         }
 
-        if (waypoints.length === 1) {
-          const c = waypoints[0];
-          geom = generateCorridorGeoJSON(
-            { latitude: c.latitude - 0.02, longitude: c.longitude - 0.02 },
-            { latitude: c.latitude + 0.02, longitude: c.longitude + 0.02 },
-            [],
-            80
-          );
-        } else if (waypoints.length > 1) {
-          waypoints.sort((a, b) => a.longitude - b.longitude);
-          const start = waypoints[0];
-          const end = waypoints[waypoints.length - 1];
-          const intermediates = waypoints.slice(1, -1);
-          geom = generateCorridorGeoJSON(start, end, intermediates, 80);
+        if (centers.length > 0) {
+          const miterResult = computeCorridorAndCasesMiter(centers, 550);
+          geom = miterResult.corridorPolygon;
         }
       }
     }

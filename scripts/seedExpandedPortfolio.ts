@@ -24,7 +24,7 @@ import {
   getSubDistricts,
   getVillages,
 } from '../server/services/administrativeGeographyService';
-import { generateCorridorGeoJSON } from '../server/services/spatialIntelligenceService';
+import { generateCorridorGeoJSON, computeCorridorAndCasesMiter } from '../server/services/spatialIntelligenceService';
 import type { AdministrativeUnit } from '../shared/types';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
@@ -262,11 +262,37 @@ async function main() {
     },
   ];
 
-  const projectMap = new Map<string, string>(); // code -> id
+  const projectMap = new Map<string, { id: string; blueprint: typeof projectBlueprints[0]; chain: GeoChain }>();
 
-  for (const b of projectBlueprints) {
-    const chain = chains[b.stateIdx % chains.length];
+  // 5. Seed Major Infrastructure Projects and calculate coherent corridors
+  console.log('\n1. Synthesizing Major Infrastructure Projects and Corridors...');
+
+  for (let pIdx = 0; pIdx < projectBlueprints.length; pIdx++) {
+    const b = projectBlueprints[pIdx];
+    const chainStartIdx = (b.stateIdx * 3) % chains.length;
+    const chain = chains[chainStartIdx];
     const stateName = chain.state.name;
+    const baseCoords = STATE_COORDINATES[chain.state.code] || [77.0, 20.0];
+
+    // Compute 3 case centers along the district alignment
+    const districtChains = [
+      chains[chainStartIdx],
+      chains[(chainStartIdx + 1) % chains.length],
+      chains[(chainStartIdx + 2) % chains.length],
+    ];
+
+    const caseCenters = districtChains.map((dc, vIdx) => {
+      const areaHectares = Number((25.0 + (pIdx * 7.3 + vIdx * 8.5) % 65.0).toFixed(2));
+      return {
+        vIdx,
+        chain: dc,
+        lon: Number((baseCoords[0] + (vIdx - 1) * 0.013).toFixed(6)),
+        lat: Number((baseCoords[1] + (vIdx - 1) * 0.011).toFixed(6)),
+        areaHa: areaHectares,
+      };
+    });
+
+    const { corridorPolygon, casePolygons } = computeCorridorAndCasesMiter(caseCenters, 550);
 
     const { data: existing } = await supabase
       .from('projects')
@@ -274,66 +300,50 @@ async function main() {
       .eq('code', b.code)
       .maybeSingle();
 
-    const baseCoords = STATE_COORDINATES[chain.state.code] || [77.0, 20.0];
-    const corridorStart = {
-      latitude: Number((baseCoords[1] - 0.06).toFixed(6)),
-      longitude: Number((baseCoords[0] - 0.06).toFixed(6)),
-    };
-    const corridorEnd = {
-      latitude: Number((baseCoords[1] + 0.06).toFixed(6)),
-      longitude: Number((baseCoords[0] + 0.06).toFixed(6)),
-    };
-    const corridorWaypoints = [
-      {
-        latitude: Number((baseCoords[1] - 0.01).toFixed(6)),
-        longitude: Number((baseCoords[0] - 0.01).toFixed(6)),
-      },
-      {
-        latitude: Number((baseCoords[1] + 0.03).toFixed(6)),
-        longitude: Number((baseCoords[0] + 0.02).toFixed(6)),
-      },
-    ];
-    const corridorGeoJSON = generateCorridorGeoJSON(corridorStart, corridorEnd, corridorWaypoints, 80);
-
+    let projectId: string;
     if (existing) {
-      projectMap.set(b.code, existing.id);
-      if (!existing.geojson_boundary) {
-        await supabase
-          .from('projects')
-          .update({ geojson_boundary: corridorGeoJSON })
-          .eq('id', existing.id);
-        console.log(`✓ Project corridor geometry updated: ${b.code}`);
-      }
-      continue;
-    }
-
-    const { data: created, error } = await supabase
-      .from('projects')
-      .insert({
-        code: b.code,
-        name: `${b.name} (${chain.district.name}, ${stateName})`,
-        description: `${b.desc} Located across ${chain.district.name} district, ${stateName}.`,
-        project_type: b.project_type,
-        sponsoring_agency: b.sponsoring_agency,
-        estimated_budget: b.budget,
-        target_completion_date: b.target_date,
-        status: 'in_progress',
-        state: stateName,
-        district: chain.district.name,
-        geojson_boundary: corridorGeoJSON,
-      })
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error(`Failed to insert project ${b.code}:`, error.message);
+      projectId = existing.id;
+      await supabase
+        .from('projects')
+        .update({
+          name: `${b.name} (${chain.district.name}, ${stateName})`,
+          state: stateName,
+          district: chain.district.name,
+          geojson_boundary: corridorPolygon,
+        })
+        .eq('id', existing.id);
+      console.log(`✓ Project corridor geometry updated: ${b.code}`);
     } else {
-      projectMap.set(b.code, created.id);
+      const { data: created, error } = await supabase
+        .from('projects')
+        .insert({
+          code: b.code,
+          name: `${b.name} (${chain.district.name}, ${stateName})`,
+          description: `${b.desc} Located across ${chain.district.name} district, ${stateName}.`,
+          project_type: b.project_type,
+          sponsoring_agency: b.sponsoring_agency,
+          estimated_budget: b.budget,
+          target_completion_date: b.target_date,
+          status: 'in_progress',
+          state: stateName,
+          district: chain.district.name,
+          geojson_boundary: corridorPolygon,
+        })
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error(`Failed to insert project ${b.code}:`, error.message);
+        continue;
+      }
+      projectId = created.id;
       console.log(`✓ Project provisioned with corridor: ${b.code} — ${b.name}`);
     }
+
+    projectMap.set(b.code, { id: projectId, blueprint: b, chain });
   }
 
-  // 6. Seed Cases Across The Chains
+  // 6. Seed Cases Across The Chains (3 per project, strictly inside corridor)
   console.log('\n2. Generating Acquisition Cases Across States & Districts...');
 
   const existingCasesRes = await supabase.from('acquisition_cases').select('id, case_number');
@@ -341,107 +351,117 @@ async function main() {
 
   const insertedCases: { id: string; case_number: string; stageLevel: number; chain: GeoChain }[] = [];
 
-  for (let i = 0; i < chains.length && i < 28; i++) {
-    const chain = chains[i];
-    const projBp = projectBlueprints[i % projectBlueprints.length];
-    const projectId = projectMap.get(projBp.code);
-    if (!projectId) continue;
+  for (let pIdx = 0; pIdx < projectBlueprints.length; pIdx++) {
+    const b = projectBlueprints[pIdx];
+    const projEntry = projectMap.get(b.code);
+    if (!projEntry) continue;
 
-    const statePrefix = chain.state.name.substring(0, 2).toUpperCase();
-    const distPrefix = chain.district.name.substring(0, 3).toUpperCase();
-    const caseNumber = `BS-${statePrefix}-${distPrefix}-2026-${String(100 + i).padStart(3, '0')}`;
+    const chainStartIdx = (b.stateIdx * 3) % chains.length;
+    const baseCoords = STATE_COORDINATES[projEntry.chain.state.code] || [77.0, 20.0];
 
-    if (existingCaseNumbers.has(caseNumber)) {
-      continue;
-    }
+    const districtChains = [
+      chains[chainStartIdx],
+      chains[(chainStartIdx + 1) % chains.length],
+      chains[(chainStartIdx + 2) % chains.length],
+    ];
 
-    // Realistic variation of case parameters
-    const areaHectares = Number((12.5 + (i * 7.3) % 85.0).toFixed(2));
-    const compensationInr = Math.round(areaHectares * (18000000 + ((i * 3500000) % 25000000)));
-
-    // Stage progression profile across portfolio (1 to 7)
-    // 0..4 -> Stage 1 (Sec 11)
-    // 5..10 -> Stage 2 (Sec 15 Hearings)
-    // 11..16 -> Stage 3 (Sec 19 Approver Sanctions)
-    // 17..21 -> Stage 4 (Sec 26 Valuation)
-    // 22..24 -> Stage 5 (Sec 30 Award)
-    // 25..26 -> Stage 6 (Sec 37 Compensation DBT)
-    // 27 -> Stage 7 (Sec 38 Possession Completed)
-    let stageLevel = 1;
-    if (i >= 5 && i <= 10) stageLevel = 2;
-    else if (i >= 11 && i <= 16) stageLevel = 3;
-    else if (i >= 17 && i <= 21) stageLevel = 4;
-    else if (i >= 22 && i <= 24) stageLevel = 5;
-    else if (i >= 25 && i <= 26) stageLevel = 6;
-    else if (i >= 27) stageLevel = 7;
-
-    // Status: some delayed (e.g. at hearing or valuation), some active, completed at stage 7
-    let caseStatus: 'active' | 'delayed' | 'completed' = 'active';
-    if (stageLevel === 7) caseStatus = 'completed';
-    else if (i % 3 === 1) caseStatus = 'delayed';
-
-    const priority: 'high' | 'medium' | 'low' = i % 4 === 0 ? 'high' : i % 4 === 1 ? 'medium' : 'low';
-
-    // Start dates staggered over the past 8 months
-    const monthsAgo = Math.max(1, 9 - stageLevel);
-    const startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - monthsAgo);
-    const startDateStr = startDate.toISOString().split('T')[0];
-
-    const expDate = new Date();
-    expDate.setMonth(expDate.getMonth() + (12 - stageLevel * 1.5));
-    const expDateStr = expDate.toISOString().split('T')[0];
-
-    // GeoJSON Polygon calculation
-    const baseCoords = STATE_COORDINATES[chain.state.code] || [77.0, 20.0];
-    const villageOffsetLon = baseCoords[0] + ((i * 0.04) % 0.3) - 0.15;
-    const villageOffsetLat = baseCoords[1] + ((i * 0.035) % 0.25) - 0.12;
-    const geoBoundary = generateGeoPolygon(villageOffsetLon, villageOffsetLat, 0.015);
-
-    const caseTitle = `${projBp.name} — ${chain.village.name} Requisition Package`;
-    const caseDesc = `Statutory land acquisition under RFCTLARR Act 2013 for ${projBp.name}. Cadastral survey unit located in village ${chain.village.name} (LGD: ${chain.village.code}), sub-district ${chain.subDistrict.name} (LGD: ${chain.subDistrict.code}), district ${chain.district.name} (LGD: ${chain.district.code}), ${chain.state.name}. Total area under acquisition: ${areaHectares} Ha.`;
-
-    const { data: newCase, error: caseErr } = await supabase
-      .from('acquisition_cases')
-      .insert({
-        case_number: caseNumber,
-        project_id: projectId,
-        workflow_id: workflowId,
-        title: caseTitle,
-        description: caseDesc,
-        state: chain.state.name,
-        district: chain.district.name,
-        tehsil: chain.subDistrict.name,
-        village: chain.village.name,
-        state_lgd_code: chain.state.code,
-        district_lgd_code: chain.district.code,
-        subdistrict_lgd_code: chain.subDistrict.code,
-        village_lgd_code: chain.village.code,
-        total_area_hectares: areaHectares,
-        estimated_compensation: compensationInr,
-        status: caseStatus,
-        priority: priority,
-        start_date: startDateStr,
-        expected_completion_date: expDateStr,
-        actual_completion_date: caseStatus === 'completed' ? new Date().toISOString().split('T')[0] : null,
-        assigned_officer_id: laoUser?.id || projectOfficerUser?.id,
-        geojson_boundary: geoBoundary,
-      })
-      .select('id, case_number')
-      .single();
-
-    if (caseErr) {
-      console.error(`Failed to create case ${caseNumber}:`, caseErr.message);
-      continue;
-    }
-
-    insertedCases.push({
-      id: newCase.id,
-      case_number: newCase.case_number,
-      stageLevel,
-      chain,
+    const caseCenters = districtChains.map((dc, vIdx) => {
+      const areaHectares = Number((25.0 + (pIdx * 7.3 + vIdx * 8.5) % 65.0).toFixed(2));
+      return {
+        vIdx,
+        chain: dc,
+        lon: Number((baseCoords[0] + (vIdx - 1) * 0.013).toFixed(6)),
+        lat: Number((baseCoords[1] + (vIdx - 1) * 0.011).toFixed(6)),
+        areaHa: areaHectares,
+      };
     });
-    console.log(`✓ Case created: ${newCase.case_number} -> ${chain.village.name}, ${chain.district.name} (Stage ${stageLevel}/7, ${caseStatus})`);
+
+    const { casePolygons } = computeCorridorAndCasesMiter(caseCenters, 550);
+
+    for (let vIdx = 0; vIdx < districtChains.length; vIdx++) {
+      const globalIdx = pIdx * 3 + vIdx;
+      const chain = districtChains[vIdx];
+      const statePrefix = chain.state.name.substring(0, 2).toUpperCase();
+      const distPrefix = chain.district.name.substring(0, 3).toUpperCase();
+      const caseNumber = `BS-${statePrefix}-${distPrefix}-2026-${String(100 + globalIdx).padStart(3, '0')}`;
+
+      if (existingCaseNumbers.has(caseNumber)) {
+        continue;
+      }
+
+      const areaHectares = caseCenters[vIdx].areaHa;
+      const compensationInr = Math.round(areaHectares * (18000000 + ((globalIdx * 3500000) % 25000000)));
+
+      let stageLevel = 1;
+      if (globalIdx >= 5 && globalIdx <= 10) stageLevel = 2;
+      else if (globalIdx >= 11 && globalIdx <= 16) stageLevel = 3;
+      else if (globalIdx >= 17 && globalIdx <= 21) stageLevel = 4;
+      else if (globalIdx >= 22 && globalIdx <= 24) stageLevel = 5;
+      else if (globalIdx >= 25 && globalIdx <= 26) stageLevel = 6;
+      else if (globalIdx >= 27) stageLevel = 7;
+
+      let caseStatus: 'active' | 'delayed' | 'completed' = 'active';
+      if (stageLevel === 7) caseStatus = 'completed';
+      else if (globalIdx % 3 === 1) caseStatus = 'delayed';
+
+      const priority: 'high' | 'medium' | 'low' = globalIdx % 4 === 0 ? 'high' : globalIdx % 4 === 1 ? 'medium' : 'low';
+
+      const monthsAgo = Math.max(1, 9 - stageLevel);
+      const startDate = new Date();
+      startDate.setMonth(startDate.getMonth() - monthsAgo);
+      const startDateStr = startDate.toISOString().split('T')[0];
+
+      const expDate = new Date();
+      expDate.setMonth(expDate.getMonth() + (12 - stageLevel * 1.5));
+      const expDateStr = expDate.toISOString().split('T')[0];
+
+      const geoBoundary = casePolygons[vIdx].polygon;
+
+      const caseTitle = `${b.name} — ${chain.village.name} Requisition Package`;
+      const caseDesc = `Statutory land acquisition under RFCTLARR Act 2013 for ${b.name}. Cadastral survey unit located in village ${chain.village.name} (LGD: ${chain.village.code}), sub-district ${chain.subDistrict.name} (LGD: ${chain.subDistrict.code}), district ${chain.district.name} (LGD: ${chain.district.code}), ${chain.state.name}. Total area under acquisition: ${areaHectares} Ha.`;
+
+      const { data: newCase, error: caseErr } = await supabase
+        .from('acquisition_cases')
+        .insert({
+          case_number: caseNumber,
+          project_id: projEntry.id,
+          workflow_id: workflowId,
+          title: caseTitle,
+          description: caseDesc,
+          state: chain.state.name,
+          district: chain.district.name,
+          tehsil: chain.subDistrict.name,
+          village: chain.village.name,
+          state_lgd_code: chain.state.code,
+          district_lgd_code: chain.district.code,
+          subdistrict_lgd_code: chain.subDistrict.code,
+          village_lgd_code: chain.village.code,
+          total_area_hectares: areaHectares,
+          estimated_compensation: compensationInr,
+          status: caseStatus,
+          priority: priority,
+          start_date: startDateStr,
+          expected_completion_date: expDateStr,
+          actual_completion_date: caseStatus === 'completed' ? new Date().toISOString().split('T')[0] : null,
+          assigned_officer_id: laoUser?.id || projectOfficerUser?.id,
+          geojson_boundary: geoBoundary,
+        })
+        .select('id, case_number')
+        .single();
+
+      if (caseErr) {
+        console.error(`Failed to create case ${caseNumber}:`, caseErr.message);
+        continue;
+      }
+
+      insertedCases.push({
+        id: newCase.id,
+        case_number: newCase.case_number,
+        stageLevel,
+        chain,
+      });
+      console.log(`✓ Case created: ${newCase.case_number} -> ${chain.village.name}, ${chain.district.name} (Stage ${stageLevel}/7, ${caseStatus})`);
+    }
   }
 
   // 7. Seed Workflow Stage Instances for each case

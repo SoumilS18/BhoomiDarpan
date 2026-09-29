@@ -21,6 +21,8 @@ import {
   detectSpatialAndCadastralRelationships,
   resolveSpatialConflict,
   simulateSpatialResolution,
+  generateCorridorGeoJSON,
+  computeCorridorAndCasesMiter,
 } from '../services/spatialIntelligenceService';
 import { getSpatialPolicySync } from '../services/policyEngine';
 
@@ -243,48 +245,7 @@ router.get('/gis/layers', requireAuth, handleLayers);
 
 export const inMemoryCorridors = new Map<string, any>();
 
-export function generateCorridorGeoJSON(
-  start: { latitude: number; longitude: number },
-  end: { latitude: number; longitude: number },
-  waypoints: Array<{ latitude: number; longitude: number }> = [],
-  rowWidthMeters = 60
-) {
-  const points = [start, ...waypoints, end];
-  const bufferDegrees = (rowWidthMeters / 2) / 111320;
-  
-  const leftPoints: number[][] = [];
-  const rightPoints: number[][] = [];
-  
-  for (let i = 0; i < points.length; i++) {
-    const p = points[i];
-    let dx = 0;
-    let dy = 0;
-    
-    if (i < points.length - 1) {
-      const next = points[i + 1];
-      dx = next.longitude - p.longitude;
-      dy = next.latitude - p.latitude;
-    } else if (i > 0) {
-      const prev = points[i - 1];
-      dx = p.longitude - prev.longitude;
-      dy = p.latitude - prev.latitude;
-    }
-    
-    const len = Math.sqrt(dx * dx + dy * dy) || 1;
-    const nx = -dy / len;
-    const ny = dx / len;
-    
-    leftPoints.push([Number((p.longitude + nx * bufferDegrees).toFixed(6)), Number((p.latitude + ny * bufferDegrees).toFixed(6))]);
-    rightPoints.unshift([Number((p.longitude - nx * bufferDegrees).toFixed(6)), Number((p.latitude - ny * bufferDegrees).toFixed(6))]);
-  }
-  
-  const polygonRing = [...leftPoints, ...rightPoints, leftPoints[0]];
-  
-  return {
-    type: 'Polygon',
-    coordinates: [polygonRing],
-  };
-}
+export { generateCorridorGeoJSON, computeCorridorAndCasesMiter };
 
 // ============================================================================
 // PROJECT CORRIDOR MANAGEMENT ENDPOINTS
@@ -329,11 +290,11 @@ router.get(['/cases/:id/corridor', '/gis/cases/:id/corridor'], requireAuth, asyn
       corridor_name: `${caseItem.title} - Alignment Package`,
       corridor_type: 'highway',
       total_length_km: Math.max(5, Math.round((caseItem.total_area_hectares || 10) * 1.5)),
-      right_of_way_width_meters: 60,
+      right_of_way_width_meters: 550,
       start_point: defaultStart,
       end_point: defaultEnd,
       intermediate_waypoints: [],
-      geojson_corridor: caseItem.geojson_boundary || generateCorridorGeoJSON(defaultStart, defaultEnd, [], 60),
+      geojson_corridor: caseItem.geojson_boundary || generateCorridorGeoJSON(defaultStart, defaultEnd, [], 550),
       status: 'active_alignment',
       updated_at: new Date().toISOString(),
     };
@@ -370,7 +331,7 @@ router.post(
           body.start_point,
           body.end_point,
           body.intermediate_waypoints || [],
-          body.right_of_way_width_meters || 60
+          body.right_of_way_width_meters || 550
         );
       }
 
