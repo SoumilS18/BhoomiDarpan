@@ -41,6 +41,7 @@ import {
   NoticeBox,
 } from '../../components/layout/public/PublicSections';
 import { PublicPageLayout } from '../../components/layout/public/PublicPageLayout';
+import { LandingShowcase } from '../../components/layout/public/LandingShowcase';
 import { Link, getRouteById } from '../../router';
 import { PUBLIC_CONFIG } from '../../lib/publicConfig';
 
@@ -134,20 +135,21 @@ export const LandingPage: React.FC = () => {
         primaryAction={
           <Link
             to={loginPath}
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-5 py-3 text-sm font-semibold text-gov-navy shadow-sm transition-colors hover:bg-slate-100"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-400 px-6 py-3.5 text-sm font-bold text-gov-navy shadow-lg transition-all hover:scale-105 hover:shadow-amber-500/20"
           >
-            Sign In
+            Sign In (Demo Roles)
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         }
         secondaryAction={
           <Link
             to={featuresPath}
-            className="inline-flex items-center justify-center rounded-md border border-white/25 bg-white/10 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/20"
+            className="inline-flex items-center justify-center rounded-xl border border-white/25 bg-white/10 px-6 py-3.5 text-sm font-semibold text-white transition-all hover:bg-white/20 hover:border-white/40"
           >
-            Explore capabilities
+            Explore Capabilities
           </Link>
         }
+        showcase={<LandingShowcase />}
       />
 
       {/* 2 — What BhoomiDarpan does */}

@@ -63,53 +63,63 @@ export const IconPlate: React.FC<{
 export const LandingHero: React.FC<{
   primaryAction?: React.ReactNode;
   secondaryAction?: React.ReactNode;
-}> = ({ primaryAction, secondaryAction }) => (
+  showcase?: React.ReactNode;
+  children?: React.ReactNode;
+}> = ({ primaryAction, secondaryAction, showcase, children }) => (
   <section className="relative overflow-hidden bg-gov-slate text-white">
     {/* Institutional accent bar */}
     <div className="h-1 bg-gov-saffron" aria-hidden="true" />
     <div
-      className="absolute inset-0 opacity-[0.18]"
+      className="absolute inset-0 opacity-[0.22]"
       aria-hidden="true"
       style={{
         backgroundImage:
-          'radial-gradient(circle at 15% 20%, #1e3a8a 0%, transparent 45%), radial-gradient(circle at 85% 70%, #2563eb 0%, transparent 45%)',
+          'radial-gradient(circle at 15% 20%, #1e3a8a 0%, transparent 50%), radial-gradient(circle at 85% 70%, #2563eb 0%, transparent 50%)',
       }}
     />
-    <PublicContainer className="relative py-16 sm:py-20 lg:py-28">
-      <div className="max-w-3xl">
-        <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-amber-300">
-          {PUBLIC_CONFIG.nativeName} · BhoomiDarpan
-        </p>
-        <h1 className="mt-5 text-3xl font-bold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
+    <PublicContainer className="relative pt-12 pb-14 sm:pt-16 sm:pb-20 lg:pt-20 lg:pb-24">
+      <div className="mx-auto max-w-4xl text-center">
+        <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/10 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-amber-300 shadow-sm backdrop-blur-md">
+          <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+          <span>{PUBLIC_CONFIG.nativeName} · PM GatiShakti Sovereign Platform</span>
+        </div>
+        <h1 className="mt-5 text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl lg:text-5xl text-white">
           {PUBLIC_CONFIG.descriptor}
         </h1>
-        <p className="mt-5 text-base leading-relaxed text-slate-300 sm:text-lg">
-          One operational record for every acquisition case — statutory workflow, document evidence,
-          spatial context and predictive intelligence, held together with a complete audit trail.
+        <p className="mx-auto mt-4 max-w-3xl text-base leading-relaxed text-slate-300 sm:text-lg">
+          One unified operational platform for national land acquisition — statutory RFCTLARR Act 2013 workflow, 
+          multi-modal corridor Right-of-Way GIS cadastre, document intelligence and sovereign audit trails.
         </p>
 
-        <div className="mt-7 flex flex-wrap items-center gap-2" aria-label="Operating model">
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2" aria-label="Operating model">
           {PUBLIC_CONFIG.operatingModel.map((step, index) => (
             <React.Fragment key={step}>
               {index > 0 && (
                 <ArrowRight className="hidden h-4 w-4 text-amber-400 sm:block" aria-hidden="true" />
               )}
-              <span className="rounded-md border border-white/15 bg-white/10 px-3 py-1.5 text-sm font-semibold text-white">
+              <span className="rounded-md border border-white/15 bg-white/10 px-3 py-1.5 text-xs sm:text-sm font-semibold text-white shadow-2xs">
                 {step}
               </span>
             </React.Fragment>
           ))}
         </div>
 
-        <div className="mt-8 flex flex-wrap gap-3">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           {primaryAction}
           {secondaryAction}
         </div>
-
-        <p className="mt-6 max-w-2xl text-xs leading-relaxed text-slate-400">
-          {PUBLIC_CONFIG.deploymentStatement}
-        </p>
       </div>
+
+      {/* Featured Showcase: High-Definition Flyover Video & Interactive 3D Cadastral Digital Twin */}
+      {(showcase || children) && (
+        <div className="mt-10">
+          {showcase || children}
+        </div>
+      )}
+
+      <p className="mx-auto mt-8 max-w-3xl text-center text-xs leading-relaxed text-slate-400">
+        {PUBLIC_CONFIG.deploymentStatement}
+      </p>
     </PublicContainer>
   </section>
 );
