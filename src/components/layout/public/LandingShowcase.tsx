@@ -371,10 +371,10 @@ export const LandingShowcase: React.FC<LandingShowcaseProps> = () => {
   }, [activeTab]);
 
   return (
-    <div className="relative mx-auto mt-8 w-full max-w-6xl">
+    <div className="relative w-full">
       {/* Ambient background glow */}
       <div
-        className="pointer-events-none absolute -inset-3 rounded-3xl opacity-35 blur-2xl"
+        className="pointer-events-none absolute -inset-2 rounded-2xl opacity-30 blur-xl"
         style={{
           background:
             'radial-gradient(ellipse at center, rgba(37, 99, 235, 0.45) 0%, rgba(245, 158, 11, 0.2) 50%, transparent 80%)',
@@ -383,69 +383,66 @@ export const LandingShowcase: React.FC<LandingShowcaseProps> = () => {
       />
 
       {/* Main Showcase Studio Window Container */}
-      <div className="relative overflow-hidden rounded-2xl border border-white/20 bg-slate-950/90 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] backdrop-blur-xl">
+      <div className="relative overflow-hidden rounded-2xl border border-white/20 bg-slate-950/90 shadow-[0_20px_50px_-10px_rgba(0,0,0,0.7)] backdrop-blur-xl">
         {/* Top Control & Navigation Ribbon */}
-        <div className="flex flex-wrap items-center justify-between border-b border-white/10 bg-slate-900/80 px-4 py-3 sm:px-6">
+        <div className="flex flex-wrap items-center justify-between border-b border-white/10 bg-slate-900/80 px-3.5 py-2.5 sm:px-4">
           {/* Brand & Live Status */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <div className="flex items-center gap-1.5" aria-hidden="true">
-              <div className="h-3 w-3 rounded-full bg-rose-500/80 shadow-xs" />
-              <div className="h-3 w-3 rounded-full bg-amber-500/80 shadow-xs" />
-              <div className="h-3 w-3 rounded-full bg-emerald-500/80 shadow-xs" />
+              <div className="h-2.5 w-2.5 rounded-full bg-rose-500/80 shadow-xs" />
+              <div className="h-2.5 w-2.5 rounded-full bg-amber-500/80 shadow-xs" />
+              <div className="h-2.5 w-2.5 rounded-full bg-emerald-500/80 shadow-xs" />
             </div>
 
-            <div className="h-4 w-px bg-white/20 mx-1 hidden sm:block" />
+            <div className="h-3.5 w-px bg-white/20 mx-0.5 hidden sm:block" />
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <span className="flex h-2 w-2 relative">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+              <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-slate-200">
                 Digital Twin Studio
-              </span>
-              <span className="hidden rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[10px] font-medium text-amber-300 sm:inline-block">
-                PM GatiShakti GIS 2026
               </span>
             </div>
           </div>
 
           {/* Mode Switcher Tabs */}
-          <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-slate-950/70 p-1">
+          <div className="flex items-center gap-1 rounded-lg border border-white/10 bg-slate-950/70 p-0.5">
             <button
               onClick={() => setActiveTab('video')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] sm:text-xs font-semibold transition-all ${
                 activeTab === 'video'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-xs'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Play className="h-3.5 w-3.5" />
-              <span>Platform Flyover Reel</span>
+              <Play className="h-3 w-3" />
+              <span>Flyover Reel</span>
             </button>
 
             <button
               onClick={() => setActiveTab('3d')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] sm:text-xs font-semibold transition-all ${
                 activeTab === '3d'
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-xs'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Globe2 className="h-3.5 w-3.5" />
-              <span>Interactive 3D Cadastre</span>
+              <Globe2 className="h-3 w-3" />
+              <span>3D Cadastre</span>
             </button>
 
             <button
               onClick={() => setActiveTab('corridors')}
-              className={`hidden sm:flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] sm:text-xs font-semibold transition-all ${
                 activeTab === 'corridors'
-                  ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-sm'
+                  ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-xs'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Layers className="h-3.5 w-3.5" />
-              <span>Project Corridors</span>
+              <Layers className="h-3 w-3" />
+              <span>Corridors</span>
             </button>
           </div>
         </div>

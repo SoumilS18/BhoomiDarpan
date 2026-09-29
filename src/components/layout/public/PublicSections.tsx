@@ -70,56 +70,65 @@ export const LandingHero: React.FC<{
     {/* Institutional accent bar */}
     <div className="h-1 bg-gov-saffron" aria-hidden="true" />
     <div
-      className="absolute inset-0 opacity-[0.22]"
+      className="absolute inset-0 opacity-[0.20]"
       aria-hidden="true"
       style={{
         backgroundImage:
-          'radial-gradient(circle at 15% 20%, #1e3a8a 0%, transparent 50%), radial-gradient(circle at 85% 70%, #2563eb 0%, transparent 50%)',
+          'radial-gradient(circle at 12% 25%, #1e3a8a 0%, transparent 50%), radial-gradient(circle at 88% 65%, #2563eb 0%, transparent 50%)',
       }}
     />
-    <PublicContainer className="relative pt-12 pb-14 sm:pt-16 sm:pb-20 lg:pt-20 lg:pb-24">
-      <div className="mx-auto max-w-4xl text-center">
-        <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/10 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-amber-300 shadow-sm backdrop-blur-md">
-          <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-          <span>{PUBLIC_CONFIG.nativeName} · PM GatiShakti Sovereign Platform</span>
-        </div>
-        <h1 className="mt-5 text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl lg:text-5xl text-white">
-          {PUBLIC_CONFIG.descriptor}
-        </h1>
-        <p className="mx-auto mt-4 max-w-3xl text-base leading-relaxed text-slate-300 sm:text-lg">
-          One unified operational platform for national land acquisition — statutory RFCTLARR Act 2013 workflow, 
-          multi-modal corridor Right-of-Way GIS cadastre, document intelligence and sovereign audit trails.
-        </p>
-
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-2" aria-label="Operating model">
-          {PUBLIC_CONFIG.operatingModel.map((step, index) => (
-            <React.Fragment key={step}>
-              {index > 0 && (
-                <ArrowRight className="hidden h-4 w-4 text-amber-400 sm:block" aria-hidden="true" />
-              )}
-              <span className="rounded-md border border-white/15 bg-white/10 px-3 py-1.5 text-xs sm:text-sm font-semibold text-white shadow-2xs">
-                {step}
-              </span>
-            </React.Fragment>
-          ))}
-        </div>
-
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          {primaryAction}
-          {secondaryAction}
-        </div>
-      </div>
-
-      {/* Featured Showcase: High-Definition Flyover Video & Interactive 3D Cadastral Digital Twin */}
-      {(showcase || children) && (
-        <div className="mt-10">
+    <PublicContainer className="relative py-6 sm:py-8 lg:py-10">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
+        {/* Left Side: Video / 3D Digital Twin Showcase attraction */}
+        <div className="lg:col-span-7 xl:col-span-7 order-1 lg:order-1 w-full">
           {showcase || children}
         </div>
-      )}
 
-      <p className="mx-auto mt-8 max-w-3xl text-center text-xs leading-relaxed text-slate-400">
-        {PUBLIC_CONFIG.deploymentStatement}
-      </p>
+        {/* Right Side: Headline, Description, Workflow Steps, Actions */}
+        <div className="lg:col-span-5 xl:col-span-5 order-2 lg:order-2 text-left flex flex-col justify-center">
+          <h1 className="text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl lg:text-4xl text-white">
+            {PUBLIC_CONFIG.descriptor}
+          </h1>
+          <p className="mt-3 text-sm sm:text-base leading-relaxed text-slate-300">
+            One unified operational platform for national land acquisition — statutory RFCTLARR Act 2013 workflow, 
+            multi-modal corridor Right-of-Way GIS cadastre, document intelligence and sovereign audit trails.
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-1.5" aria-label="Operating model">
+            {PUBLIC_CONFIG.operatingModel.map((step, index) => (
+              <React.Fragment key={step}>
+                {index > 0 && (
+                  <ArrowRight className="h-3.5 w-3.5 text-amber-400" aria-hidden="true" />
+                )}
+                <span className="rounded-md border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-semibold text-white shadow-2xs">
+                  {step}
+                </span>
+              </React.Fragment>
+            ))}
+          </div>
+
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            {primaryAction}
+            {secondaryAction}
+          </div>
+
+          <div className="mt-5 pt-3.5 border-t border-white/10 flex flex-wrap items-center gap-3 text-xs text-slate-300">
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2 w-2 rounded-full bg-emerald-400" /> 100% RoW Corridor Enclosure
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2 w-2 rounded-full bg-blue-400" /> LGD Administrative Master
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="h-2 w-2 rounded-full bg-amber-400" /> RFCTLARR Act 2013
+            </span>
+          </div>
+
+          <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
+            {PUBLIC_CONFIG.deploymentStatement}
+          </p>
+        </div>
+      </div>
     </PublicContainer>
   </section>
 );
