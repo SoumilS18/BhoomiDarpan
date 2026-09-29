@@ -68,7 +68,7 @@ export const AttentionQueue: React.FC<AttentionQueueProps> = ({ queue, onSelectC
     if (item.unverified_docs_count > 0) {
       return {
         roleKey: 'revenue_inspector' as UserRole,
-        actionLabel: 'Verify Docs',
+        actionLabel: 'Verify',
         tab: 'documents',
         issue: `${item.unverified_docs_count} Unverified Statutory Document${item.unverified_docs_count > 1 ? 's' : ''}`,
       };
@@ -76,7 +76,7 @@ export const AttentionQueue: React.FC<AttentionQueueProps> = ({ queue, onSelectC
     if (item.disputed_parcels_count > 0) {
       return {
         roleKey: 'lao' as UserRole,
-        actionLabel: 'Review Dispute',
+        actionLabel: 'Review',
         tab: 'disputes',
         issue: `${item.disputed_parcels_count} Active Parcel Dispute${item.disputed_parcels_count > 1 ? 's' : ''}`,
       };
@@ -84,14 +84,14 @@ export const AttentionQueue: React.FC<AttentionQueueProps> = ({ queue, onSelectC
     if (item.has_active_bottleneck) {
       return {
         roleKey: 'project_officer' as UserRole,
-        actionLabel: 'De-bottleneck',
+        actionLabel: 'Resolve',
         tab: 'intelligence',
         issue: 'Active Stage Bottleneck',
       };
     }
     return {
       roleKey: 'approver' as UserRole,
-      actionLabel: 'Inspect Workflow',
+      actionLabel: 'Inspect',
       tab: 'workflow',
       issue: 'SLA Milestone Trajectory',
     };
@@ -171,16 +171,16 @@ export const AttentionQueue: React.FC<AttentionQueueProps> = ({ queue, onSelectC
       </div>
 
       {/* Queue Items Table */}
-      <div className="overflow-x-auto rounded-lg border border-slate-200">
+      <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden rounded-lg border border-slate-200">
         <table className="w-full text-left text-[11px] border-collapse">
           <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
             <tr>
               <th className="py-2.5 px-3">Case &amp; Corridor</th>
-              <th className="py-2.5 px-3">Issue &amp; Severity</th>
-              <th className="py-2.5 px-3">Why Attention Required</th>
-              <th className="py-2.5 px-3">Responsible Role</th>
-              <th className="py-2.5 px-3 text-center">Delay / Age</th>
-              <th className="py-2.5 px-3 text-right">Recommended Action</th>
+              <th className="py-2.5 px-2.5">Issue &amp; Severity</th>
+              <th className="py-2.5 px-2.5">Why Attention Required</th>
+              <th className="py-2.5 px-2.5">Responsible Role</th>
+              <th className="py-2.5 px-2 text-center">Delay / Age</th>
+              <th className="py-2.5 px-2.5 text-right">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -191,25 +191,25 @@ export const AttentionQueue: React.FC<AttentionQueueProps> = ({ queue, onSelectC
               return (
                 <tr key={item.case_id} className="hover:bg-slate-50/80 transition-colors group">
                   {/* Case Identifier */}
-                  <td className="py-3 px-3">
+                  <td className="py-2.5 px-3">
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-[10px] font-bold text-gov-navy bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
+                        <span className="font-mono text-[10px] font-bold text-gov-navy bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 shrink-0">
                           {item.case_number}
                         </span>
-                        <strong className="text-gov-slate font-semibold text-xs group-hover:text-gov-navy transition-colors">
+                        <strong className="text-gov-slate font-semibold text-xs group-hover:text-gov-navy transition-colors line-clamp-1 max-w-[200px] xl:max-w-[280px]">
                           {item.title}
                         </strong>
                       </div>
-                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
-                        {item.project_name && <span className="text-slate-500 font-medium">{item.project_name} •</span>}
-                        <span>{item.village}, {item.district}, {item.state}</span>
+                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400 line-clamp-1 max-w-[200px] xl:max-w-[280px]">
+                        {item.project_name && <span className="text-slate-500 font-medium truncate">{item.project_name} •</span>}
+                        <span className="truncate">{item.village}, {item.district}, {item.state}</span>
                       </div>
                     </div>
                   </td>
 
                   {/* Issue & Severity */}
-                  <td className="py-3 px-3 whitespace-nowrap">
+                  <td className="py-2.5 px-2.5 whitespace-nowrap">
                     <div className="space-y-1">
                       <div className="font-semibold text-gov-slate text-[11px]">
                         {recommendation.issue}
@@ -224,12 +224,12 @@ export const AttentionQueue: React.FC<AttentionQueueProps> = ({ queue, onSelectC
                   </td>
 
                   {/* Why Attention Required */}
-                  <td className="py-3 px-3 max-w-sm">
-                    <p className="text-slate-700 leading-relaxed line-clamp-2">
+                  <td className="py-2.5 px-2.5 max-w-[210px]">
+                    <p className="text-slate-700 leading-snug line-clamp-1 text-[11px]">
                       {item.primary_evidence}
                     </p>
 
-                    <div className="flex flex-wrap gap-1 mt-1 text-[10px]">
+                    <div className="flex flex-wrap gap-1 mt-1 text-[9px]">
                       {item.has_active_bottleneck && (
                         <span className="inline-flex items-center gap-0.5 bg-orange-50 text-orange-700 border border-orange-200 px-1.5 py-0.2 rounded font-medium">
                           <GitPullRequest className="h-2.5 w-2.5" /> Stage Overdue
@@ -249,21 +249,21 @@ export const AttentionQueue: React.FC<AttentionQueueProps> = ({ queue, onSelectC
                   </td>
 
                   {/* Responsible Role */}
-                  <td className="py-3 px-3 whitespace-nowrap">
+                  <td className="py-2.5 px-2.5 whitespace-nowrap">
                     <div className="flex items-center gap-1 text-[11px] font-medium text-slate-700">
                       <UserCheck className="h-3 w-3 text-slate-400 shrink-0" />
                       <span>{ROLE_LABELS[recommendation.roleKey]}</span>
                     </div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">
+                    <div className="text-[10px] text-slate-400 mt-0.5 max-w-[140px] truncate">
                       Stage: {item.current_stage_title}
                     </div>
                   </td>
 
                   {/* Delay / Age */}
-                  <td className="py-3 px-3 text-center whitespace-nowrap">
+                  <td className="py-2.5 px-2 text-center whitespace-nowrap">
                     <div>
                       {item.projected_delay_days > 0 ? (
-                        <span className="font-mono font-bold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded text-[11px]">
+                        <span className="font-mono font-bold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded text-[10px]">
                           +{item.projected_delay_days}d SLA
                         </span>
                       ) : (
@@ -279,16 +279,16 @@ export const AttentionQueue: React.FC<AttentionQueueProps> = ({ queue, onSelectC
                   </td>
 
                   {/* Recommended Action / Direct jump */}
-                  <td className="py-3 px-3 text-right whitespace-nowrap">
+                  <td className="py-2.5 px-2.5 text-right whitespace-nowrap">
                     <button
                       type="button"
                       onClick={() => onSelectCase(item.case_id, recommendation.tab)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-gov-navy hover:bg-gov-blue rounded-md shadow-xs transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-white bg-gov-navy hover:bg-gov-blue rounded-md shadow-xs transition-colors cursor-pointer shrink-0"
                       title={`Jump to ${recommendation.tab} tab`}
                     >
-                      <Zap className="h-3 w-3 text-amber-300" />
+                      <Zap className="h-2.5 w-2.5 text-amber-300 shrink-0" />
                       <span>{recommendation.actionLabel}</span>
-                      <ArrowRight className="h-3 w-3" />
+                      <ArrowRight className="h-2.5 w-2.5 shrink-0 opacity-80" />
                     </button>
                   </td>
                 </tr>
