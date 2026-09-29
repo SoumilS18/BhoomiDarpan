@@ -15,6 +15,7 @@
     "test:bhuvan-live": "bun run scripts/verifyBhuvanLive.ts",
     "geography:build-engine": "bun run scripts/buildVillageEngine.ts",
     "seed": "bun run scripts/seed.ts",
+    "seed:portfolio": "bun run scripts/seedExpandedPortfolio.ts",
     "demo:accounts": "bun run scripts/provision-demo-accounts.ts",
     "migrate": "bun run scripts/migrate.ts",
     "migrate:verify": "bun run scripts/migrate.ts --verify"
